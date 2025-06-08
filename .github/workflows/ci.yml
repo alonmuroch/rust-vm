@@ -7,35 +7,35 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  check:
+    name: Check, Lint, Test, Audit
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Set up Rust
-      uses: actions/setup-rust@v1
-      with:
-        rust-version: stable
+      - name: 🦀 Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: clippy, rustfmt
 
-    - name: Install dependencies
-      run: rustup component add clippy rustfmt
+      - name: 🎯 Check formatting
+        run: cargo fmt --all -- --check
 
-    - name: Check formatting
-      run: cargo fmt --all -- --check
+      - name: 🔍 Run Clippy (linter)
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
-    - name: Run Clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: 🧪 Run cargo check
+        run: cargo check --all --all-targets
 
-    - name: Check compilation
-      run: cargo check --all
+      - name: ✅ Run tests
+        run: cargo test --all
 
-    - name: Run tests
-      run: cargo test --all
+      - name: 🔐 Install cargo-audit
+        run: cargo install cargo-audit
 
-    - name: Install cargo-audit
-      run: cargo install cargo-audit
-
-    - name: Run security audit
-      run: cargo audit
+      - name: 🔎 Run security audit
+        run: cargo audit
