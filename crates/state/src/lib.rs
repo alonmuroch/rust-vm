@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+#[derive(Default)]
 pub struct State {
     pub storage: HashMap<String, u64>,
 }
