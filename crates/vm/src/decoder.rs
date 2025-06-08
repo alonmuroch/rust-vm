@@ -83,7 +83,6 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 },
                 _ => None,
             }
-
         },
         Opcode::Load => {
             let imm = (word as i32) >> 20;
@@ -136,10 +135,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
         },
         Opcode::Jal => {
             let imm = extract_jal_offset(word);
-            Some(Instruction::Jal {
-                rd,
-                offset: imm,
-            })
+            Some(Instruction::Jal { rd, offset: imm })
         },
         Opcode::Jalr => {
             let imm = (word as i32) >> 20;
@@ -163,7 +159,6 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
         Opcode::System => Some(Instruction::Ecall),
     }
 }
-
 /// Decode a 16-bit RISC-V compressed instruction into a full Instruction.
 ///
 /// This function currently supports a minimal set:
@@ -221,31 +216,26 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             Some(Instruction::Jal { rd: 0, offset: imm }) // jump without link
         }
 
-        CompressedOpcode::RegOrJump => {
-            match (rs1, rs2) {
-                (0, 0) => Some(Instruction::Ebreak),
-                (1, 0) => Some(Instruction::Ret),
-                (_, 0) => Some(Instruction::Jr { rs1 }),
-                (_, _) => {
-                    if rs1 == rs2 {
-                        Some(Instruction::Mv { rd: rs1, rs2 })
-                    } else {
-                        Some(Instruction::Add { rd: rs1, rs1, rs2 })
-                    }
+        CompressedOpcode::RegOrJump => match (rs1, rs2) {
+            (0, 0) => Some(Instruction::Ebreak),
+            (1, 0) => Some(Instruction::Ret),
+            (_, 0) => Some(Instruction::Jr { rs1 }),
+            (_, _) => {
+                if rs1 == rs2 {
+                    Some(Instruction::Mv { rd: rs1, rs2 })
+                } else {
+                    Some(Instruction::Add { rd: rs1, rs1, rs2 })
                 }
             }
-        }
-
+        },
         CompressedOpcode::Slli => {
             let shamt = ((hword >> 2) & 0b11111) as i32;
             Some(Instruction::Addi { rd, rs1, imm: shamt }) // emulate as ADDI with left shift beforehand
         }
-
         CompressedOpcode::Beqz | CompressedOpcode::Bnez => {
             // You may decode it, but usually this is handled in control flow
             None
         }
-
         _ => {
             println!("Unimplemented instruction: {:?}", op);
             todo!("implement: {:?}", op);

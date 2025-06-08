@@ -196,6 +196,5 @@ impl CPU {
             _ => todo!("unhandled instruction"),
         }
         true
-
     }
 }
