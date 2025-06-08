@@ -12,38 +12,30 @@ struct TestCase<'a> {
 #[test]
 fn test_multiple_riscv_programs() {
     let test_cases = [
-        // TestCase {
-        //     name: "simple",
-        //     path: "tests/programs/bin/simple.bin",
-        //     expected_x10: 15,
-        //     input_regs: &[], // no inputs needed
-        // },
+        TestCase {
+            name: "simple",
+            path: "tests/programs/bin/simple.bin",
+            expected_x10: 15,
+            input_regs: &[], // no inputs needed
+        },
         TestCase {
             name: "simple flow control",
             path: "tests/programs/bin/simple_flow_control.bin",
             expected_x10: 1,
-            input_regs: &[
-                (Register::A0, 7), 
-                (Register::A1, 3), 
-            ],
+            input_regs: &[(Register::A0, 7), (Register::A1, 3)],
         },
         TestCase {
             name: "simple flow control #2",
             path: "tests/programs/bin/simple_flow_control.bin",
             expected_x10: 2,
-            input_regs: &[
-                (Register::A0, 3), 
-                (Register::A1, 7), 
-            ],
+            input_regs: &[(Register::A0, 3), (Register::A1, 7)],
         },
     ];
 
     for case in test_cases {
         println!("--- Running program: {} ---", case.name);
 
-        let binary = fs::read(case.path)
-            .unwrap_or_else(|_| panic!("Failed to load {}", case.path));
-
+        let binary = fs::read(case.path).unwrap_or_else(|_| panic!("Failed to load {}", case.path));
         let mut cpu = CPU::new(binary);
         cpu.verbose = true;
 

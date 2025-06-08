@@ -1,5 +1,5 @@
-use crate::instruction::Instruction;
 use crate::decoder::{decode_full, decode_compressed};
+use crate::instruction::Instruction;
 use std::convert::TryInto;
 
 pub struct CPU {
@@ -36,7 +36,6 @@ impl CPU {
         }
     }
 
-
     pub fn next_instruction(&mut self) -> Option<(Instruction, u8)> {
         let pc = self.pc as usize;
         let bytes = &self.memory[pc..];
@@ -60,24 +59,44 @@ impl CPU {
 
     pub fn execute(&mut self, instr: Instruction) -> bool {
         match instr {
-            Instruction::Add { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2]),
-            Instruction::Sub { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1].wrapping_sub(self.regs[rs2]),
-            Instruction::Addi { rd, rs1, imm } => self.regs[rd] = self.regs[rs1].wrapping_add(imm as u32),
+            Instruction::Add { rd, rs1, rs2 } => {
+                self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2])
+            }
+            Instruction::Sub { rd, rs1, rs2 } => {
+                self.regs[rd] = self.regs[rs1].wrapping_sub(self.regs[rs2])
+            }
+            Instruction::Addi { rd, rs1, imm } => {
+                self.regs[rd] = self.regs[rs1].wrapping_add(imm as u32)
+            }
             Instruction::And { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] & self.regs[rs2],
             Instruction::Or { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] | self.regs[rs2],
             Instruction::Xor { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] ^ self.regs[rs2],
             Instruction::Andi { rd, rs1, imm } => self.regs[rd] = self.regs[rs1] & (imm as u32),
             Instruction::Ori { rd, rs1, imm } => self.regs[rd] = self.regs[rs1] | (imm as u32),
             Instruction::Xori { rd, rs1, imm } => self.regs[rd] = self.regs[rs1] ^ (imm as u32),
-            Instruction::Slt { rd, rs1, rs2 } => self.regs[rd] = (self.regs[rs1] as i32).lt(&(self.regs[rs2] as i32)) as u32,
-            Instruction::Sltu { rd, rs1, rs2 } => self.regs[rd] = (self.regs[rs1].lt(&self.regs[rs2])) as u32,
-            Instruction::Slti { rd, rs1, imm } => self.regs[rd] = (self.regs[rs1] as i32).lt(&imm) as u32,
-            Instruction::Sll { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] << (self.regs[rs2] & 0x1F),
-            Instruction::Srl { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] >> (self.regs[rs2] & 0x1F),
-            Instruction::Sra { rd, rs1, rs2 } => self.regs[rd] = ((self.regs[rs1] as i32) >> (self.regs[rs2] & 0x1F)) as u32,
+            Instruction::Slt { rd, rs1, rs2 } => {
+                self.regs[rd] = (self.regs[rs1] as i32).lt(&(self.regs[rs2] as i32)) as u32
+            }
+            Instruction::Sltu { rd, rs1, rs2 } => {
+                self.regs[rd] = (self.regs[rs1].lt(&self.regs[rs2])) as u32
+            }
+            Instruction::Slti { rd, rs1, imm } => {
+                self.regs[rd] = (self.regs[rs1] as i32).lt(&imm) as u32
+            }
+            Instruction::Sll { rd, rs1, rs2 } => {
+                self.regs[rd] = self.regs[rs1] << (self.regs[rs2] & 0x1F)
+            }
+            Instruction::Srl { rd, rs1, rs2 } => {
+                self.regs[rd] = self.regs[rs1] >> (self.regs[rs2] & 0x1F)
+            }
+            Instruction::Sra { rd, rs1, rs2 } => {
+                self.regs[rd] = ((self.regs[rs1] as i32) >> (self.regs[rs2] & 0x1F)) as u32
+            }
             Instruction::Slli { rd, rs1, shamt } => self.regs[rd] = self.regs[rs1] << shamt,
             Instruction::Srli { rd, rs1, shamt } => self.regs[rd] = self.regs[rs1] >> shamt,
-            Instruction::Srai { rd, rs1, shamt } => self.regs[rd] = ((self.regs[rs1] as i32) >> shamt) as u32,
+            Instruction::Srai { rd, rs1, shamt } => {
+                self.regs[rd] = ((self.regs[rs1] as i32) >> shamt) as u32
+            }
             Instruction::Lw { rd, rs1, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
                 self.regs[rd] = u32::from_le_bytes(self.memory[addr..addr + 4].try_into().unwrap());
@@ -121,14 +140,29 @@ impl CPU {
                 return true;
             }
             Instruction::Lui { rd, imm } => self.regs[rd] = (imm << 12) as u32,
-            Instruction::Auipc { rd, imm } => self.regs[rd] = self.pc.wrapping_add((imm << 12) as u32),
-            Instruction::Mul { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1].wrapping_mul(self.regs[rs2]),
-            Instruction::Mulh { rd, rs1, rs2 } => self.regs[rd] = (((self.regs[rs1] as i64) * (self.regs[rs2] as i64)) >> 32) as u32,
-            Instruction::Mulhu { rd, rs1, rs2 } => self.regs[rd] = (((self.regs[rs1] as u64) * (self.regs[rs2] as u64)) >> 32) as u32,
-            Instruction::Mulhsu { rd, rs1, rs2 } => self.regs[rd] = (((self.regs[rs1] as i64) * (self.regs[rs2] as u64 as i64)) >> 32) as u32,
-            Instruction::Div { rd, rs1, rs2 } => self.regs[rd] = (self.regs[rs1] as i32).wrapping_div(self.regs[rs2] as i32) as u32,
+            Instruction::Auipc { rd, imm } => {
+                self.regs[rd] = self.pc.wrapping_add((imm << 12) as u32)
+            }
+            Instruction::Mul { rd, rs1, rs2 } => {
+                self.regs[rd] = self.regs[rs1].wrapping_mul(self.regs[rs2])
+            }
+            Instruction::Mulh { rd, rs1, rs2 } => {
+                self.regs[rd] = (((self.regs[rs1] as i64) * (self.regs[rs2] as i64)) >> 32) as u32
+            }
+            Instruction::Mulhu { rd, rs1, rs2 } => {
+                self.regs[rd] = (((self.regs[rs1] as u64) * (self.regs[rs2] as u64)) >> 32) as u32
+            }
+            Instruction::Mulhsu { rd, rs1, rs2 } => {
+                self.regs[rd] =
+                    (((self.regs[rs1] as i64) * (self.regs[rs2] as u64 as i64)) >> 32) as u32
+            }
+            Instruction::Div { rd, rs1, rs2 } => {
+                self.regs[rd] = (self.regs[rs1] as i32).wrapping_div(self.regs[rs2] as i32) as u32
+            }
             Instruction::Divu { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] / self.regs[rs2],
-            Instruction::Rem { rd, rs1, rs2 } => self.regs[rd] = (self.regs[rs1] as i32).wrapping_rem(self.regs[rs2] as i32) as u32,
+            Instruction::Rem { rd, rs1, rs2 } => {
+                self.regs[rd] = (self.regs[rs1] as i32).wrapping_rem(self.regs[rs2] as i32) as u32
+            }
             Instruction::Remu { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] % self.regs[rs2],
             Instruction::Ecall => return false,
             Instruction::Ebreak => return false,
@@ -161,8 +195,7 @@ impl CPU {
             }
             _ => todo!("unhandled instruction"),
         }
-
         true
-    }               
 
+    }               
 }

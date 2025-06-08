@@ -1,5 +1,4 @@
 use vm::cpu::CPU; // assuming CPU is pub in src/cpu.rs
-// use vm::decoder::*; // if needed
 
 #[test]
 fn test_addi_program() {
