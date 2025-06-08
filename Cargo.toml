@@ -1,5 +1,6 @@
 [workspace]
 members = [
   "crates/vm",
-  "crates/state",
+  "crates/state", 
+  "crates/contract_std",
 ]

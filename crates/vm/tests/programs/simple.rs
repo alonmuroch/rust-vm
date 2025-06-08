@@ -8,8 +8,8 @@ fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }
 
-// Mark the symbol as externally visible and entry point
 #[no_mangle]
-pub extern "C" fn main() -> i32 {
-    5 + 10
+pub extern "C" fn _start() -> ! {
+    let _result = 5 + 10;
+    loop {}
 }

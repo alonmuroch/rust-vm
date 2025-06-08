@@ -4,7 +4,10 @@
 use core::panic::PanicInfo;
 
 #[no_mangle]
-pub extern "C" fn main(a: u32, b: u32) -> u32 {
+pub extern "C" fn _start() -> ! {
+    let a: u32 = 5;
+    let b: u32 = 3;
+
     let mut result = 0;
 
     if a > b {
@@ -13,7 +16,10 @@ pub extern "C" fn main(a: u32, b: u32) -> u32 {
         result = 2;
     }
 
-    result
+    // prevent optimization
+    unsafe { core::ptr::write_volatile(&mut result as *mut u32, result); }
+
+    loop {}
 }
 
 #[panic_handler]
