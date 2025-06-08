@@ -1,6 +1,4 @@
 pub mod cpu;
-pub mod memory;
-pub mod decode;
 
 use cpu::CPU;
 
