@@ -1,40 +1,12 @@
 use crate::cpu::CPU;
-use crate::decoder::decode;
 
 impl CPU {
     pub fn run_with_trace(&mut self, max_cycles: usize) -> String {
         println!("--- Begin execution trace ---");
 
-        for cycle in 0..max_cycles {
-            let pc = self.pc as usize;
-            let mem = &self.memory[pc..];
-
-            match decode(mem) {
-                Some((instruction, size)) => {
-                    let encoded = &mem[..size as usize];
-                    let hex = match size {
-                        2 => u16::from_le_bytes([encoded[0], encoded[1]]) as u32,
-                        4 => u32::from_le_bytes([encoded[0], encoded[1], encoded[2], encoded[3]]),
-                        _ => 0,
-                    };
-                    println!(
-                        "[Cycle {:03}] PC = 0x{:08x}, Instr = 0x{:0width$x} ({} bytes) => {:?}",
-                        cycle,
-                        self.pc,
-                        hex,
-                        size,
-                        instruction,
-                        width = (size * 2) as usize,
-                    );
-                }
-                None => {
-                    println!("[Cycle {:03}] PC = 0x{:08x}, Invalid instruction", cycle, self.pc);
-                    break;
-                }
-            }
-
+        for _ in 0..max_cycles {
             if !self.step() {
-                println!("[Cycle {:03}] Halted", cycle);
+                println!("Halted");
                 break;
             }
         }

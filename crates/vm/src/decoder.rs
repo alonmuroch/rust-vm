@@ -39,6 +39,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             (0x0, 0x20) => Some(Instruction::Sub { rd, rs1, rs2 }),
             (0x1, 0x00) => Some(Instruction::Sll { rd, rs1, rs2 }),
             (0x2, 0x00) => Some(Instruction::Slt { rd, rs1, rs2 }),
+            (0x3, 0x00) => Some(Instruction::Sltu { rd, rs1, rs2 }),
             (0x4, 0x00) => Some(Instruction::Xor { rd, rs1, rs2 }),
             (0x5, 0x00) => Some(Instruction::Srl { rd, rs1, rs2 }),
             (0x5, 0x20) => Some(Instruction::Sra { rd, rs1, rs2 }),

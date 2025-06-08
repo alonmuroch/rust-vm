@@ -6,6 +6,9 @@ pub struct CPU {
     pub pc: u32,
     pub regs: [u32; 32],
     pub memory: Vec<u8>,
+
+    // log
+    pub verbose: bool,
 }
 
 impl CPU {
@@ -14,12 +17,17 @@ impl CPU {
             pc: 0,
             regs: [0; 32],
             memory: code,
+            verbose: false,
         }
     }
 
     pub fn step(&mut self) -> bool {
         match self.next_instruction() {
             Some((instr, size)) => {
+                if self.verbose {
+                    println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
+                }
+
                 let result = self.execute(instr);
                 self.pc = self.pc.wrapping_add(size as u32);
                 result
@@ -62,6 +70,7 @@ impl CPU {
             Instruction::Ori { rd, rs1, imm } => self.regs[rd] = self.regs[rs1] | (imm as u32),
             Instruction::Xori { rd, rs1, imm } => self.regs[rd] = self.regs[rs1] ^ (imm as u32),
             Instruction::Slt { rd, rs1, rs2 } => self.regs[rd] = (self.regs[rs1] as i32).lt(&(self.regs[rs2] as i32)) as u32,
+            Instruction::Sltu { rd, rs1, rs2 } => self.regs[rd] = (self.regs[rs1].lt(&self.regs[rs2])) as u32,
             Instruction::Slti { rd, rs1, imm } => self.regs[rd] = (self.regs[rs1] as i32).lt(&imm) as u32,
             Instruction::Sll { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] << (self.regs[rs2] & 0x1F),
             Instruction::Srl { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] >> (self.regs[rs2] & 0x1F),
