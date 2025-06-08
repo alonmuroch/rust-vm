@@ -1,19 +1,7 @@
+pub mod isa;
+pub mod isa_compressed;
+pub mod instruction;
+pub mod decoder;
+pub mod vm;
 pub mod cpu;
-
-use cpu::CPU;
-
-pub struct VM {
-    cpu: CPU,
-}
-
-impl VM {
-    pub fn new(code: Vec<u8>) -> Self {
-        Self {
-            cpu: CPU::new(code),
-        }
-    }
-
-    pub fn run(&mut self) {
-        while self.cpu.step() {}
-    }
-}
+pub mod runner;
