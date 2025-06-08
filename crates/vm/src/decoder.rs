@@ -54,7 +54,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             (0x6, 0x01) => Some(Instruction::Rem { rd, rs1, rs2 }),
             (0x7, 0x01) => Some(Instruction::Remu { rd, rs1, rs2 }),
             _ => None,
-        }
+        },
         Opcode::OpImm => {
             let imm = (word as i32) >> 20;
             match funct3 {
@@ -83,7 +83,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 },
                 _ => None,
             }
-        }
+        },
         Opcode::Load => {
             let imm = (word as i32) >> 20;
             match funct3 {
@@ -94,7 +94,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 }),
                 _ => None,
             }
-        }
+        },
         Opcode::Store => {
             let imm = (((word >> 25) & 0x7f) << 5 | ((word >> 7) & 0x1f)) as i32;
             let imm = (imm << 20) >> 20;
@@ -106,7 +106,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 }),
                 _ => None,
             }
-        }
+        },
         Opcode::Branch => {
             let imm = extract_branch_offset(word);
             match funct3 {
@@ -132,11 +132,11 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 }),
                 _ => None,
             }
-        }
+        },
         Opcode::Jal => {
             let imm = extract_jal_offset(word);
             Some(Instruction::Jal { rd, offset: imm })
-        }
+        },
         Opcode::Jalr => {
             let imm = (word as i32) >> 20;
             Some(Instruction::Jalr {
@@ -144,18 +144,18 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 rs1,
                 offset: imm,
             })
-        }
+        },
         Opcode::Lui => {
             let imm = (word & 0xfffff000) as i32;
             Some(Instruction::Lui {
                 rd,
                 imm: imm as i32,
             })
-        }
+        },
         Opcode::Auipc => {
             let imm = (word & 0xfffff000) as i32;
             Some(Instruction::Auipc { rd, imm })
-        }
+        },
         Opcode::System => Some(Instruction::Ecall),
     }
 }
@@ -177,13 +177,13 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             let imm = (((hword >> 2) & 0b11111) | (((hword >> 12) & 0x1) << 5)) as i32;
             let imm = (imm << 26) >> 26; // sign-extend
             Some(Instruction::Addi { rd, rs1, imm })
-        }
+        },
 
         CompressedOpcode::Li => {
             let imm = (((hword >> 2) & 0b11111) | (((hword >> 12) & 0x1) << 5)) as i32;
             let imm = (imm << 26) >> 26;
             Some(Instruction::Addi { rd, rs1: 0, imm })
-        }
+        },
 
         CompressedOpcode::LuiOrAddi16sp => {
             if rd == 2 {
@@ -206,17 +206,17 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             } else {
                 None
             }
-        }
+        },
 
         CompressedOpcode::Jal => {
             let imm = decode_cj_imm(hword); // implement CJ immediate decoder
             Some(Instruction::Jal { rd: 1, offset: imm }) // rd = x1
-        }
+        },
 
         CompressedOpcode::J => {
             let imm = decode_cj_imm(hword);
             Some(Instruction::Jal { rd: 0, offset: imm }) // jump without link
-        }
+        },
 
         CompressedOpcode::RegOrJump => match (rs1, rs2) {
             (0, 0) => Some(Instruction::Ebreak),
@@ -229,7 +229,7 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
                     Some(Instruction::Add { rd: rs1, rs1, rs2 })
                 }
             }
-        }
+        },
         CompressedOpcode::Slli => {
             let shamt = ((hword >> 2) & 0b11111) as i32;
             Some(Instruction::Addi {
@@ -237,11 +237,11 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
                 rs1,
                 imm: shamt,
             }) // emulate as ADDI with left shift beforehand
-        }
+        },
         CompressedOpcode::Beqz | CompressedOpcode::Bnez => {
             // You may decode it, but usually this is handled in control flow
             None
-        }
+        },
         _ => {
             println!("Unimplemented instruction: {:?}", op);
             todo!("implement: {:?}", op);
