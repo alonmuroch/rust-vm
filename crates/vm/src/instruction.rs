@@ -5,7 +5,6 @@
 #[derive(Debug)]
 pub enum Instruction {
     // ===== RV32I =====
-
     /// Add: rd = rs1 + rs2
     Add { rd: usize, rs1: usize, rs2: usize },
     /// Subtract: rd = rs1 - rs2
@@ -76,7 +75,6 @@ pub enum Instruction {
     Ecall,
 
     // ===== RV32M =====
-
     /// Multiply: rd = rs1 * rs2
     Mul { rd: usize, rs1: usize, rs2: usize },
     /// Multiply high signed: rd = (rs1 * rs2)[63:32]
@@ -96,7 +94,6 @@ pub enum Instruction {
     Remu { rd: usize, rs1: usize, rs2: usize },
 
     // ===== RV32A (Atomics) =====
-
     /// Atomic swap (AMO): swap memory with register
     AmoswapW { rd: usize, rs1: usize, rs2: usize },
     /// Atomic add
@@ -117,7 +114,6 @@ pub enum Instruction {
     AmominuW { rd: usize, rs1: usize, rs2: usize },
 
     // ===== RV32C (Compressed Instructions) =====
-
     /// Jump to register (c.jr): pc = rs1
     Jr { rs1: usize },
 
@@ -148,129 +144,174 @@ impl Instruction {
         fn reg(r: usize) -> String {
             format!("x{}", r) // or use register aliases like a0, t1, etc. if desired
         }
-
         match self {
-            Instruction::Add { rd, rs1, rs2 } =>
-                format!("add  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Sub { rd, rs1, rs2 } =>
-                format!("sub  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Addi { rd, rs1, imm } =>
-                format!("addi {}, {}, {}", reg(*rd), reg(*rs1), imm),
+            Instruction::Add { rd, rs1, rs2 } => {
+                format!("add  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Sub { rd, rs1, rs2 } => {
+                format!("sub  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Addi { rd, rs1, imm } => {
+                format!("addi {}, {}, {}", reg(*rd), reg(*rs1), imm)
+            }
 
-            Instruction::And { rd, rs1, rs2 } =>
-                format!("and  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Or  { rd, rs1, rs2 } =>
-                format!("or   {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Xor { rd, rs1, rs2 } =>
-                format!("xor  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
+            Instruction::And { rd, rs1, rs2 } => {
+                format!("and  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Or { rd, rs1, rs2 } => {
+                format!("or   {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Xor { rd, rs1, rs2 } => {
+                format!("xor  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
 
-            Instruction::Andi { rd, rs1, imm } =>
-                format!("andi {}, {}, {}", reg(*rd), reg(*rs1), imm),
-            Instruction::Ori  { rd, rs1, imm } =>
-                format!("ori  {}, {}, {}", reg(*rd), reg(*rs1), imm),
-            Instruction::Xori { rd, rs1, imm } =>
-                format!("xori {}, {}, {}", reg(*rd), reg(*rs1), imm),
+            Instruction::Andi { rd, rs1, imm } => {
+                format!("andi {}, {}, {}", reg(*rd), reg(*rs1), imm)
+            }
+            Instruction::Ori { rd, rs1, imm } => {
+                format!("ori  {}, {}, {}", reg(*rd), reg(*rs1), imm)
+            }
+            Instruction::Xori { rd, rs1, imm } => {
+                format!("xori {}, {}, {}", reg(*rd), reg(*rs1), imm)
+            }
 
-            Instruction::Slt  { rd, rs1, rs2 } =>
-                format!("slt  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Sltu { rd, rs1, rs2 } =>
-                format!("sltu {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Slti { rd, rs1, imm } =>
-                format!("slti {}, {}, {}", reg(*rd), reg(*rs1), imm),
+            Instruction::Slt { rd, rs1, rs2 } => {
+                format!("slt  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Sltu { rd, rs1, rs2 } => {
+                format!("sltu {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Slti { rd, rs1, imm } => {
+                format!("slti {}, {}, {}", reg(*rd), reg(*rs1), imm)
+            }
 
-            Instruction::Sll  { rd, rs1, rs2 } =>
-                format!("sll  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Srl  { rd, rs1, rs2 } =>
-                format!("srl  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Sra  { rd, rs1, rs2 } =>
-                format!("sra  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Slli { rd, rs1, shamt } =>
-                format!("slli {}, {}, {}", reg(*rd), reg(*rs1), shamt),
-            Instruction::Srli { rd, rs1, shamt } =>
-                format!("srli {}, {}, {}", reg(*rd), reg(*rs1), shamt),
-            Instruction::Srai { rd, rs1, shamt } =>
-                format!("srai {}, {}, {}", reg(*rd), reg(*rs1), shamt),
+            Instruction::Sll { rd, rs1, rs2 } => {
+                format!("sll  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Srl { rd, rs1, rs2 } => {
+                format!("srl  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Sra { rd, rs1, rs2 } => {
+                format!("sra  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Slli { rd, rs1, shamt } => {
+                format!("slli {}, {}, {}", reg(*rd), reg(*rs1), shamt)
+            }
+            Instruction::Srli { rd, rs1, shamt } => {
+                format!("srli {}, {}, {}", reg(*rd), reg(*rs1), shamt)
+            }
+            Instruction::Srai { rd, rs1, shamt } => {
+                format!("srai {}, {}, {}", reg(*rd), reg(*rs1), shamt)
+            }
 
-            Instruction::Lw { rd, rs1, offset } =>
-                format!("lw   {}, {}({})", reg(*rd), offset, reg(*rs1)),
-            Instruction::Sw { rs1, rs2, offset } =>
-                format!("sw   {}, {}({})", reg(*rs2), offset, reg(*rs1)),
+            Instruction::Lw { rd, rs1, offset } => {
+                format!("lw   {}, {}({})", reg(*rd), offset, reg(*rs1))
+            }
+            Instruction::Sw { rs1, rs2, offset } => {
+                format!("sw   {}, {}({})", reg(*rs2), offset, reg(*rs1))
+            }
 
-            Instruction::Beq { rs1, rs2, offset } =>
-                format!("beq  {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset),
-            Instruction::Bne { rs1, rs2, offset } =>
-                format!("bne  {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset),
-            Instruction::Blt { rs1, rs2, offset } =>
-                format!("blt  {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset),
-            Instruction::Bge { rs1, rs2, offset } =>
-                format!("bge  {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset),
+            Instruction::Beq { rs1, rs2, offset } => {
+                format!("beq  {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset)
+            }
+            Instruction::Bne { rs1, rs2, offset } => {
+                format!("bne  {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset)
+            }
+            Instruction::Blt { rs1, rs2, offset } => {
+                format!("blt  {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset)
+            }
+            Instruction::Bge { rs1, rs2, offset } => {
+                format!("bge  {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset)
+            }
 
-            Instruction::Jal { rd, offset } =>
-                format!("jal  {}, pc+{}", reg(*rd), offset),
-            Instruction::Jalr { rd, rs1, offset } =>
-                format!("jalr {}, {}({})", reg(*rd), offset, reg(*rs1)),
+            Instruction::Jal { rd, offset } => {
+                format!("jal  {}, pc+{}", reg(*rd), offset)
+            }
+            Instruction::Jalr { rd, rs1, offset } => {
+                format!("jalr {}, {}({})", reg(*rd), offset, reg(*rs1))
+            }
 
-            Instruction::Lui { rd, imm } =>
-                format!("lui  {}, {}", reg(*rd), imm),
-            Instruction::Auipc { rd, imm } =>
-                format!("auipc {}, {}", reg(*rd), imm),
+            Instruction::Lui { rd, imm } => {
+                format!("lui  {}, {}", reg(*rd), imm)
+            }
+            Instruction::Auipc { rd, imm } => {
+                format!("auipc {}, {}", reg(*rd), imm)
+            }
 
-            Instruction::Ecall =>
-                "ecall".to_string(),
+            Instruction::Ecall => "ecall".to_string(),
 
-            Instruction::Mul { rd, rs1, rs2 } =>
-                format!("mul  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Mulh { rd, rs1, rs2 } =>
-                format!("mulh {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Mulhsu { rd, rs1, rs2 } =>
-                format!("mulhsu {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Mulhu { rd, rs1, rs2 } =>
-                format!("mulhu {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
+            Instruction::Mul { rd, rs1, rs2 } => {
+                format!("mul  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Mulh { rd, rs1, rs2 } => {
+                format!("mulh {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Mulhsu { rd, rs1, rs2 } => {
+                format!("mulhsu {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Mulhu { rd, rs1, rs2 } => {
+                format!("mulhu {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
 
-            Instruction::Div { rd, rs1, rs2 } =>
-                format!("div  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Divu { rd, rs1, rs2 } =>
-                format!("divu {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Rem { rd, rs1, rs2 } =>
-                format!("rem  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::Remu { rd, rs1, rs2 } =>
-                format!("remu {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
+            Instruction::Div { rd, rs1, rs2 } => {
+                format!("div  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Divu { rd, rs1, rs2 } => {
+                format!("divu {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Rem { rd, rs1, rs2 } => {
+                format!("rem  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::Remu { rd, rs1, rs2 } => {
+                format!("remu {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
 
-            Instruction::AmoswapW { rd, rs1, rs2 } =>
-                format!("amoswap.w {}, ({}) <- {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::AmoaddW { rd, rs1, rs2 } =>
-                format!("amoadd.w  {}, ({}) + {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::AmoandW { rd, rs1, rs2 } =>
-                format!("amoand.w  {}, ({}) & {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::AmoorW { rd, rs1, rs2 } =>
-                format!("amoor.w   {}, ({}) | {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::AmoxorW { rd, rs1, rs2 } =>
-                format!("amoxor.w  {}, ({}) ^ {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::AmomaxW { rd, rs1, rs2 } =>
-                format!("amomax.w  {}, ({}) max {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::AmominW { rd, rs1, rs2 } =>
-                format!("amomin.w  {}, ({}) min {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::AmomaxuW { rd, rs1, rs2 } =>
-                format!("amomaxu.w {}, ({}) maxu {}", reg(*rd), reg(*rs1), reg(*rs2)),
-            Instruction::AmominuW { rd, rs1, rs2 } =>
-                format!("amominu.w {}, ({}) minu {}", reg(*rd), reg(*rs1), reg(*rs2)),
+            Instruction::AmoswapW { rd, rs1, rs2 } => {
+                format!("amoswap.w {}, ({}) <- {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::AmoaddW { rd, rs1, rs2 } => {
+                format!("amoadd.w  {}, ({}) + {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::AmoandW { rd, rs1, rs2 } => {
+                format!("amoand.w  {}, ({}) & {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::AmoorW { rd, rs1, rs2 } => {
+                format!("amoor.w   {}, ({}) | {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::AmoxorW { rd, rs1, rs2 } => {
+                format!("amoxor.w  {}, ({}) ^ {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::AmomaxW { rd, rs1, rs2 } => {
+                format!("amomax.w  {}, ({}) max {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::AmominW { rd, rs1, rs2 } => {
+                format!("amomin.w  {}, ({}) min {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::AmomaxuW { rd, rs1, rs2 } => {
+                format!("amomaxu.w {}, ({}) maxu {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
+            Instruction::AmominuW { rd, rs1, rs2 } => {
+                format!("amominu.w {}, ({}) minu {}", reg(*rd), reg(*rs1), reg(*rs2))
+            }
 
-            Instruction::Jr { rs1 } =>
-                format!("jr   {}", reg(*rs1)),
-            Instruction::Ret =>
-                "ret".to_string(),
-            Instruction::Mv { rd, rs2 } =>
-                format!("mv   {}, {}", reg(*rd), reg(*rs2)),
-            Instruction::Addi16sp { imm } =>
-                format!("addi16sp sp, {}", imm),
-            Instruction::Nop =>
-                "nop".to_string(),
-            Instruction::Beqz { rs1, offset } =>
-                format!("beqz {}, pc+{}", reg(*rs1), offset),
-            Instruction::Bnez { rs1, offset } =>
-                format!("bnez {}, pc+{}", reg(*rs1), offset),
-            Instruction::Ebreak =>
-                "ebreak".to_string(),
+            Instruction::Jr { rs1 } => {
+                format!("jr   {}", reg(*rs1))
+            }
+            Instruction::Ret => "ret".to_string(),
+            Instruction::Mv { rd, rs2 } => {
+                format!("mv   {}, {}", reg(*rd), reg(*rs2))
+            }
+            Instruction::Addi16sp { imm } => {
+                format!("addi16sp sp, {}", imm)
+            }
+            Instruction::Nop => "nop".to_string(),
+            Instruction::Beqz { rs1, offset } => {
+                format!("beqz {}, pc+{}", reg(*rs1), offset)
+            }
+            Instruction::Bnez { rs1, offset } => {
+                format!("bnez {}, pc+{}", reg(*rs1), offset)
+            }
+            Instruction::Ebreak => "ebreak".to_string(),
         }
     }
 }

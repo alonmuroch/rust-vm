@@ -1,4 +1,4 @@
-use crate::decoder::{decode_full, decode_compressed};
+use crate::decoder::{decode_compressed, decode_full};
 use crate::instruction::Instruction;
 use std::convert::TryInto;
 
@@ -197,5 +197,5 @@ impl CPU {
         }
         true
 
-    }               
+    }
 }

@@ -63,18 +63,18 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 0x4 => Some(Instruction::Xori { rd, rs1, imm }),
                 0x6 => Some(Instruction::Ori { rd, rs1, imm }),
                 0x7 => Some(Instruction::Andi { rd, rs1, imm }),
-                0x1 => Some(Instruction::Slli { 
+                0x1 => Some(Instruction::Slli {
                     rd,
                     rs1,
                     shamt: (imm & 0x1f) as u8,
                 }),
                 0x5 => match funct7 {
-                    0x00 => Some(Instruction::Srli { 
+                    0x00 => Some(Instruction::Srli {
                         rd,
                         rs1,
                         shamt: (imm & 0x1f) as u8,
                     }),
-                    0x20 => Some(Instruction::Srai { 
+                    0x20 => Some(Instruction::Srai {
                         rd,
                         rs1,
                         shamt: (imm & 0x1f) as u8,
@@ -88,10 +88,10 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
         Opcode::Load => {
             let imm = (word as i32) >> 20;
             match funct3 {
-                0x2 => Some(Instruction::Lw { 
-                    rd, 
-                    rs1, 
-                    offset: imm, 
+                0x2 => Some(Instruction::Lw {
+                    rd,
+                    rs1,
+                    offset: imm,
                 }),
                 _ => None,
             }
@@ -100,10 +100,10 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             let imm = (((word >> 25) & 0x7f) << 5 | ((word >> 7) & 0x1f)) as i32;
             let imm = (imm << 20) >> 20;
             match funct3 {
-                0x2 => Some(Instruction::Sw { 
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
+                0x2 => Some(Instruction::Sw {
+                    rs1,
+                    rs2,
+                    offset: imm,
                 }),
                 _ => None,
             }
@@ -111,49 +111,49 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
         Opcode::Branch => {
             let imm = extract_branch_offset(word);
             match funct3 {
-                0x0 => Some(Instruction::Beq { 
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
+                0x0 => Some(Instruction::Beq {
+                    rs1,
+                    rs2,
+                    offset: imm,
                 }),
-                0x1 => Some(Instruction::Bne { 
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
+                0x1 => Some(Instruction::Bne {
+                    rs1,
+                    rs2,
+                    offset: imm,
                 }),
-                0x4 => Some(Instruction::Blt { 
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
+                0x4 => Some(Instruction::Blt {
+                    rs1,
+                    rs2,
+                    offset: imm,
                 }),
-                0x5 => Some(Instruction::Bge { 
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
+                0x5 => Some(Instruction::Bge {
+                    rs1,
+                    rs2,
+                    offset: imm,
                 }),
                 _ => None,
             }
         },
         Opcode::Jal => {
             let imm = extract_jal_offset(word);
-            Some(Instruction::Jal { 
-                rd, 
-                offset: imm, 
+            Some(Instruction::Jal {
+                rd,
+                offset: imm,
             })
         },
         Opcode::Jalr => {
             let imm = (word as i32) >> 20;
-            Some(Instruction::Jalr { 
-                rd, 
-                rs1, 
-                offset: imm, 
+            Some(Instruction::Jalr {
+                rd,
+                rs1,
+                offset: imm,
             })
         },
         Opcode::Lui => {
             let imm = (word & 0xfffff000) as i32;
-            Some(Instruction::Lui { 
+            Some(Instruction::Lui {
                 rd,
-                imm: imm as i32, 
+                imm: imm as i32,
             })
         },
         Opcode::Auipc => {
