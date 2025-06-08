@@ -9,14 +9,6 @@ impl CPU {
             let pc = self.pc as usize;
             let mem = &self.memory[pc..];
 
-            println!(
-                "mem[0] = 0x{:02x}, mem[1] = 0x{:02x}, hword = 0x{:04x}, hword_reverse = 0x{:04x}",
-                mem[0],
-                mem[1],
-                u16::from_le_bytes([mem[0], mem[1]]),
-                u16::from_le_bytes([mem[1], mem[0]])
-            );
-
             match decode(mem) {
                 Some((instruction, size)) => {
                     let encoded = &mem[..size as usize];

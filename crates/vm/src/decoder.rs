@@ -11,7 +11,6 @@ pub fn decode(bytes: &[u8]) -> Option<(Instruction, u8)> {
         return None;
     }
 
-    println!("bytes[0] = 0x{:02x}, bytes[1] = 0x{:02x}", bytes[0], bytes[1]);
     let hword = u16::from_le_bytes([bytes[0], bytes[1]]);
     let is_compressed = (hword & 0b11) != 0b11;
 
