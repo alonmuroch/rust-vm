@@ -1,6 +1,7 @@
+use std::convert::TryInto;
+
 use crate::decoder::{decode_compressed, decode_full};
 use crate::instruction::Instruction;
-use std::convert::TryInto;
 
 pub struct CPU {
     pub pc: u32,
