@@ -97,13 +97,21 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             }
         },
         Opcode::Store => {
-            let imm = (((word >> 25) & 0x7f) << 5 | ((word >> 7) & 0x1f)) as i32;
-            let imm = (imm << 20) >> 20;
+            // Extract 12-bit signed immediate for S-type (e.g., sw)
+            let imm11_5 = ((word >> 25) & 0x7f) << 5;
+            let imm4_0 = (word >> 7) & 0x1f;
+            let imm = ((imm11_5 | imm4_0) as i32) << 20 >> 20; // sign-extend 12-bit
+
             match funct3 {
+                0x0 => Some(Instruction::Sb { 
+                    rs1, 
+                    rs2, 
+                    offset: imm,
+                }),
                 0x2 => Some(Instruction::Sw { 
                     rs1, 
                     rs2, 
-                    offset: imm, 
+                    offset: imm,
                 }),
                 _ => None,
             }
@@ -130,6 +138,16 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                     rs1, 
                     rs2, 
                     offset: imm, 
+                }),
+                0x6 => Some(Instruction::Bltu {
+                    rs1,
+                    rs2,
+                    offset: imm,
+                }),
+                0x7 => Some(Instruction::Bgeu {
+                    rs1,
+                    rs2,
+                    offset: imm,
                 }),
                 _ => None,
             }
@@ -161,6 +179,10 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             Some(Instruction::Auipc { rd, imm })
         },
         Opcode::System => Some(Instruction::Ecall),
+        _ => {
+            println!("Unimplemented instruction: {:?}", opcode);
+            todo!("implement: {:?}", opcode);
+        }
     }
 }
 
@@ -211,6 +233,26 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             }
         }
 
+        CompressedOpcode::Addi4spn => {
+            let rd = 8 + ((hword >> 2) & 0b111) as usize;
+
+            if rd == 0 {
+                return None; // reserved
+            }
+
+            let imm =
+                ((hword >>  6) & 0b0001) << 2  |  // bit 2
+                ((hword >>  5) & 0b0001) << 3  |  // bit 3
+                ((hword >> 11) & 0b0001) << 4  |  // bit 4
+                ((hword >>  7) & 0b1111) << 6;    // bits 6–9
+
+            if imm == 0 {
+                return None; // nzuimm must be non-zero
+            }
+
+            Some(Instruction::Addi4spn { rd, imm: imm as u32 })
+        }
+
         CompressedOpcode::Jal => {
             let imm = decode_cj_imm(hword); // implement CJ immediate decoder
             Some(Instruction::Jal { rd: 1, offset: imm }) // rd = x1
@@ -246,8 +288,45 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             None
         }
 
+        CompressedOpcode::Sw => {
+            let rd_ = ((hword >> 2) & 0b111) + 8;   // rs2'
+            let rs1_ = ((hword >> 7) & 0b111) + 8;  // rs1'
+            let imm = ((hword >> 10) & 0b111) << 3 | ((hword >> 5) & 0b11) << 6;
+            let offset = (imm as i32); // no sign-extension needed
+            Some(Instruction::Sw {
+                rs1: rs1_ as usize,
+                rs2: rd_ as usize,
+                offset,
+            })
+        }
+
+        CompressedOpcode::Lw => {
+            let rd_ = ((hword >> 2) & 0b111) + 8;    // rd'
+            let rs1_ = ((hword >> 7) & 0b111) + 8;   // rs1'
+
+            // imm[5|4:3|2] → bits: [5] bit 5 = bit 5, [4:3] bits 11:10, [2] bit 6
+            let imm = ((hword >> 6) & 0b1) << 2      // imm[2]
+                    | ((hword >> 10) & 0b11) << 3    // imm[4:3]
+                    | ((hword >> 5) & 0b1) << 6;     // imm[5]
+
+            let offset = imm as i32;
+
+            Some(Instruction::Lw {
+                rd: rd_ as usize,
+                rs1: rs1_ as usize,
+                offset,
+            })
+        }
+
+
+        CompressedOpcode::Swsp => {
+            let rs2 = ((hword >> 2) & 0x1F) as usize;
+            let imm = (((hword >> 7) & 0x1F) << 2) | (((hword >> 9) & 0x3) << 6);
+            Some(Instruction::Sw { rs1: 2, rs2, offset: imm as i32 }) // rs1 = sp (x2)
+        }
+
         _ => {
-            println!("Unimplemented instruction: {:?}", op);
+            println!("Unimplemented compressed instruction: {:?}", op);
             todo!("implement: {:?}", op);
         }
     }

@@ -1,6 +1,6 @@
 use std::fs;
 use vm::vm::VM;
-use vm::registries::Register;
+use vm::registers::Register;
 
 use core::convert::TryInto;
 
@@ -63,8 +63,10 @@ fn test_entrypoint_function() {
         // 3. Execute program
         vm.run();
 
+        // vm.dump_memory(0, VM_MEMORY_SIZE);
+
         // 4. Read result struct from memory
-        let result = &vm.cpu.memory[result_ptr as usize..result_ptr as usize + 5];
+        let result = &vm.cpu.memory[result_ptr as usize..result_ptr as usize + 8];
         let error_code = u32::from_le_bytes(result[0..4].try_into().unwrap());
         let success = result[4] != 0;
 

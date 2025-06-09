@@ -27,12 +27,14 @@ impl CPU {
                 if self.verbose {
                     println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
                 }
-
                 let result = self.execute(instr);
                 self.pc = self.pc.wrapping_add(size as u32);
                 result
             }
-            None => false,
+            None => {
+                eprintln!("🚨 Unknown or invalid instruction at PC = 0x{:08x}", self.pc);
+                false
+            }
         }
     }
 
@@ -105,6 +107,17 @@ impl CPU {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
                 self.memory[addr..addr + 4].copy_from_slice(&self.regs[rs2].to_le_bytes());
             }
+            Instruction::Sw { rs1, rs2, offset } => {
+                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
+                self.memory[addr..addr + 4].copy_from_slice(&self.regs[rs2].to_le_bytes());
+            }
+            Instruction::Sb { rs1, rs2, offset } => {
+                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
+                if addr >= self.memory.len() {
+                    panic!("Sb out of bounds: addr = 0x{:08x}", addr);
+                }
+                self.memory[addr] = (self.regs[rs2] & 0xFF) as u8;
+            }
             Instruction::Beq { rs1, rs2, offset } => {
                 if self.regs[rs1] == self.regs[rs2] {
                     self.pc = self.pc.wrapping_add(offset as u32);
@@ -125,6 +138,19 @@ impl CPU {
             }
             Instruction::Bge { rs1, rs2, offset } => {
                 if (self.regs[rs1] as i32) >= (self.regs[rs2] as i32) {
+                    self.pc = self.pc.wrapping_add(offset as u32);
+                    return true;
+                }
+            }
+            Instruction::Bltu { rs1, rs2, offset } => {
+                if self.regs[rs1] < self.regs[rs2] {
+                    self.pc = self.pc.wrapping_add(offset as u32);
+                    return true;
+                }
+            }
+
+            Instruction::Bgeu { rs1, rs2, offset } => {
+                if self.regs[rs1] >= self.regs[rs2] {
                     self.pc = self.pc.wrapping_add(offset as u32);
                     return true;
                 }
@@ -175,11 +201,15 @@ impl CPU {
                 if target == 0 {
                     return false; // halt if ret target is 0
                 }
+    
                 self.pc = target;
                 return true;
             }
             Instruction::Mv { rd, rs2 } => self.regs[rd] = self.regs[rs2],
             Instruction::Addi16sp { imm } => self.regs[2] = self.regs[2].wrapping_add(imm as u32), // x2 is sp
+            Instruction::Addi4spn { rd, imm } => {
+                self.regs[rd] = self.regs[2].wrapping_add(imm);
+            }
             Instruction::Nop => {}
             Instruction::Beqz { rs1, offset } => {
                 if self.regs[rs1] == 0 {

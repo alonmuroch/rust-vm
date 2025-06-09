@@ -52,6 +52,8 @@ pub enum Instruction {
     Lw { rd: usize, rs1: usize, offset: i32 },
     /// Store word: *(rs1 + offset) = rs2
     Sw { rs1: usize, rs2: usize, offset: i32 },
+    /// store byte
+    Sb { rs1: usize, rs2: usize, offset: i32 },
 
     /// Branch if equal: if (rs1 == rs2) pc += offset
     Beq { rs1: usize, rs2: usize, offset: i32 },
@@ -61,6 +63,10 @@ pub enum Instruction {
     Blt { rs1: usize, rs2: usize, offset: i32 },
     /// Branch if greater or equal
     Bge { rs1: usize, rs2: usize, offset: i32 },
+    /// Branch if less than (unsigned)
+    Bltu { rs1: usize, rs2: usize, offset: i32 },
+    /// Branch if greater or equal (unsigned)
+    Bgeu { rs1: usize, rs2: usize, offset: i32 },
 
     /// Jump and link: rd = pc + 4; pc += offset
     Jal { rd: usize, offset: i32 },
@@ -130,6 +136,9 @@ pub enum Instruction {
     /// Add immediate to stack pointer (c.addi16sp)
     Addi16sp { imm: i32 },
 
+    /// Compressed add immediate to stack pointer + register
+    Addi4spn { rd: usize, imm: u32 },
+
     /// No operation (c.nop): addi x0, x0, 0
     Nop,
 
@@ -195,6 +204,8 @@ impl Instruction {
                 format!("lw   {}, {}({})", reg(*rd), offset, reg(*rs1)),
             Instruction::Sw { rs1, rs2, offset } =>
                 format!("sw   {}, {}({})", reg(*rs2), offset, reg(*rs1)),
+            Instruction::Sb { rs1, rs2, offset } =>
+                format!("sb   {}, {}({})", reg(*rs2), offset, reg(*rs1)),
 
             Instruction::Beq { rs1, rs2, offset } =>
                 format!("beq  {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset),
@@ -204,6 +215,10 @@ impl Instruction {
                 format!("blt  {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset),
             Instruction::Bge { rs1, rs2, offset } =>
                 format!("bge  {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset),
+            Instruction::Bltu { rs1, rs2, offset } =>
+                format!("bltu {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset),
+            Instruction::Bgeu { rs1, rs2, offset } =>
+                format!("bgeu {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset),
 
             Instruction::Jal { rd, offset } =>
                 format!("jal  {}, pc+{}", reg(*rd), offset),
@@ -263,6 +278,9 @@ impl Instruction {
                 format!("mv   {}, {}", reg(*rd), reg(*rs2)),
             Instruction::Addi16sp { imm } =>
                 format!("addi16sp sp, {}", imm),
+            Instruction::Addi4spn { rd, imm } =>
+                format!("c.addi4spn {}, {}", reg(*rd), imm),
+                
             Instruction::Nop =>
                 "nop".to_string(),
             Instruction::Beqz { rs1, offset } =>

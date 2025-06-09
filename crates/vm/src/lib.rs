@@ -5,4 +5,4 @@ pub mod decoder;
 pub mod vm;
 pub mod cpu;
 pub mod runner;
-pub mod registries;
+pub mod registers;

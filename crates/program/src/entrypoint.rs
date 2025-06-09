@@ -15,18 +15,33 @@ macro_rules! entrypoint {
                 $crate::pubkey::Pubkey(array)
             };
 
-            let input = {
-                assert!(input_len <= 1024);
-                core::slice::from_raw_parts(input_ptr, input_len)
-            };
+            if input_len < 16 {
+                let result = $crate::result::Result {
+                    success: true,
+                    error_code: 1, // or any value representing "input too short"
+                };
+                result.write_to_memory(result_ptr as *mut u8);
+            } else {
+                let input = {
+                    // assert!(input_len <= 1024);
+                    core::slice::from_raw_parts(input_ptr, input_len)
+                };
 
-            let result = $func(pubkey, input);
-            *result_ptr = result;
+                let result = $func(pubkey, input);
+                core::ptr::write(result_ptr, result);
+            }
+
+            // // 🛑 Explicitly halt to avoid fallthrough return (which compiles to `ret`)
+            unsafe { core::arch::asm!("ebreak") };
+            loop {}
         }
 
         #[panic_handler]
-        fn panic(_info: &core::panic::PanicInfo) -> ! {
+        fn panic(_info: &core::panic::PanicInfo) -> ! {    
+            // soft halt signal to host
+            unsafe { core::arch::asm!("ebreak") };
             loop {}
         }
+
     };
 }

@@ -1,39 +1,46 @@
 use crate::cpu::CPU;
-use crate::registries::Register;
+use crate::registers::Register;
 
 pub struct VM {
     pub cpu: CPU,
     pub next_free: u32, // Tracks next free byte in memory
 }
 
-impl VM {
-    pub const CODE_SIZE_LIMIT: usize = 0x800; // Max code section: 2 KB
+ pub const CODE_SIZE_LIMIT: usize = 0x800; // Max code section: 2 KB
+ pub const STACK_SIZE: usize = 0x200; // Max code section: 512 bytes
+ pub const STACK_OFFSET_FROM_TOP: usize = STACK_SIZE / 2;
 
+impl VM {
     pub fn new(memory_size: usize) -> Self {
         assert!(
-            memory_size >= Self::CODE_SIZE_LIMIT,
+            memory_size >= CODE_SIZE_LIMIT,
             "memory_size must be at least CODE_LIMIT ({} bytes)",
-            Self::CODE_SIZE_LIMIT
+            CODE_SIZE_LIMIT
         );
+
+        let mut regs = [0u32; 32];
+        // Set SP to halfway down from the top of memory
+        regs[Register::Sp as usize] = (memory_size - STACK_OFFSET_FROM_TOP) as u32;
 
         Self {
             cpu: CPU {
                 pc: 0,
-                regs: [0; 32],
+                regs,
                 memory: vec![0; memory_size],
                 verbose: false,
             },
-            next_free: Self::CODE_SIZE_LIMIT as u32, // Start allocating data after code
+            next_free: CODE_SIZE_LIMIT as u32, // Start allocating data after code
         }
     }
+
 
     /// Load the RISC-V code into memory at address 0
     pub fn set_code(&mut self, code: &[u8]) {
         assert!(
-            code.len() <= Self::CODE_SIZE_LIMIT,
+            code.len() <= CODE_SIZE_LIMIT,
             "code size ({}) exceeds CODE_LIMIT ({:#x})",
             code.len(),
-            Self::CODE_SIZE_LIMIT
+            CODE_SIZE_LIMIT
         );
         self.cpu.memory[0..code.len()].copy_from_slice(code);
         self.cpu.pc = 0; // entrypoint
