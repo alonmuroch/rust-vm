@@ -21,6 +21,8 @@ impl VM {
         let mut regs = [0u32; 32];
         // Set SP to halfway down from the top of memory
         regs[Register::Sp as usize] = (memory_size - STACK_OFFSET_FROM_TOP) as u32;
+        // Set RA (return address) to sentinel value for clean halting
+        regs[Register::Ra as usize] = 0xFFFF_FFFF;
 
         Self {
             cpu: CPU {

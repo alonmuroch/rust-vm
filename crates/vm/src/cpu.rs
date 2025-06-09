@@ -103,10 +103,7 @@ impl CPU {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
                 self.regs[rd] = u32::from_le_bytes(self.memory[addr..addr + 4].try_into().unwrap());
             }
-            Instruction::Sw { rs1, rs2, offset } => {
-                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                self.memory[addr..addr + 4].copy_from_slice(&self.regs[rs2].to_le_bytes());
-            }
+
             Instruction::Sw { rs1, rs2, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
                 self.memory[addr..addr + 4].copy_from_slice(&self.regs[rs2].to_le_bytes());
@@ -161,8 +158,15 @@ impl CPU {
                 return true;
             }
             Instruction::Jalr { rd, rs1, offset } => {
-                self.regs[rd] = self.pc + 4;
-                self.pc = self.regs[rs1].wrapping_add(offset as u32) & !1;
+                let target = self.regs[rs1].wrapping_add(offset as u32) & !1;
+                let return_address = self.pc + 4;
+
+                // Only write to rd if rd != 0 (x0 is hardwired to zero)
+                if rd != 0 {
+                    self.regs[rd] = return_address;
+                }
+
+                self.pc = target;
                 return true;
             }
             Instruction::Lui { rd, imm } => self.regs[rd] = (imm << 12) as u32,
@@ -198,7 +202,7 @@ impl CPU {
             }
             Instruction::Ret => {
                 let target = self.regs[1]; // x1 = ra
-                if target == 0 {
+                if target == 0 || target == 0xFFFF_FFFF {
                     return false; // halt if ret target is 0
                 }
     
