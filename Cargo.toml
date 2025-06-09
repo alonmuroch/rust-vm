@@ -2,5 +2,5 @@
 members = [
   "crates/vm",
   "crates/state", 
-  "crates/contract_std",
+  "crates/program",
 ]

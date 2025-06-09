@@ -1,52 +1,51 @@
 BIN_DIR := bin
 SRC := $(wildcard *.rs)
-ELF := $(SRC:.rs=.elf)
+OBJ := $(SRC:.rs=.o)
 BIN := $(SRC:.rs=.bin)
 
 TARGET := riscv32imac-unknown-none-elf
 RUSTC := rustc
 OBJCOPY := $(shell command -v rust-objcopy || command -v llvm-objcopy || command -v riscv64-unknown-elf-objcopy)
 
-# Dynamically resolve contract_std .rlib path
-CONTRACT_STD_RLIB := $(shell find ../../../../target/$(TARGET)/debug/deps -name 'libcontract_std-*.rlib' 2>/dev/null)
+# Find the compiled libprogram .rlib file
+PROGRAM_RLIB := $(shell find ../../../../target/$(TARGET)/debug/deps -name 'libprogram-*.rlib' | head -n 1)
 
-# Keep ELF outputs
-.PRECIOUS: $(addprefix $(BIN_DIR)/, $(ELF))
+# Prevent Make from deleting intermediate .o files
+.PRECIOUS: $(addprefix $(BIN_DIR)/, $(OBJ))
 
-all: list contract_std $(addprefix $(BIN_DIR)/, $(BIN))
+# Default target
+all: build_program list $(addprefix $(BIN_DIR)/, $(BIN))
 
-# Show which files are being compiled
+# Build the program crate first (needed for --extern)
+build_program:
+	@echo "📦 Building program crate..."
+	cargo build -p program --target=$(TARGET)
+
+# List which Rust files are being compiled
 list:
-	@echo "Compiling these source files:"
+	@echo "📝 Compiling these source files:"
 	@$(foreach file,$(SRC), echo " - $(file)";)
 
-# Ensure contract_std is built before using it
-contract_std:
-ifeq ($(strip $(CONTRACT_STD_RLIB)),)
-	@echo "📦 Building contract_std..."
-	cargo build -p contract_std --target=$(TARGET)
-	$(eval CONTRACT_STD_RLIB := $(shell find ../../../../target/$(TARGET)/debug/deps -name 'libcontract_std-*.rlib' 2>/dev/null))
-endif
-
-# Compile .rs to .elf with --extern contract_std
-$(BIN_DIR)/%.elf: %.rs
+# Compile .rs to .o
+$(BIN_DIR)/%.o: %.rs
 	@mkdir -p $(BIN_DIR)
-	@echo "🔗 Linking against: $(CONTRACT_STD_RLIB)"
+	@echo "🔗 Linking against: $(PROGRAM_RLIB)"
 	$(RUSTC) \
 		--target=$(TARGET) \
 		-C opt-level=2 \
 		-C panic=abort \
-		-L ../../../../target/$(TARGET)/debug/deps \
-		--extern contract_std=$(CONTRACT_STD_RLIB) \
 		--crate-type=bin \
-		--emit=link \
+		--emit=obj \
+		-L ../../../../target/$(TARGET)/debug/deps \
+		--extern program=$(PROGRAM_RLIB) \
 		-o $@ \
 		$<
 
-# Convert .elf to .bin
-$(BIN_DIR)/%.bin: $(BIN_DIR)/%.elf
+# Convert .o to .bin by extracting the .text section
+$(BIN_DIR)/%.bin: $(BIN_DIR)/%.o
 	@echo "📦 Extracting .text section to raw binary..."
-	$(OBJCOPY) --only-section=.text -O binary $< $@
+	$(OBJCOPY) --only-section=.text.entrypoint -O binary $< $@
 
+# Clean build outputs
 clean:
 	rm -rf $(BIN_DIR)
