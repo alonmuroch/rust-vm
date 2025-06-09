@@ -1,13 +1,14 @@
-use crate::decoder::{decode_full, decode_compressed};
-use crate::instruction::Instruction;
 use std::convert::TryInto;
+
+use crate::decoder::{decode_compressed, decode_full};
+use crate::instruction::Instruction;
 
 pub struct CPU {
     pub pc: u32,
     pub regs: [u32; 32],
     pub memory: Vec<u8>,
 
-    // log
+    // enable verbose logging
     pub verbose: bool,
 }
 
@@ -196,6 +197,5 @@ impl CPU {
             _ => todo!("unhandled instruction"),
         }
         true
-
-    }               
+    }
 }

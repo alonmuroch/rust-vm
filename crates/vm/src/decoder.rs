@@ -63,18 +63,18 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 0x4 => Some(Instruction::Xori { rd, rs1, imm }),
                 0x6 => Some(Instruction::Ori { rd, rs1, imm }),
                 0x7 => Some(Instruction::Andi { rd, rs1, imm }),
-                0x1 => Some(Instruction::Slli { 
+                0x1 => Some(Instruction::Slli {
                     rd,
                     rs1,
                     shamt: (imm & 0x1f) as u8,
                 }),
                 0x5 => match funct7 {
-                    0x00 => Some(Instruction::Srli { 
+                    0x00 => Some(Instruction::Srli {
                         rd,
                         rs1,
                         shamt: (imm & 0x1f) as u8,
                     }),
-                    0x20 => Some(Instruction::Srai { 
+                    0x20 => Some(Instruction::Srai {
                         rd,
                         rs1,
                         shamt: (imm & 0x1f) as u8,
@@ -83,15 +83,14 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 },
                 _ => None,
             }
-
         },
         Opcode::Load => {
             let imm = (word as i32) >> 20;
             match funct3 {
-                0x2 => Some(Instruction::Lw { 
-                    rd, 
-                    rs1, 
-                    offset: imm, 
+                0x2 => Some(Instruction::Lw {
+                    rd,
+                    rs1,
+                    offset: imm,
                 }),
                 _ => None,
             }
@@ -100,10 +99,10 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             let imm = (((word >> 25) & 0x7f) << 5 | ((word >> 7) & 0x1f)) as i32;
             let imm = (imm << 20) >> 20;
             match funct3 {
-                0x2 => Some(Instruction::Sw { 
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
+                0x2 => Some(Instruction::Sw {
+                    rs1,
+                    rs2,
+                    offset: imm,
                 }),
                 _ => None,
             }
@@ -111,49 +110,46 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
         Opcode::Branch => {
             let imm = extract_branch_offset(word);
             match funct3 {
-                0x0 => Some(Instruction::Beq { 
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
+                0x0 => Some(Instruction::Beq {
+                    rs1,
+                    rs2,
+                    offset: imm,
                 }),
-                0x1 => Some(Instruction::Bne { 
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
+                0x1 => Some(Instruction::Bne {
+                    rs1,
+                    rs2,
+                    offset: imm,
                 }),
-                0x4 => Some(Instruction::Blt { 
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
+                0x4 => Some(Instruction::Blt {
+                    rs1,
+                    rs2,
+                    offset: imm,
                 }),
-                0x5 => Some(Instruction::Bge { 
-                    rs1, 
-                    rs2, 
-                    offset: imm, 
+                0x5 => Some(Instruction::Bge {
+                    rs1,
+                    rs2,
+                    offset: imm,
                 }),
                 _ => None,
             }
         },
         Opcode::Jal => {
             let imm = extract_jal_offset(word);
-            Some(Instruction::Jal { 
-                rd, 
-                offset: imm, 
-            })
+            Some(Instruction::Jal { rd, offset: imm })
         },
         Opcode::Jalr => {
             let imm = (word as i32) >> 20;
-            Some(Instruction::Jalr { 
-                rd, 
-                rs1, 
-                offset: imm, 
+            Some(Instruction::Jalr {
+                rd,
+                rs1,
+                offset: imm,
             })
         },
         Opcode::Lui => {
             let imm = (word & 0xfffff000) as i32;
-            Some(Instruction::Lui { 
+            Some(Instruction::Lui {
                 rd,
-                imm: imm as i32, 
+                imm: imm as i32,
             })
         },
         Opcode::Auipc => {
@@ -163,7 +159,6 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
         Opcode::System => Some(Instruction::Ecall),
     }
 }
-
 /// Decode a 16-bit RISC-V compressed instruction into a full Instruction.
 ///
 /// This function currently supports a minimal set:
@@ -182,70 +177,71 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             let imm = (((hword >> 2) & 0b11111) | (((hword >> 12) & 0x1) << 5)) as i32;
             let imm = (imm << 26) >> 26; // sign-extend
             Some(Instruction::Addi { rd, rs1, imm })
-        }
+        },
 
         CompressedOpcode::Li => {
             let imm = (((hword >> 2) & 0b11111) | (((hword >> 12) & 0x1) << 5)) as i32;
             let imm = (imm << 26) >> 26;
             Some(Instruction::Addi { rd, rs1: 0, imm })
-        }
+        },
 
         CompressedOpcode::LuiOrAddi16sp => {
             if rd == 2 {
                 // C.ADDI16SP
-                let imm = (
-                    ((hword >> 12) & 0x1) << 5 |
-                    ((hword >> 6) & 0x1) << 4 |
-                    ((hword >> 5) & 0x1) << 9 |
-                    ((hword >> 3) & 0x3) << 6 |
-                    ((hword >> 2) & 0x1) << 8) as i32;
+                let imm = (((hword >> 12) & 0x1) << 5
+                    | ((hword >> 6) & 0x1) << 4
+                    | ((hword >> 5) & 0x1) << 9
+                    | ((hword >> 3) & 0x3) << 6
+                    | ((hword >> 2) & 0x1) << 8) as i32;
                 let imm = (imm << 23) >> 23; // sign-extend
                 Some(Instruction::Addi16sp { imm })
             } else if rd != 0 {
                 // C.LUI
                 let imm = (((hword >> 2) & 0x1F) | ((hword >> 12) & 0x1) << 5) as u32;
                 let imm = imm << 12;
-                Some(Instruction::Lui { rd, imm: imm as i32 })
+                Some(Instruction::Lui {
+                    rd,
+                    imm: imm as i32,
+                })
             } else {
                 None
             }
-        }
+        },
 
         CompressedOpcode::Jal => {
             let imm = decode_cj_imm(hword); // implement CJ immediate decoder
             Some(Instruction::Jal { rd: 1, offset: imm }) // rd = x1
-        }
+        },
 
         CompressedOpcode::J => {
             let imm = decode_cj_imm(hword);
             Some(Instruction::Jal { rd: 0, offset: imm }) // jump without link
-        }
+        },
 
-        CompressedOpcode::RegOrJump => {
-            match (rs1, rs2) {
-                (0, 0) => Some(Instruction::Ebreak),
-                (1, 0) => Some(Instruction::Ret),
-                (_, 0) => Some(Instruction::Jr { rs1 }),
-                (_, _) => {
-                    if rs1 == rs2 {
-                        Some(Instruction::Mv { rd: rs1, rs2 })
-                    } else {
-                        Some(Instruction::Add { rd: rs1, rs1, rs2 })
-                    }
+        CompressedOpcode::RegOrJump => match (rs1, rs2) {
+            (0, 0) => Some(Instruction::Ebreak),
+            (1, 0) => Some(Instruction::Ret),
+            (_, 0) => Some(Instruction::Jr { rs1 }),
+            (_, _) => {
+                if rs1 == rs2 {
+                    Some(Instruction::Mv { rd: rs1, rs2 })
+                } else {
+                    Some(Instruction::Add { rd: rs1, rs1, rs2 })
                 }
             }
-        }
-
+        },
         CompressedOpcode::Slli => {
             let shamt = ((hword >> 2) & 0b11111) as i32;
-            Some(Instruction::Addi { rd, rs1, imm: shamt }) // emulate as ADDI with left shift beforehand
-        }
-
+            Some(Instruction::Addi {
+                rd,
+                rs1,
+                imm: shamt,
+            }) // emulate as ADDI with left shift beforehand
+        },
         CompressedOpcode::Beqz | CompressedOpcode::Bnez => {
             // You may decode it, but usually this is handled in control flow
             None
-        }
-
+        },
         _ => {
             println!("Unimplemented instruction: {:?}", op);
             todo!("implement: {:?}", op);
@@ -254,16 +250,14 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 }
 
 fn decode_cj_imm(hword: u16) -> i32 {
-    let imm = (
-        ((hword >> 12) & 0b1) << 11 |
-        ((hword >> 11) & 0b1) << 4  |
-        ((hword >> 9)  & 0b11) << 8 |
-        ((hword >> 8)  & 0b1) << 10 |
-        ((hword >> 7)  & 0b1) << 6  |
-        ((hword >> 6)  & 0b1) << 7  |
-        ((hword >> 3)  & 0b111) << 1 |
-        ((hword >> 2)  & 0b1) << 5
-    ) as i32;
+    let imm = (((hword >> 12) & 0b1) << 11
+        | ((hword >> 11) & 0b1) << 4
+        | ((hword >> 9) & 0b11) << 8
+        | ((hword >> 8) & 0b1) << 10
+        | ((hword >> 7) & 0b1) << 6
+        | ((hword >> 6) & 0b1) << 7
+        | ((hword >> 3) & 0b111) << 1
+        | ((hword >> 2) & 0b1) << 5) as i32;
     (imm << 20) >> 20 // sign-extend 12-bit
 }
 
