@@ -8,7 +8,7 @@ pub struct CPU {
     pub regs: [u32; 32],
     pub memory: Vec<u8>,
 
-    // log
+    // enable verbose logging
     pub verbose: bool,
 }
 
