@@ -8,3 +8,4 @@ pub mod entrypoint;
 pub use pubkey::Pubkey;
 pub use result::Result;
 
+pub use state::State;
