@@ -4,5 +4,5 @@ pub mod instruction;
 pub mod decoder;
 pub mod vm;
 pub mod cpu;
-pub mod runner;
 pub mod registers;
+pub mod memory;

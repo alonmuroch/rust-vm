@@ -1,33 +1,31 @@
 use crate::decoder::{decode_full, decode_compressed};
 use crate::instruction::Instruction;
-use std::convert::TryInto;
+use crate::memory::VmMemory;
 
 pub struct CPU {
     pub pc: u32,
     pub regs: [u32; 32],
-    pub memory: Vec<u8>,
 
     // log
     pub verbose: bool,
 }
 
 impl CPU {
-    pub fn new(code: Vec<u8>) -> Self {
+    pub fn new() -> Self {
         Self {
             pc: 0,
             regs: [0; 32],
-            memory: code,
             verbose: false,
         }
     }
 
-    pub fn step(&mut self) -> bool {
-        match self.next_instruction() {
+    pub fn step(&mut self, memory: &VmMemory) -> bool {
+        match self.next_instruction(memory) {
             Some((instr, size)) => {
                 if self.verbose {
                     println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
                 }
-                let result = self.execute(instr);
+                let result = self.execute(instr, memory);
                 self.pc = self.pc.wrapping_add(size as u32);
                 result
             }
@@ -38,9 +36,9 @@ impl CPU {
         }
     }
 
-    pub fn next_instruction(&mut self) -> Option<(Instruction, u8)> {
+    pub fn next_instruction(&mut self, memory: &VmMemory) -> Option<(Instruction, u8)> {
         let pc = self.pc as usize;
-        let bytes = &self.memory[pc..];
+        let bytes = memory.mem_slice(pc, 4)?;
 
         if bytes.len() < 2 {
             return None;
@@ -59,7 +57,7 @@ impl CPU {
         }
     }
 
-    pub fn execute(&mut self, instr: Instruction) -> bool {
+    pub fn execute(&mut self, instr: Instruction, memory: &VmMemory) -> bool {
         match instr {
             Instruction::Add { rd, rs1, rs2 } => {
                 self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2])
@@ -101,19 +99,16 @@ impl CPU {
             }
             Instruction::Lw { rd, rs1, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                self.regs[rd] = u32::from_le_bytes(self.memory[addr..addr + 4].try_into().unwrap());
+                self.regs[rd] = memory.load_u32(addr);
             }
 
             Instruction::Sw { rs1, rs2, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                self.memory[addr..addr + 4].copy_from_slice(&self.regs[rs2].to_le_bytes());
+                memory.store_u32(addr, self.regs[rs2]);
             }
             Instruction::Sb { rs1, rs2, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                if addr >= self.memory.len() {
-                    panic!("Sb out of bounds: addr = 0x{:08x}", addr);
-                }
-                self.memory[addr] = (self.regs[rs2] & 0xFF) as u8;
+                memory.store_u8(addr, (self.regs[rs2] & 0xFF) as u8);
             }
             Instruction::Beq { rs1, rs2, offset } => {
                 if self.regs[rs1] == self.regs[rs2] {
