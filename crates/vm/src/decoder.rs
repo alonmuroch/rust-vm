@@ -181,10 +181,6 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             Some(Instruction::Auipc { rd, imm })
         },
         Opcode::System => Some(Instruction::Ecall),
-        _ => {
-            println!("Unimplemented instruction: {:?}", opcode);
-            todo!("implement: {:?}", opcode);
-        }
     }
 }
 
@@ -294,7 +290,7 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             let rd_ = ((hword >> 2) & 0b111) + 8;   // rs2'
             let rs1_ = ((hword >> 7) & 0b111) + 8;  // rs1'
             let imm = ((hword >> 10) & 0b111) << 3 | ((hword >> 5) & 0b11) << 6;
-            let offset = (imm as i32); // no sign-extension needed
+            let offset = imm as i32; // no sign-extension needed
             Some(Instruction::Sw {
                 rs1: rs1_ as usize,
                 rs2: rd_ as usize,

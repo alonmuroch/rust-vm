@@ -53,8 +53,8 @@ fn test_entrypoint_function() {
         vm.set_code(&code);
 
         // 2. Allocate memory and set registers
-        let pubkey_ptr = vm.set_reg_to_data(Register::A0, &case.pubkey);
-        let input_ptr = vm.set_reg_to_data(Register::A1, case.input);
+        let _pubkey_ptr = vm.set_reg_to_data(Register::A0, &case.pubkey);
+        let _input_ptr = vm.set_reg_to_data(Register::A1, case.input);
         vm.set_reg_u32(Register::A2, case.input.len() as u32);
         let result_ptr = vm.set_reg_to_data(Register::A3, &[0u8; 5]);
 
