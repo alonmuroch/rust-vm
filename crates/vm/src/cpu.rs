@@ -38,7 +38,7 @@ impl CPU {
 
     pub fn next_instruction(&mut self, memory: &VmMemory) -> Option<(Instruction, u8)> {
         let pc = self.pc as usize;
-        let bytes = memory.mem_slice(pc, 4)?;
+        let bytes = memory.mem_slice(pc, pc + 4)?;
 
         if bytes.len() < 2 {
             return None;
