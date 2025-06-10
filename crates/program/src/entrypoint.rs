@@ -1,3 +1,4 @@
+
 #[macro_export]
 macro_rules! entrypoint {
     ($func:path) => {
@@ -15,7 +16,6 @@ macro_rules! entrypoint {
                 $crate::pubkey::Pubkey(array)
             };
             let input = {
-                // assert!(input_len <= 1024);
                 core::slice::from_raw_parts(input_ptr, input_len)
             };
 

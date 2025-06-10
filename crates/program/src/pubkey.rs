@@ -1,5 +1,3 @@
-#![no_std]
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct Pubkey(pub [u8; 32]);

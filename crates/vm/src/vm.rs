@@ -1,6 +1,7 @@
 use crate::cpu::CPU;
 use crate::registers::Register;
 use crate::memory::{Memory};
+use crate::global::Config;
 
 pub struct VM {
     pub cpu: CPU,
@@ -40,6 +41,10 @@ impl VM {
         addr
     }
 
+    pub fn set_reg_u32(&mut self, reg: Register, data: u32) {
+        self.cpu.regs[reg as usize] = data;
+    }
+
     pub fn dump_memory(&self, start: usize, end: usize) {
         assert!(start < end, "invalid memory range");
         assert!(end <= self.memory.mem().len(), "range out of bounds");
@@ -59,6 +64,31 @@ impl VM {
     }
 
     pub fn run(&mut self) {
+        // Validate pubkey pointer (A0)
+        let pubkey_ptr = self.cpu.regs[Register::A0 as usize] as usize;
+        if pubkey_ptr == 0 {
+            panic!("Entrypoint: pubkey pointer is not set");
+        }
+
+        // Validate input length (A2)
+        let input_len = self.cpu.regs[Register::A2 as usize] as usize;
+        if input_len > Config::MAX_INPUT_LEN {
+            panic!(
+                "Entrypoint: input length {} exceeds MAX_INPUT_LEN ({})",
+                input_len,
+                Config::MAX_INPUT_LEN
+            );
+        }
+
+        // Validate result pointer (A3)
+        let result_ptr = self.cpu.regs[Register::A3 as usize] as usize;
+        if result_ptr == 0 {
+            panic!("Entrypoint: result pointer is not set");
+        }
+        if result_ptr >= self.memory.mem().len() {
+            panic!("Entrypoint: result pointer is out of memory bounds");
+        }
+
         while self.cpu.step(&self.memory) {}
     }
 } 

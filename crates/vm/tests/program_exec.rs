@@ -20,7 +20,7 @@ fn test_entrypoint_function() {
     let test_cases = [
         TestCase {
             name: "compare_two_numbers",
-            path: "tests/programs/bin/multi_func.bin",
+            path: "tests/programs/bin/simple.bin",
             expected_success: true,
             expected_error_code: 1,
             pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
@@ -31,7 +31,7 @@ fn test_entrypoint_function() {
         },
         TestCase {
             name: "compare_two_numbers #2",
-            path: "tests/programs/bin/multi_func.bin",
+            path: "tests/programs/bin/simple.bin",
             expected_success: true,
             expected_error_code: 2,
             pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
@@ -55,7 +55,7 @@ fn test_entrypoint_function() {
         // 2. Allocate memory and set registers
         let pubkey_ptr = vm.set_reg_to_data(Register::A0, &case.pubkey);
         let input_ptr = vm.set_reg_to_data(Register::A1, case.input);
-        vm.set_reg_to_data(Register::A2, &case.input.len().to_le_bytes());
+        vm.set_reg_u32(Register::A2, case.input.len() as u32);
         let result_ptr = vm.set_reg_to_data(Register::A3, &[0u8; 5]);
 
         // vm.dump_memory(0, VM_MEMORY_SIZE);
