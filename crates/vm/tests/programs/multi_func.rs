@@ -15,10 +15,11 @@ fn my_vm_entry(caller: Pubkey, data: &[u8]) -> Result {
     let second = u64::from_le_bytes(data[8..16].try_into().unwrap());
 
     if first > second {
-        Result { success: true, error_code: 0 }
+        return Result { success: true, error_code: 1 }
     } else {
-        Result { success: false, error_code: 0 }
+        return Result { success: true, error_code: 2 }
     }
+    return Result { success: true, error_code: 123 }
 }
 
 // Register the function as the entrypoint

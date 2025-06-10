@@ -2,14 +2,14 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::convert::TryInto;
 
-pub struct VmMemory {
+pub struct Memory {
     mem: Rc<RefCell<Vec<u8>>>,
     pub next_heap: u32,
 }
 
 pub const STACK_OFFSET_FROM_TOP: usize = 0x100;
 
-impl VmMemory {
+impl Memory {
     pub fn new(memory_size: usize) -> Self {
         Self {
             mem: Rc::new(RefCell::new(vec![0u8; memory_size])),
@@ -48,6 +48,36 @@ impl VmMemory {
             panic!("load u32 out of bounds: addr = 0x{:08x}", addr);
         }
         u32::from_le_bytes(mem[addr..addr + 4].try_into().unwrap())
+    }
+
+    pub fn load_byte(&self, addr: usize) -> u8 {
+        let mem = self.mem.borrow();
+        mem[addr]
+    }
+
+    pub fn load_halfword(&self, addr: usize) -> u16 {
+        let mem = self.mem.borrow();
+        u16::from_le_bytes(mem[addr..addr + 2].try_into().unwrap())
+    }
+
+    pub fn load_word(&self, addr: usize) -> u32 {
+        let mem = self.mem.borrow();
+        u32::from_le_bytes(mem[addr..addr + 4].try_into().unwrap())
+    }
+
+    pub fn store_byte(&mut self, addr: usize, value: u8) {
+        let mut mem = self.mem.borrow_mut();
+        mem[addr] = value;
+    }
+
+    pub fn store_halfword(&mut self, addr: usize, value: u16) {
+        let mut mem = self.mem.borrow_mut();
+        mem[addr..addr + 2].copy_from_slice(&value.to_le_bytes());
+    }
+
+    pub fn store_word(&mut self, addr: usize, value: u32) {
+        let mut mem = self.mem.borrow_mut();
+        mem[addr..addr + 4].copy_from_slice(&value.to_le_bytes());
     }
 
     pub fn mem_slice(&self, start: usize, end: usize) -> Option<std::cell::Ref<[u8]>> {

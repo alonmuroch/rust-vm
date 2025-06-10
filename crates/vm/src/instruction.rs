@@ -33,6 +33,8 @@ pub enum Instruction {
     Sltu { rd: usize, rs1: usize, rs2: usize },
     /// Set less than immediate: rd = (rs1 < imm)
     Slti { rd: usize, rs1: usize, imm: i32 },
+    /// Set Less Than Immediate Unsigned: rd = (rs1 < imm) ? 1 : 0
+    Sltiu { rd: usize, rs1: usize, imm: i32 },
 
     /// Shift left logical: rd = rs1 << rs2
     Sll { rd: usize, rs1: usize, rs2: usize },
@@ -50,6 +52,8 @@ pub enum Instruction {
 
     /// Load word: rd = *(rs1 + offset)
     Lw { rd: usize, rs1: usize, offset: i32 },
+    /// Load Byte Unsigned: rd = zero_extend(memory[rs1 + offset])
+    Lbu { rd: usize, rs1: usize, offset: i32 },
     /// Store word: *(rs1 + offset) = rs2
     Sw { rs1: usize, rs2: usize, offset: i32 },
     /// store byte
@@ -150,6 +154,17 @@ pub enum Instruction {
 
     /// Environment breakpoint (compressed `C.EBREAK`)
     Ebreak,
+
+    /// Compressed Miscellaneous ALU (C.SUB, C.XOR, C.OR, C.AND)
+    MiscAlu { rd: usize, rs2: usize, op: MiscAluOp },
+}
+
+#[derive(Debug)]
+pub enum MiscAluOp {
+    Sub,
+    Xor,
+    Or,
+    And,
 }
 
 impl Instruction {
@@ -186,6 +201,8 @@ impl Instruction {
                 format!("sltu {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
             Instruction::Slti { rd, rs1, imm } =>
                 format!("slti {}, {}, {}", reg(*rd), reg(*rs1), imm),
+            Instruction::Sltiu { rd, rs1, imm } =>
+                format!("sltiu {}, {}, {}", reg(*rd), reg(*rs1), imm),
 
             Instruction::Sll  { rd, rs1, rs2 } =>
                 format!("sll  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),
@@ -202,6 +219,8 @@ impl Instruction {
 
             Instruction::Lw { rd, rs1, offset } =>
                 format!("lw   {}, {}({})", reg(*rd), offset, reg(*rs1)),
+            Instruction::Lbu { rd, rs1, offset } =>
+                format!("lbu   {}, {}({})", reg(*rd), offset, reg(*rs1)),
             Instruction::Sw { rs1, rs2, offset } =>
                 format!("sw   {}, {}({})", reg(*rs2), offset, reg(*rs1)),
             Instruction::Sb { rs1, rs2, offset } =>
@@ -289,6 +308,16 @@ impl Instruction {
                 format!("bnez {}, pc+{}", reg(*rs1), offset),
             Instruction::Ebreak =>
                 "ebreak".to_string(),
+
+            Instruction::MiscAlu { rd, rs2, op } => {
+                let op_str = match op {
+                    MiscAluOp::Sub => "c.sub",
+                    MiscAluOp::Xor => "c.xor",
+                    MiscAluOp::Or  => "c.or",
+                    MiscAluOp::And => "c.and",
+                };
+                format!("{} {}, {}", op_str, reg(*rd), reg(*rs2))
+            }
         }
     }
 }

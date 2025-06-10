@@ -1,4 +1,4 @@
-use crate::instruction::Instruction;
+use crate::instruction::{Instruction, MiscAluOp};
 use crate::isa::Opcode;
 use crate::isa_compressed::CompressedOpcode;
 
@@ -60,6 +60,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             match funct3 {
                 0x0 => Some(Instruction::Addi { rd, rs1, imm }),
                 0x2 => Some(Instruction::Slti { rd, rs1, imm }),
+                0x3 => Some(Instruction::Sltiu { rd, rs1, imm }),
                 0x4 => Some(Instruction::Xori { rd, rs1, imm }),
                 0x6 => Some(Instruction::Ori { rd, rs1, imm }),
                 0x7 => Some(Instruction::Andi { rd, rs1, imm }),
@@ -93,6 +94,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                     rs1, 
                     offset: imm, 
                 }),
+                0x4 => Some(Instruction::Lbu { rd, rs1, offset: imm }),
                 _ => None,
             }
         },
@@ -318,6 +320,20 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             })
         }
 
+        // ...other compressed cases...
+        CompressedOpcode::MiscAlu => {
+            let funct2 = (hword >> 5) & 0b11;
+            let rd = 8 + ((hword >> 7) & 0b111) as usize;
+            let rs2 = 8 + ((hword >> 2) & 0b111) as usize;
+            let op = match funct2 {
+                0b00 => MiscAluOp::Sub,
+                0b01 => MiscAluOp::Xor,
+                0b10 => MiscAluOp::Or,
+                0b11 => MiscAluOp::And,
+                _ => return None,
+            };
+            Some(Instruction::MiscAlu { rd, rs2, op })
+        }
 
         CompressedOpcode::Swsp => {
             let rs2 = ((hword >> 2) & 0x1F) as usize;

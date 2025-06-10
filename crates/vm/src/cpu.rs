@@ -1,6 +1,6 @@
 use crate::decoder::{decode_full, decode_compressed};
 use crate::instruction::Instruction;
-use crate::memory::VmMemory;
+use crate::memory::Memory;
 
 pub struct CPU {
     pub pc: u32,
@@ -19,7 +19,7 @@ impl CPU {
         }
     }
 
-    pub fn step(&mut self, memory: &VmMemory) -> bool {
+    pub fn step(&mut self, memory: &Memory) -> bool {
         match self.next_instruction(memory) {
             Some((instr, size)) => {
                 if self.verbose {
@@ -30,13 +30,29 @@ impl CPU {
                 result
             }
             None => {
-                eprintln!("🚨 Unknown or invalid instruction at PC = 0x{:08x}", self.pc);
+                if let Some(slice_ref) = memory.mem_slice(self.pc as usize, self.pc as usize + 4) {
+                    let hex_dump = slice_ref.iter()
+                        .map(|b| format!("{:02x}", b)) // still needs deref
+                        .collect::<Vec<_>>()
+                        .join(" ");
+
+                    eprintln!(
+                        "🚨 Unknown or invalid instruction at PC = 0x{:08x} (bytes: [{}])",
+                        self.pc,
+                        hex_dump
+                    );
+                } else {
+                    eprintln!(
+                        "🚨 Unknown or invalid instruction at PC = 0x{:08x} (could not read memory)",
+                        self.pc
+                    );
+                }
                 false
             }
         }
     }
 
-    pub fn next_instruction(&mut self, memory: &VmMemory) -> Option<(Instruction, u8)> {
+    pub fn next_instruction(&mut self, memory: &Memory) -> Option<(Instruction, u8)> {
         let pc = self.pc as usize;
         let bytes = memory.mem_slice(pc, pc + 4)?;
 
@@ -57,7 +73,7 @@ impl CPU {
         }
     }
 
-    pub fn execute(&mut self, instr: Instruction, memory: &VmMemory) -> bool {
+    pub fn execute(&mut self, instr: Instruction, memory: &Memory) -> bool {
         match instr {
             Instruction::Add { rd, rs1, rs2 } => {
                 self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2])
@@ -83,6 +99,11 @@ impl CPU {
             Instruction::Slti { rd, rs1, imm } => {
                 self.regs[rd] = (self.regs[rs1] as i32).lt(&imm) as u32
             }
+            Instruction::Sltiu { rd, rs1, imm } => {
+                let lhs = self.regs[rs1];
+                let rhs = imm as u32;
+                self.regs[rd] = if lhs < rhs { 1 } else { 0 };
+            }
             Instruction::Sll { rd, rs1, rs2 } => {
                 self.regs[rd] = self.regs[rs1] << (self.regs[rs2] & 0x1F)
             }
@@ -101,6 +122,11 @@ impl CPU {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
                 self.regs[rd] = memory.load_u32(addr);
             }
+            Instruction::Lbu { rd, rs1, offset } => {
+                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
+                let byte = memory.load_byte(addr);
+                self.regs[rd] = byte as u32;
+            }
 
             Instruction::Sw { rs1, rs2, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
@@ -110,6 +136,7 @@ impl CPU {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
                 memory.store_u8(addr, (self.regs[rs2] & 0xFF) as u8);
             }
+        
             Instruction::Beq { rs1, rs2, offset } => {
                 if self.regs[rs1] == self.regs[rs2] {
                     self.pc = self.pc.wrapping_add(offset as u32);
@@ -220,6 +247,23 @@ impl CPU {
                 if self.regs[rs1] != 0 {
                     self.pc = self.pc.wrapping_add(offset as u32);
                     return true;
+                }
+            }
+
+            Instruction::MiscAlu { rd, rs2, op } => {
+                match op {
+                    crate::instruction::MiscAluOp::Sub => {
+                        self.regs[rd] = self.regs[rd].wrapping_sub(self.regs[rs2]);
+                    }
+                    crate::instruction::MiscAluOp::Xor => {
+                        self.regs[rd] = self.regs[rd] ^ self.regs[rs2];
+                    }
+                    crate::instruction::MiscAluOp::Or => {
+                        self.regs[rd] = self.regs[rd] | self.regs[rs2];
+                    }
+                    crate::instruction::MiscAluOp::And => {
+                        self.regs[rd] = self.regs[rd] & self.regs[rs2];
+                    }
                 }
             }
             _ => todo!("unhandled instruction"),

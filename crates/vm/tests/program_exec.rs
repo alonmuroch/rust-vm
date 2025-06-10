@@ -22,24 +22,24 @@ fn test_entrypoint_function() {
             name: "compare_two_numbers",
             path: "tests/programs/bin/multi_func.bin",
             expected_success: true,
-            expected_error_code: 0,
+            expected_error_code: 1,
             pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
             input: &[
                 100, 0, 0, 0, 0, 0, 0, 0,   // first u64 = 100
                 42, 0, 0, 0, 0, 0, 0, 0     // second u64 = 42
             ],
         },
-        // TestCase {
-        //     name: "equal_numbers",
-        //     path: "tests/programs/bin/multi_func.bin",
-        //     expected_success: false,
-        //     expected_error_code: 0,
-        //     pubkey: [1u8; 32],
-        //     input: &[
-        //         77, 0, 0, 0, 0, 0, 0, 0,    // first u64 = 77
-        //         77, 0, 0, 0, 0, 0, 0, 0     // second u64 = 77
-        //     ],
-        // },
+        TestCase {
+            name: "compare_two_numbers #2",
+            path: "tests/programs/bin/multi_func.bin",
+            expected_success: true,
+            expected_error_code: 2,
+            pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+            input: &[
+                25, 0, 0, 0, 0, 0, 0, 0,   // first u64 = 100
+                50, 0, 0, 0, 0, 0, 0, 0     // second u64 = 42
+            ],
+        }
     ];
 
     for case in test_cases {
@@ -55,6 +55,7 @@ fn test_entrypoint_function() {
         // 2. Allocate memory and set registers
         let pubkey_ptr = vm.set_reg_to_data(Register::A0, &case.pubkey);
         let input_ptr = vm.set_reg_to_data(Register::A1, case.input);
+        vm.set_reg_to_data(Register::A2, &case.input.len().to_le_bytes());
         let result_ptr = vm.set_reg_to_data(Register::A3, &[0u8; 5]);
 
         // vm.dump_memory(0, VM_MEMORY_SIZE);

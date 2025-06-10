@@ -1,17 +1,17 @@
 use crate::cpu::CPU;
 use crate::registers::Register;
-use crate::memory::{VmMemory};
+use crate::memory::{Memory};
 
 pub struct VM {
     pub cpu: CPU,
-    pub memory: VmMemory,
+    pub memory: Memory,
 }
 
 pub const CODE_SIZE_LIMIT: usize = 0x800;
 
 impl VM {
     pub fn new(memory_size: usize) -> Self {
-        let memory = VmMemory::new(memory_size);
+        let memory = Memory::new(memory_size);
 
         let mut regs = [0u32; 32];
         regs[Register::Sp as usize] = memory.stack_top();
