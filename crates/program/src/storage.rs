@@ -1,6 +1,6 @@
 #![no_std]
 
-// === Trait for Persistent Storage ===
+/// Trait for persistent structs
 pub trait Persistent {
     fn load() -> Option<Self>
     where
@@ -9,10 +9,10 @@ pub trait Persistent {
     fn store(&self);
 }
 
-// === Macro for Declaring Persistent Structs ===
+/// Macro that defines persistent structs with embedded static key
 #[macro_export]
 macro_rules! persist_struct {
-    ($name:ident, $key:expr, {
+    ($name:ident, $key_ident:ident, {
         $($field:ident : $type:ty),* $(,)?
     }) => {
         #[repr(C)]
@@ -21,8 +21,15 @@ macro_rules! persist_struct {
             $(pub $field: $type),*
         }
 
-        // Inherent impl for byte handling + static load()
         impl $name {
+            fn key_ptr() -> *const u8 {
+                $key_ident.as_ptr()
+            }
+
+            fn key_len() -> usize {
+                $key_ident.len()
+            }
+
             pub fn as_bytes(&self) -> &[u8] {
                 let ptr = self as *const _ as *const u8;
                 let len = core::mem::size_of::<Self>();
@@ -38,18 +45,16 @@ macro_rules! persist_struct {
                     core::ptr::copy_nonoverlapping(
                         bytes.as_ptr(),
                         val.as_mut_ptr() as *mut u8,
-                        bytes.len()
+                        bytes.len(),
                     );
                     Some(val.assume_init())
                 }
             }
 
-            /// This enables `Struct::load()` syntax
             pub fn load() -> Option<Self> {
                 <$name as $crate::Persistent>::load()
             }
 
-            /// This enables `instance.store()` syntax
             pub fn store(&self) {
                 <$name as $crate::Persistent>::store(self)
             }
@@ -58,11 +63,10 @@ macro_rules! persist_struct {
         impl $crate::Persistent for $name {
             fn load() -> Option<Self> {
                 unsafe {
-                    let key = $key;
-                    let key_ptr = key.as_ptr();
-                    let key_len = key.len();
-                    let mut value_ptr: u32;
+                    let key_ptr = $name::key_ptr();
+                    let key_len = $name::key_len();
 
+                    let mut value_ptr: u32;
                     core::arch::asm!(
                         "mv a0, {0}",
                         "mv a1, {1}",
@@ -78,22 +82,18 @@ macro_rules! persist_struct {
                         return None;
                     }
 
-                    // First 4 bytes = length
                     let len_bytes = core::slice::from_raw_parts(value_ptr as *const u8, 4);
                     let value_len = u32::from_le_bytes(len_bytes.try_into().unwrap()) as usize;
-
                     let data_ptr = (value_ptr + 4) as *const u8;
                     let value_buf = core::slice::from_raw_parts(data_ptr, value_len);
-
                     Self::from_bytes(value_buf)
                 }
             }
 
             fn store(&self) {
                 unsafe {
-                    let key = $key;
-                    let key_ptr = key.as_ptr();
-                    let key_len = key.len();
+                    let key_ptr = $name::key_ptr();
+                    let key_len = $name::key_len();
 
                     let val_buf = self.as_bytes();
                     let val_ptr = val_buf.as_ptr();
@@ -116,3 +116,4 @@ macro_rules! persist_struct {
         }
     };
 }
+

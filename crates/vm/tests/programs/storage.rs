@@ -6,9 +6,11 @@ use program::{entrypoint, Pubkey, Result};
 use program::persist_struct;
 use core::convert::TryInto;
 
+#[link_section = ".rodata"]
+#[no_mangle]
+pub static PERSIST_KEY: [u8; 8] = *b"counter\0";
 
-// Macro must be invoked before you use `Counter`
-persist_struct!(Counter, b"counter", {
+persist_struct!(Counter, PERSIST_KEY, {
     value: u64,
 });
 
