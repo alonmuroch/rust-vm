@@ -7,3 +7,5 @@ pub mod cpu;
 pub mod registers;
 pub mod memory;
 pub mod global;
+pub mod sys_call;
+pub mod storage;

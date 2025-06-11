@@ -1,0 +1,118 @@
+#![no_std]
+
+// === Trait for Persistent Storage ===
+pub trait Persistent {
+    fn load() -> Option<Self>
+    where
+        Self: Sized;
+
+    fn store(&self);
+}
+
+// === Macro for Declaring Persistent Structs ===
+#[macro_export]
+macro_rules! persist_struct {
+    ($name:ident, $key:expr, {
+        $($field:ident : $type:ty),* $(,)?
+    }) => {
+        #[repr(C)]
+        #[derive(Copy, Clone, Debug)]
+        pub struct $name {
+            $(pub $field: $type),*
+        }
+
+        // Inherent impl for byte handling + static load()
+        impl $name {
+            pub fn as_bytes(&self) -> &[u8] {
+                let ptr = self as *const _ as *const u8;
+                let len = core::mem::size_of::<Self>();
+                unsafe { core::slice::from_raw_parts(ptr, len) }
+            }
+
+            pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+                if bytes.len() != core::mem::size_of::<Self>() {
+                    return None;
+                }
+                let mut val = core::mem::MaybeUninit::<Self>::uninit();
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        bytes.as_ptr(),
+                        val.as_mut_ptr() as *mut u8,
+                        bytes.len()
+                    );
+                    Some(val.assume_init())
+                }
+            }
+
+            /// This enables `Struct::load()` syntax
+            pub fn load() -> Option<Self> {
+                <$name as $crate::Persistent>::load()
+            }
+
+            /// This enables `instance.store()` syntax
+            pub fn store(&self) {
+                <$name as $crate::Persistent>::store(self)
+            }
+        }
+
+        impl $crate::Persistent for $name {
+            fn load() -> Option<Self> {
+                unsafe {
+                    let key = $key;
+                    let key_ptr = key.as_ptr();
+                    let key_len = key.len();
+                    let mut value_ptr: u32;
+
+                    core::arch::asm!(
+                        "mv a0, {0}",
+                        "mv a1, {1}",
+                        "li a7, 1", // syscall_storage_read
+                        "ecall",
+                        "mv {2}, a0",
+                        in(reg) key_ptr,
+                        in(reg) key_len,
+                        out(reg) value_ptr,
+                    );
+
+                    if value_ptr == 0 {
+                        return None;
+                    }
+
+                    // First 4 bytes = length
+                    let len_bytes = core::slice::from_raw_parts(value_ptr as *const u8, 4);
+                    let value_len = u32::from_le_bytes(len_bytes.try_into().unwrap()) as usize;
+
+                    let data_ptr = (value_ptr + 4) as *const u8;
+                    let value_buf = core::slice::from_raw_parts(data_ptr, value_len);
+
+                    Self::from_bytes(value_buf)
+                }
+            }
+
+            fn store(&self) {
+                unsafe {
+                    let key = $key;
+                    let key_ptr = key.as_ptr();
+                    let key_len = key.len();
+
+                    let val_buf = self.as_bytes();
+                    let val_ptr = val_buf.as_ptr();
+                    let val_len = val_buf.len();
+
+                    core::arch::asm!(
+                        "mv a0, {0}",
+                        "mv a1, {1}",
+                        "mv a2, {2}",
+                        "mv a3, {3}",
+                        "li a7, 2", // syscall_storage_write
+                        "ecall",
+                        in(reg) key_ptr,
+                        in(reg) key_len,
+                        in(reg) val_ptr,
+                        in(reg) val_len,
+                    );
+                }
+            }
+        }
+    };
+}

@@ -2,10 +2,12 @@ use crate::cpu::CPU;
 use crate::registers::Register;
 use crate::memory::{Memory};
 use crate::global::Config;
+use crate::storage::{self, Storage};
 
 pub struct VM {
     pub cpu: CPU,
     pub memory: Memory,
+    pub storage: Storage,
 }
 
 pub const CODE_SIZE_LIMIT: usize = 0x800;
@@ -23,7 +25,9 @@ impl VM {
             verbose: false,
         };
 
-        Self { cpu, memory }
+        let storage = Storage::new();
+
+        Self { cpu, memory, storage }
     }
 
     pub fn set_code(&mut self, code: &[u8]) {
@@ -89,6 +93,6 @@ impl VM {
             panic!("Entrypoint: result pointer is out of memory bounds");
         }
 
-        while self.cpu.step(&self.memory) {}
+        while self.cpu.step(&self.memory, &self.storage) {}
     }
 } 

@@ -1,10 +1,10 @@
 use std::rc::Rc;
-use std::cell::RefCell;
+use std::cell::{RefCell, Cell};
 use std::convert::TryInto;
 
 pub struct Memory {
     mem: Rc<RefCell<Vec<u8>>>,
-    pub next_heap: u32,
+    pub next_heap: Cell<u32>,
 }
 
 pub const STACK_OFFSET_FROM_TOP: usize = 0x100;
@@ -13,7 +13,7 @@ impl Memory {
     pub fn new(memory_size: usize) -> Self {
         Self {
             mem: Rc::new(RefCell::new(vec![0u8; memory_size])),
-            next_heap: 0x800, // example starting point
+            next_heap: Cell::new(0x800), // example starting point
         }
     }
 
@@ -94,12 +94,12 @@ impl Memory {
         self.mem.borrow_mut()[..code.len()].copy_from_slice(code);
     }
 
-    pub fn alloc_on_heap(&mut self, data: &[u8]) -> u32 {
-        let addr = self.next_heap;
+    pub fn alloc_on_heap(&self, data: &[u8]) -> u32 {
+        let addr = self.next_heap.get();
         let end = addr + data.len() as u32;
         assert!(end as usize <= self.size());
         self.mem.borrow_mut()[addr as usize..end as usize].copy_from_slice(data);
-        self.next_heap = end;
+        self.next_heap.set(end);
         addr
     }
 

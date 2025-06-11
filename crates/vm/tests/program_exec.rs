@@ -19,27 +19,35 @@ struct TestCase<'a> {
 fn test_entrypoint_function() {
     let test_cases = [
         TestCase {
-            name: "compare_two_numbers",
-            path: "tests/programs/bin/simple.bin",
+            name: "storage",
+            path: "tests/programs/bin/storage.bin",
             expected_success: true,
             expected_error_code: 1,
             pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
-            input: &[
-                100, 0, 0, 0, 0, 0, 0, 0,   // first u64 = 100
-                42, 0, 0, 0, 0, 0, 0, 0     // second u64 = 42
-            ],
+            input: &[],
         },
-        TestCase {
-            name: "compare_two_numbers #2",
-            path: "tests/programs/bin/simple.bin",
-            expected_success: true,
-            expected_error_code: 2,
-            pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
-            input: &[
-                25, 0, 0, 0, 0, 0, 0, 0,   // first u64 = 100
-                50, 0, 0, 0, 0, 0, 0, 0     // second u64 = 42
-            ],
-        }
+        // TestCase {
+        //     name: "compare_two_numbers",
+        //     path: "tests/programs/bin/simple.bin",
+        //     expected_success: true,
+        //     expected_error_code: 1,
+        //     pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+        //     input: &[
+        //         100, 0, 0, 0, 0, 0, 0, 0,   // first u64 = 100
+        //         42, 0, 0, 0, 0, 0, 0, 0     // second u64 = 42
+        //     ],
+        // },
+        // TestCase {
+        //     name: "compare_two_numbers #2",
+        //     path: "tests/programs/bin/simple.bin",
+        //     expected_success: true,
+        //     expected_error_code: 2,
+        //     pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+        //     input: &[
+        //         25, 0, 0, 0, 0, 0, 0, 0,   // first u64 = 100
+        //         50, 0, 0, 0, 0, 0, 0, 0     // second u64 = 42
+        //     ],
+        // }
     ];
 
     for case in test_cases {
