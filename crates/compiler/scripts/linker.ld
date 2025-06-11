@@ -1,13 +1,30 @@
 SECTIONS
 {
-    . = 0x10000;
+    . = 0x0100;  /* Start address for first section */
 
-    .text : {
-        KEEP(*(.text.keep))
-        *(.text*)
+    .text.entrypoint : {
+        KEEP(*(.text.entrypoint))
     }
 
-    .rodata : { *(.rodata*) }
-    .data : { *(.data*) }
-    .bss : { *(.bss*) }
+    /* Manually skip ahead by 0x40 bytes */
+    . = ALIGN(4);
+    . = . + 0x40;
+
+    .rodata : {
+        *(.rodata*)
+    }
+
+    .data : {
+        *(.data*)
+    }
+
+    .bss : {
+        *(.bss*)
+    }
+
+    /DISCARD/ : {
+        *(.comment)
+        *(.note.GNU-stack)
+        *(.riscv.attributes)
+    }
 }

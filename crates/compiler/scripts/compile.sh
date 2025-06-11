@@ -39,7 +39,7 @@ rustc \
   -C link-arg=-T"$LINKER_PATH" \
   -L "$(dirname "$RLIB")" \
   --extern program="$RLIB" \
-  --emit=obj \
+  --emit=link \
   -o "$OUT" \
   "$SRC"
 

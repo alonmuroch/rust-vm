@@ -10,8 +10,6 @@ pub struct VM {
     pub storage: Storage,
 }
 
-pub const CODE_SIZE_LIMIT: usize = 0x800;
-
 impl VM {
     pub fn new(memory_size: usize) -> Self {
         let memory = Memory::new(memory_size);
@@ -30,9 +28,14 @@ impl VM {
         Self { cpu, memory, storage }
     }
 
-    pub fn set_code(&mut self, code: &[u8]) {
-        self.memory.write_code(code);
-        self.cpu.pc = 0;
+    pub fn set_code(&mut self, addr: usize, code: &[u8]) {
+        self.memory.write_code(addr, code);
+        self.cpu.pc = addr as u32;
+    }
+
+
+    pub fn set_rodata(&mut self, addr: usize, data: &[u8]) {
+        self.memory.write_rodata(addr, data);
     }
 
     pub fn alloc_and_write(&mut self, data: &[u8]) -> u32 {

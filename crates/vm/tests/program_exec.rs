@@ -46,7 +46,8 @@ fn test_entrypoint_function() {
 
         // 3. Run VM
         vm.run();
-
+        vm.dump_memory(0, VM_MEMORY_SIZE);
+        
         // 4. Extract result struct
         let mem = vm.memory.mem();
         let start = result_ptr as usize;
@@ -99,11 +100,27 @@ pub fn load_and_run_elf<P: AsRef<Path>>(path: P, vm: &mut VM) {
     println!("✅ Parsed ELF: {} ({} sections)", path_str, elf.sections.len());
 
     for section in &elf.sections {
-        println!(
-            " - {} (addr: 0x{:08x}, size: {})",
-            section.name, section.addr, section.size
-        );
-    }
+        let vma = section.addr as usize;
+        let file_offset = section.addr as usize;
+        let size = section.size as usize;
 
-    vm.set_code(elf.code); // Load the entire ELF binary into the VM
+        if size == 0 {
+            continue; // Skip empty sections
+        }
+
+        match section.name.as_str() {
+            ".text.entrypoint" => {
+                println!("📦 Loading code section: {} at 0x{:08x} ({} bytes)", section.name, vma, size);
+                let data = &bytes[file_offset..file_offset + size];
+                vm.set_code(vma, data);
+            }
+            ".rodata" => {
+                println!("📦 Loading rodata section: {} at 0x{:08x} ({} bytes)", section.name, vma, size);
+                let data = &bytes[file_offset..file_offset + size];
+                vm.set_rodata(vma, data);
+            }
+            _ => {}
+        }
+    }
 }
+
