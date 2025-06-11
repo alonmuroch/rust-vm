@@ -66,14 +66,11 @@ macro_rules! persist_struct {
 
                     let mut value_ptr: u32;
                     core::arch::asm!(
-                        "mv a0, {0}",
-                        "mv a1, {1}",
-                        "li a7, 1", // syscall_storage_read
-                        "ecall",
-                        "mv {2}, a0",
-                        in(reg) key_ptr,
-                        in(reg) key_len,
-                        out(reg) value_ptr,
+                        "li a7, 1",  // set syscall number
+                        "ecall",     // invoke syscall
+                        in("a0") key_ptr,
+                        in("a1") key_len,
+                        out("a2") value_ptr,
                     );
 
                     if value_ptr == 0 {
@@ -98,17 +95,26 @@ macro_rules! persist_struct {
                     let val_len = val_buf.len();
 
                     core::arch::asm!(
-                        "mv a0, {0}",
-                        "mv a1, {1}",
-                        "mv a2, {2}",
-                        "mv a3, {3}",
-                        "li a7, 2", // syscall_storage_write
-                        "ecall",
-                        in(reg) key_ptr,
-                        in(reg) key_len,
-                        in(reg) val_ptr,
-                        in(reg) val_len,
+                        "li a7, 2",         // syscall number
+                        "ecall",            // invoke syscall
+                        in("a0") key_ptr,   // directly bind to a0
+                        in("a1") key_len,
+                        in("a2") val_ptr,
+                        in("a3") val_len,
                     );
+
+                    // core::arch::asm!(
+                    //     "mv a0, {0}",
+                    //     "mv a1, {1}",
+                    //     "mv a2, {2}",
+                    //     "mv a3, {3}",
+                    //     "li a7, 2", // syscall_storage_write
+                    //     "ecall",
+                    //     in(reg) key_ptr,
+                    //     in(reg) key_len,
+                    //     in(reg) val_ptr,
+                    //     in(reg) val_len,
+                    // );
                 }
             }
         }

@@ -16,9 +16,9 @@ pub static PERSIST_KEY2: [u8; 9] = *b"counter2\0";
 
 #[link_section = ".rodata"]
 #[no_mangle]
-pub static PERSIST_KEY3: [u8; 9] = *b"counter3\0";
+pub static PERSIST_KEY3: [u8; 10] = *b"counter33\0";
 
-persist_struct!(Counter, PERSIST_KEY, {
+persist_struct!(Counter, PERSIST_KEY3, {
     value: u64,
 });
 
