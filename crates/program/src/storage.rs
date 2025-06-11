@@ -1,5 +1,3 @@
-#![no_std]
-
 /// Trait for persistent structs
 pub trait Persistent {
     fn load() -> Option<Self>
