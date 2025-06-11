@@ -1,21 +1,29 @@
 #!/bin/bash
 set -e
 
-# === Resolve script location ===
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# === Arguments ===
-SRC=$1         # Path to .rs file (absolute or relative to project root)
-OUT=$2         # Output .elf path
-RLIB=$3        # Path to libprogram-*.rlib
-LINKER=$4      # Just the filename, e.g., linker.ld
-TARGET=$5      # e.g., riscv32imac-unknown-none-elf
+SRC=$1
+OUT=$2
+LINKER=$3  # just the file name
+TARGET=$4
 
-# === Full path to linker.ld (assumed to live next to this script) ===
 LINKER_PATH="$SCRIPT_DIR/$LINKER"
+PROGRAM_CRATE="$SCRIPT_DIR/../../../program"
 
-# === Compile ===
-echo "🔧 Compiling:"
+# === Build libprogram ===
+echo "📦 Building 'program' crate with target: $TARGET"
+cargo build -p program --target "$TARGET"
+
+# === Locate the generated .rlib ===
+RLIB=$(find "$SCRIPT_DIR/../../../target/$TARGET/debug/deps" -name 'libprogram-*.rlib' | head -n 1)
+
+if [[ -z "$RLIB" ]]; then
+  echo "❌ Could not find libprogram rlib for target $TARGET"
+  exit 1
+fi
+
+echo "🔧 Compiling guest Rust program:"
 echo "    SRC:    $SRC"
 echo "    OUT:    $OUT"
 echo "    RLIB:   $RLIB"
@@ -31,7 +39,8 @@ rustc \
   -C link-arg=-T"$LINKER_PATH" \
   -L "$(dirname "$RLIB")" \
   --extern program="$RLIB" \
+  --emit=obj \
   -o "$OUT" \
   "$SRC"
 
-echo "✅ Success: $OUT"
+echo "✅ Success: built $OUT"
