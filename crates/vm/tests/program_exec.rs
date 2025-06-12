@@ -5,7 +5,7 @@ use std::fs;
 use std::path::Path;
 use compiler::elf::parse_elf_from_bytes;
 
-pub const VM_MEMORY_SIZE: usize = 5 * 1024; // 10 KB
+pub const VM_MEMORY_SIZE: usize = 5 * 1024; // 5 KB
 
 #[derive(Debug)]
 struct TestCase<'a> {

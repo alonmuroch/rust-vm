@@ -1,0 +1,27 @@
+---
+# General rules for all files
+description: Global coding and collaboration rules
+globs: "**/*"
+alwaysApply: false
+rules:
+  - Do not modify existing code without explicit user approval.
+  - Always show a diff before applying changes.
+  - Ask for clarification before making assumptions in logic.
+  - Suggestions should be minimal and localized unless explicitly told otherwise.
+  - Respect custom architecture or VM constraints when refactoring.
+
+---
+
+# Rules for Rust files
+description: Rust project style and safety guidelines
+globs: "**/*.rs"
+alwaysApply: false
+rules:
+  - Follow `no_std` conventions; avoid importing `std`.
+  - Do not use `unsafe` unless explicitly allowed.
+  - Use `Result<T, E>` for error handling; avoid panics.
+  - All public functions must have doc comments.
+  - Use `snake_case` for functions, variables, and fields.
+  - Use 4-space indentation.
+  - Avoid dynamic memory allocations unless required.
+  - Keep function bodies under 50 lines if possible.

@@ -282,8 +282,25 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         }
 
         CompressedOpcode::Beqz | CompressedOpcode::Bnez => {
-            // You may decode it, but usually this is handled in control flow
-            None
+            let rs1 = 8 + ((hword >> 7) & 0b111) as usize; // rs1' field
+            
+            // Decode CB-format immediate for compressed branches
+            let imm = (
+                ((hword >> 12) & 0x1) << 8 |  // imm[8]
+                ((hword >> 10) & 0x3) << 3 |  // imm[4:3]
+                ((hword >> 5) & 0x3) << 6 |   // imm[7:6]
+                ((hword >> 3) & 0x3) << 1 |   // imm[2:1]
+                ((hword >> 2) & 0x1) << 5     // imm[5]
+            ) as i32;
+            
+            // Sign extend the 9-bit immediate
+            let imm = (imm << 23) >> 23;
+            
+            match op {
+                CompressedOpcode::Beqz => Some(Instruction::Beqz { rs1, offset: imm }),
+                CompressedOpcode::Bnez => Some(Instruction::Bnez { rs1, offset: imm }),
+                _ => unreachable!(),
+            }
         }
 
         CompressedOpcode::Sw => {

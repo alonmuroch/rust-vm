@@ -48,6 +48,8 @@ impl CPU {
             Err(_) => return 0,
         };
 
+        println!("🔑 Storage GET key: \"{}\"", key);
+
         // Lookup the value in storage
         if let Some(value) = storage.get(key) {
             // Prepare buffer: [len (u32 LE)] + [value bytes]
@@ -58,6 +60,7 @@ impl CPU {
             let addr = memory.alloc_on_heap(&buf);
             addr
         } else {
+            println!("❌ Key not found in storage");
             0
         }
     }
