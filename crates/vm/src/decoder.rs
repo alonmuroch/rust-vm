@@ -99,7 +99,6 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             }
         },
         Opcode::Store => {
-            // Extract 12-bit signed immediate for S-type (e.g., sw)
             let imm11_5 = ((word >> 25) & 0x7f) << 5;
             let imm4_0 = (word >> 7) & 0x1f;
             let imm = ((imm11_5 | imm4_0) as i32) << 20 >> 20; // sign-extend 12-bit
@@ -281,6 +280,18 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             Some(Instruction::Addi { rd, rs1, imm: shamt }) // emulate as ADDI with left shift beforehand
         }
 
+        CompressedOpcode::Lwsp => {
+            let rd = ((hword >> 7) & 0x1F) as usize;
+            if rd == 0 {
+                return None;
+            }
+            let imm = (((hword >> 2) & 0x7) << 2)   // bits 4:2 -> imm[4:2]
+                    | ((hword >> 12) & 0x1) << 5    // bit 12 -> imm[5]
+                    | ((hword >> 6) & 0x1) << 6;    // bit 6 -> imm[6]
+            let imm = imm as i32;
+            Some(Instruction::Lw { rd, rs1: 2, offset: imm })
+        }
+
         CompressedOpcode::Beqz | CompressedOpcode::Bnez => {
             let rs1 = 8 + ((hword >> 7) & 0b111) as usize; // rs1' field
             
@@ -308,6 +319,7 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             let rs1_ = ((hword >> 7) & 0b111) + 8;  // rs1'
             let imm = ((hword >> 10) & 0b111) << 3 | ((hword >> 5) & 0b11) << 6;
             let offset = imm as i32; // no sign-extension needed
+
             Some(Instruction::Sw {
                 rs1: rs1_ as usize,
                 rs2: rd_ as usize,
@@ -350,8 +362,11 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 
         CompressedOpcode::Swsp => {
             let rs2 = ((hword >> 2) & 0x1F) as usize;
-            let imm = (((hword >> 7) & 0x1F) << 2) | (((hword >> 9) & 0x3) << 6);
-            Some(Instruction::Sw { rs1: 2, rs2, offset: imm as i32 }) // rs1 = sp (x2)
+            let imm = (((hword >> 7) & 0x3) << 6)   // bits 9:8 -> imm[7:6]
+                    | ((hword >> 6) & 0x7) << 2     // bits 8:6 -> imm[4:2]
+                    | ((hword >> 12) & 0x1) << 5;   // bit 12 -> imm[5]
+            let imm = imm as i32;
+            Some(Instruction::Sw { rs1: 2, rs2, offset: imm })
         }
 
         _ => {

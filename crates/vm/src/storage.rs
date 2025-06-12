@@ -7,7 +7,7 @@ use alloc::string::String;
 
 #[derive(Default)]
 pub struct Storage {
-    map: RefCell<BTreeMap<String, Vec<u8>>>,
+    pub map: RefCell<BTreeMap<String, Vec<u8>>>,
 }
 
 impl Storage {

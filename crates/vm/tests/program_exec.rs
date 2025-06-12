@@ -47,6 +47,7 @@ fn test_entrypoint_function() {
         // 3. Run VM
         vm.run();
         vm.dump_memory(0, VM_MEMORY_SIZE);
+        vm.dump_storage();
         
         // 4. Extract result struct
         let mem = vm.memory.mem();

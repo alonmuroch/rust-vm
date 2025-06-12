@@ -70,6 +70,16 @@ impl VM {
         }
     }
 
+    pub fn dump_storage(&self) {
+        println!("--- Storage Dump ---");
+        for (key, value) in self.storage.map.borrow().iter() {
+            let key_str = key;
+            let value_hex: Vec<String> = value.iter().map(|b| format!("{:02x}", b)).collect();
+            println!("Key: {:<20} | Value ({} bytes): {}", key_str, value.len(), value_hex.join(" "));
+        }
+        println!("--------------------");
+    }
+
     pub fn run(&mut self) {
         // Validate pubkey pointer (A0)
         let pubkey_ptr = self.cpu.regs[Register::A0 as usize] as usize;

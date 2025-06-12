@@ -102,19 +102,6 @@ macro_rules! persist_struct {
                         in("a2") val_ptr,
                         in("a3") val_len,
                     );
-
-                    // core::arch::asm!(
-                    //     "mv a0, {0}",
-                    //     "mv a1, {1}",
-                    //     "mv a2, {2}",
-                    //     "mv a3, {3}",
-                    //     "li a7, 2", // syscall_storage_write
-                    //     "ecall",
-                    //     in(reg) key_ptr,
-                    //     in(reg) key_len,
-                    //     in(reg) val_ptr,
-                    //     in(reg) val_len,
-                    // );
                 }
             }
         }

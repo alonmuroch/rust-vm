@@ -79,10 +79,12 @@ impl CPU {
         let key_slice = key_slice_ref.as_ref();
 
         // Convert the key slice to a &str
-        let key = match core::str::from_utf8(key_slice) {
+        let key: &str = match core::str::from_utf8(key_slice) {
             Ok(s) => s,
             Err(_) => return 0,
         };
+
+         println!("🔑 Storage SET key: \"{}\"", key);
 
         let value_slice_ref = match memory.mem_slice(val_ptr, val_ptr + val_len) {
             Some(r) => r,

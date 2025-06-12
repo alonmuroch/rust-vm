@@ -7,7 +7,6 @@ pub struct Memory {
     pub next_heap: Cell<u32>,
 }
 
-pub const STACK_OFFSET_FROM_TOP: usize = 0x100;
 pub const CODE_SIZE_LIMIT: usize = 0x800;
 pub const RO_DATA_SIZE_LIMIT: usize = 0x100;
 pub const HEAP_START_ADDR: usize = CODE_SIZE_LIMIT + RO_DATA_SIZE_LIMIT + 0x100;
