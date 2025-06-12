@@ -1,15 +1,7 @@
 ---
-# General rules for all files
 description: Global coding and collaboration rules
 globs: "**/*"
 alwaysApply: false
-rules:
-  - Do not modify existing code without explicit user approval.
-  - Always show a diff before applying changes.
-  - Ask for clarification before making assumptions in logic.
-  - Suggestions should be minimal and localized unless explicitly told otherwise.
-  - Respect custom architecture or VM constraints when refactoring.
-
 ---
 
 # Rules for Rust files
@@ -25,3 +17,5 @@ rules:
   - Use 4-space indentation.
   - Avoid dynamic memory allocations unless required.
   - Keep function bodies under 50 lines if possible.
+  - Be conservative in code changing, do not change unrelated code or functions
+  - Be specific in the changes you make relevant to what you've been asked to do
