@@ -27,6 +27,14 @@ impl Memory {
         let mem = self.mem();
         mem.len()
     }
+
+    pub fn store_u16(&self, addr: usize, val: u16) {
+        let mut mem = self.mem.borrow_mut();
+        if addr + 2 > mem.len() {
+            panic!("store u16 out of bounds: addr = 0x{:08x}", addr);
+        }
+        mem[addr..addr + 2].copy_from_slice(&val.to_le_bytes());
+    }
     
     pub fn store_u32(&self, addr: usize, val: u32) {
         let mut mem = self.mem.borrow_mut();

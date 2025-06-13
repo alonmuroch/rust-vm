@@ -54,6 +54,10 @@ pub enum Instruction {
     Lw { rd: usize, rs1: usize, offset: i32 },
     /// Load Byte Unsigned: rd = zero_extend(memory[rs1 + offset])
     Lbu { rd: usize, rs1: usize, offset: i32 },
+    /// Load Halfword: rd = sign_extend(*(rs1 + offset) as i16)
+    Lh { rd: usize, rs1: usize, offset: i32 },
+    /// Store halfword: *(rs1 + offset) = rs2 & 0xFFFF
+    Sh { rs1: usize, rs2: usize, offset: i32 },
     /// Store word: *(rs1 + offset) = rs2
     Sw { rs1: usize, rs2: usize, offset: i32 },
     /// store byte
@@ -221,6 +225,10 @@ impl Instruction {
                 format!("lw   {}, {}({})", reg(*rd), offset, reg(*rs1)),
             Instruction::Lbu { rd, rs1, offset } =>
                 format!("lbu   {}, {}({})", reg(*rd), offset, reg(*rs1)),
+            Instruction::Lh { rd, rs1, offset } =>
+                format!("lh   {}, {}({})", reg(*rd), offset, reg(*rs1)),
+            Instruction::Sh { rs1, rs2, offset } =>
+                format!("sh   {}, {}({})", reg(*rs2), offset, reg(*rs1)),
             Instruction::Sw { rs1, rs2, offset } =>
                 format!("sw   {}, {}({})", reg(*rs2), offset, reg(*rs1)),
             Instruction::Sb { rs1, rs2, offset } =>

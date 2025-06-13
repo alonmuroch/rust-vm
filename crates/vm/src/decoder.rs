@@ -89,6 +89,11 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
         Opcode::Load => {
             let imm = (word as i32) >> 20;
             match funct3 {
+                0x1 => Some(Instruction::Lh {  // ← new case
+                    rd,
+                    rs1,
+                    offset: imm,
+                }),
                 0x2 => Some(Instruction::Lw { 
                     rd, 
                     rs1, 
@@ -105,6 +110,11 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
 
             match funct3 {
                 0x0 => Some(Instruction::Sb { 
+                    rs1, 
+                    rs2, 
+                    offset: imm,
+                }),
+                0x1 => Some(Instruction::Sh { 
                     rs1, 
                     rs2, 
                     offset: imm,
@@ -211,14 +221,49 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 
         CompressedOpcode::LuiOrAddi16sp => {
             if rd == 2 {
+                // let bit12 = (hword >> 12) & 0x1;
+                // let bit6  = (hword >> 6)  & 0x1;
+                // let bit5  = (hword >> 5)  & 0x1;
+                // let bit4  = (hword >> 4)  & 0x1;
+                // let bit3  = (hword >> 3)  & 0x1;
+                // let bit2  = (hword >> 2)  & 0x1;
+
+                // println!("hword      = {:#06x}", hword);
+                // println!("bit 12     = {} -> imm[9]", bit12);
+                // println!("bit 6      = {} -> imm[4]", bit6);
+                // println!("bit 5      = {} -> imm[6]", bit5);
+                // println!("bit 4      = {} -> imm[8]", bit4);
+                // println!("bit 3      = {} -> imm[6]", bit3);
+                // println!("bit 2      = {} -> imm[8]", bit2);
+
+                // let imm2 = (
+                //     bit12 << 9 | // imm[5]
+                //     bit6  << 4 | // imm[4]
+                //     bit5  << 6 | // imm[9]
+                //     bit4  << 8 | // imm[8]
+                //     bit3  << 7 | // imm[6]
+                //     bit2  << 5   // imm[8]
+                // ) as i32;
+
+                // println!("assembled 10-bit immediate (unsigned) = {:#05x} ({})", imm2, imm2);
+
+                // let imm = (imm2 << 22) >> 22;
+
+                // println!("sign-extended immediate (signed)     = {}", imm);
+
                 // C.ADDI16SP
-                let imm = (
-                    ((hword >> 12) & 0x1) << 5 |
-                    ((hword >> 6) & 0x1) << 4 |
-                    ((hword >> 5) & 0x1) << 9 |
-                    ((hword >> 3) & 0x3) << 6 |
-                    ((hword >> 2) & 0x1) << 8) as i32;
-                let imm = (imm << 23) >> 23; // sign-extend
+                let imm2 = (
+                    ((hword >> 12) & 0x1) << 9  | 
+                    ((hword >> 6)  & 0x1) << 4  | 
+                    ((hword >> 5)  & 0x1) << 6  |
+                    ((hword >> 4)  & 0x1) << 8  | 
+                    ((hword >> 3)  & 0x1) << 7  | 
+                    ((hword >> 2)  & 0x1) << 5    
+                ) as i32;
+
+                // Sign-extend 10-bit immediate
+                let imm = (imm2 << 22) >> 22;
+
                 Some(Instruction::Addi16sp { imm })
             } else if rd != 0 {
                 // C.LUI

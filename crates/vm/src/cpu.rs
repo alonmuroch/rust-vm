@@ -128,7 +128,17 @@ impl CPU {
                 let byte = memory.load_byte(addr);
                 self.regs[rd] = byte as u32;
             }
+            Instruction::Lh { rd, rs1, offset } => {
+                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
+                let halfword = memory.load_halfword(addr); // returns u16
+                let value = (halfword as i16) as i32 as u32; // sign-extend to 32-bit
+                self.regs[rd] = value;
+            }
 
+            Instruction::Sh { rs1, rs2, offset } => {
+                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
+                memory.store_u16(addr, (self.regs[rs2] & 0xFFFF) as u16);
+            }
             Instruction::Sw { rs1, rs2, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
                 memory.store_u32(addr, self.regs[rs2]);
