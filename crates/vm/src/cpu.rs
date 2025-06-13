@@ -220,7 +220,9 @@ impl CPU {
             Instruction::Ecall => {
                 return self.handle_syscall(memory, storage);
             }
-            Instruction::Ebreak => return false,
+            Instruction::Ebreak => {
+                return false
+            }
             Instruction::Jr { rs1 } => {
                 self.pc = self.regs[rs1];
                 return true;

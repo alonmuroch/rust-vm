@@ -4,6 +4,7 @@ use core::convert::TryInto;
 use std::fs;
 use std::path::Path;
 use compiler::elf::parse_elf_from_bytes;
+use program::Result;
 
 pub const VM_MEMORY_SIZE: usize = 5 * 1024; // 5 KB
 
@@ -50,20 +51,39 @@ fn test_entrypoint_function() {
         vm.dump_storage();
         
         // 4. Extract result struct
-        let mem = vm.memory.mem();
-        let start = result_ptr as usize;
-        if start + 5 > mem.len() {
-            panic!("Result struct out of bounds at 0x{:08x}", start);
-        }
-        let error_code = u32::from_le_bytes(mem[start..start + 4].try_into().unwrap());
-        let success = mem[start + 4] != 0;
+        let res = extract_and_print_result(&vm, result_ptr);
+        println!("Success: {}, Error code: {}\n", res.success, res.error_code);
 
-        println!("Success: {}, Error code: {}\n", success, error_code);
-
-        assert_eq!(success, case.expected_success, "Expected success = {} but got {}", case.expected_success, success);
-        assert_eq!(error_code, case.expected_error_code, "Expected error_code = {} but got {}", case.expected_error_code, error_code);
+        assert_eq!(res.success, case.expected_success, "Expected success = {} but got {}", case.expected_success, res.success);
+        assert_eq!(res.error_code, case.expected_error_code, "Expected error_code = {} but got {}", case.expected_error_code, res.error_code);
     }
 }
+
+pub fn extract_and_print_result(vm: &VM, result_ptr: u32) -> Result {
+    let mem = vm.memory.mem();
+    let start = result_ptr as usize;
+
+    if start + 5 > mem.len() {
+        panic!("Result struct out of bounds at 0x{:08x}", start);
+    }
+
+    // Print 8 bytes starting at result_ptr
+    let slice_len = (start + 8).min(mem.len()) - start;
+    let raw_slice = &mem[start..start + slice_len];
+
+    print!("Raw memory at 0x{:08x}:", start);
+    for byte in raw_slice {
+        print!(" {:02x}", byte);
+    }
+    println!();
+
+    let error_code = u32::from_le_bytes(mem[start..start + 4].try_into().unwrap());
+    let success = mem[start + 4] != 0;
+
+    return Result { error_code, success };
+}
+
+
 
 pub fn from_hex(hex: &str) -> [u8; 32] {
     assert!(hex.len() == 64, "Hex string must be exactly 64 characters");

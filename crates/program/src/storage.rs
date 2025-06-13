@@ -91,16 +91,20 @@ macro_rules! persist_struct {
                     let key_len = $name::key_len();
 
                     let val_buf = self.as_bytes();
-                    let val_ptr = val_buf.as_ptr();
-                    let val_len = val_buf.len();
+                    let mut buf: [u8; core::mem::size_of::<Self>()] = core::mem::zeroed();
+                    buf.copy_from_slice(val_buf);
+
+                    let val_ptr = buf.as_ptr();
+                    let val_len = buf.len();
 
                     core::arch::asm!(
-                        "li a7, 2",         // syscall number
-                        "ecall",            // invoke syscall
-                        in("a0") key_ptr,   // directly bind to a0
+                        "li a7, 2",
+                        "ecall",
+                        in("a0") key_ptr,
                         in("a1") key_len,
                         in("a2") val_ptr,
                         in("a3") val_len,
+                        options(readonly, nostack, preserves_flags)
                     );
                 }
             }
