@@ -26,7 +26,7 @@ fn my_vm_entry(_caller: Pubkey, _data: &[u8]) -> Result {
     // Now Counter is in scope
     let mut counter = Counter::load().unwrap_or(Counter { value: 0 });
 
-    counter.value += 1;
+    counter.value += 5;
     counter.store();
 
     Result { success: true, error_code: counter.value as u32 }

@@ -24,7 +24,7 @@ fn test_entrypoint_function() {
             name: "storage",
             path: "tests/programs/bin/storage.elf",
             expected_success: true,
-            expected_error_code: 1,
+            expected_error_code: 5,
             pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
             input: &[],
         },

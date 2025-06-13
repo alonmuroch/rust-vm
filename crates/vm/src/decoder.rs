@@ -362,12 +362,20 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 
         CompressedOpcode::Swsp => {
             let rs2 = ((hword >> 2) & 0x1F) as usize;
-            let imm = (((hword >> 7) & 0x3) << 6)   // bits 9:8 -> imm[7:6]
-                    | ((hword >> 6) & 0x7) << 2     // bits 8:6 -> imm[4:2]
-                    | ((hword >> 12) & 0x1) << 5;   // bit 12 -> imm[5]
-            let imm = imm as i32;
-            Some(Instruction::Sw { rs1: 2, rs2, offset: imm })
+
+            // let imm_4_2 = ((hword >> 6) & 0x7) << 2;
+            // let imm_5   = ((hword >> 12) & 0x1) << 5;
+            // let imm_7_6 = ((hword >> 7) & 0x3) << 6;
+
+            let offset = ((hword >> 7) & 0b11_1111) as i32;
+
+            Some(Instruction::Sw {
+                rs1: 2, // stack pointer (sp = x2)
+                rs2,
+                offset,
+            })
         }
+
 
         _ => {
             println!("Unimplemented compressed instruction: {:?}", op);
