@@ -23,3 +23,20 @@ fn panic(_: &core::panic::PanicInfo) -> ! {
     }
     loop {}
 }
+
+pub fn vm_panic(msg: &[u8]) -> ! {
+    unsafe {
+        // Syscall number 3 = custom "panic with message"
+        core::arch::asm!(
+            "li a7, 3",
+            "ecall",
+            in("x10") msg.as_ptr(), // a0 = x10
+            in("x11") msg.len(),    // a1 = x11
+        );
+
+        // Halt execution explicitly
+        core::arch::asm!("ebreak", options(nomem, nostack));
+    }
+
+    loop {}
+}

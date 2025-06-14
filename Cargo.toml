@@ -6,3 +6,7 @@ members = [
   "crates/compiler",
   "crates/examples",
 ]
+
+[profile.release]
+panic = "abort"
+lto = true

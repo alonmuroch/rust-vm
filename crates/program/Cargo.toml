@@ -3,11 +3,8 @@ name = "program"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+test = false
+
 [dependencies]
-state = { path = "../state" }
 
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"

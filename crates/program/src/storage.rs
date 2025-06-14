@@ -38,6 +38,7 @@ macro_rules! persist_struct {
                 if bytes.len() != core::mem::size_of::<Self>() {
                     return None;
                 }
+
                 let mut val = core::mem::MaybeUninit::<Self>::uninit();
                 unsafe {
                     core::ptr::copy_nonoverlapping(
@@ -64,14 +65,14 @@ macro_rules! persist_struct {
                     let key_ptr = $name::key_ptr();
                     let key_len = $name::key_len();
 
-                     if key_len == 0 {
-                        panic!("❌ persistent key for `{}` is empty", stringify!($name));
+                    if key_len == 0 {
+                        vm_panic!(concat!("❌ persistent key for `", stringify!($name), "` is empty"));
                     }
 
                     let mut value_ptr: u32;
                     core::arch::asm!(
-                        "li a7, 1",  // set syscall number
-                        "ecall",     // invoke syscall
+                        "li a7, 1",  // syscall_storage_read
+                        "ecall",
                         in("a0") key_ptr,
                         in("a1") key_len,
                         out("a2") value_ptr,
@@ -82,9 +83,16 @@ macro_rules! persist_struct {
                     }
 
                     let len_bytes = core::slice::from_raw_parts(value_ptr as *const u8, 4);
-                    let value_len = u32::from_le_bytes(len_bytes.try_into().unwrap()) as usize;
+                    let value_len = u32::from_le_bytes([
+                        len_bytes[0],
+                        len_bytes[1],
+                        len_bytes[2],
+                        len_bytes[3],
+                    ]) as usize;
+
                     let data_ptr = (value_ptr + 4) as *const u8;
                     let value_buf = core::slice::from_raw_parts(data_ptr, value_len);
+
                     Self::from_bytes(value_buf)
                 }
             }
@@ -95,18 +103,20 @@ macro_rules! persist_struct {
                     let key_len = $name::key_len();
 
                     if key_len == 0 {
-                        panic!("❌ persistent key for `{}` is empty", stringify!($name));
+                        vm_panic!(concat!("❌ persistent key for `", stringify!($name), "` is empty"));
                     }
 
                     let val_buf = self.as_bytes();
+
                     let mut buf: [u8; core::mem::size_of::<Self>()] = core::mem::zeroed();
-                    buf.copy_from_slice(val_buf);
+                    let len = buf.len();
+                    core::ptr::copy_nonoverlapping(val_buf.as_ptr(), buf.as_mut_ptr(), len);
 
                     let val_ptr = buf.as_ptr();
-                    let val_len = buf.len();
+                    let val_len = len;
 
                     core::arch::asm!(
-                        "li a7, 2",
+                        "li a7, 2", // syscall_storage_write
                         "ecall",
                         in("a0") key_ptr,
                         in("a1") key_len,
@@ -119,4 +129,3 @@ macro_rules! persist_struct {
         }
     };
 }
-

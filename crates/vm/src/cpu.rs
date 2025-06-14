@@ -26,8 +26,12 @@ impl CPU {
                 if self.verbose {
                     println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
                 }
+                let old_pc = self.pc;
                 let result = self.execute(instr, memory, storage);
-                self.pc = self.pc.wrapping_add(size as u32);
+                // bump the PC only if the instruction did not change it
+                if self.pc == old_pc {
+                    self.pc = self.pc.wrapping_add(size as u32);
+                }
                 result
             }
             None => {
@@ -195,7 +199,7 @@ impl CPU {
                 self.pc = self.pc.wrapping_add(offset as u32);
                 return true;
             }
-           Instruction::Jalr { rd, rs1, offset } => {
+            Instruction::Jalr { rd, rs1, offset } => {
                 let base = self.regs[rs1];
                 let target = base.wrapping_add(offset as u32) & !1;
                 let return_address = self.pc + 4;

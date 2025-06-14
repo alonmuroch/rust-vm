@@ -20,6 +20,7 @@ impl CPU {
         let result = match syscall_id {
             1 => self.sys_storage_get(args, memory, storage),
             2 => self.sys_storage_set(args, memory, storage),
+            3 => self.handle_panic_with_message(memory),
             _ => {
                 panic!("Unknown syscall: {}", syscall_id);
             }
@@ -93,5 +94,20 @@ impl CPU {
         let value_slice = value_slice_ref.as_ref();
         storage.set(key, value_slice.to_vec());
         0
+    }
+
+    fn handle_panic_with_message(&mut self, memory: &Memory) -> u32 {
+        let msg_ptr = self.regs[10] as usize; // a0
+        let msg_len = self.regs[11] as usize; // a1
+
+        let msg = memory
+            .mem_slice(msg_ptr, msg_ptr + msg_len)
+            .map(|bytes| {
+                // Convert to String to avoid borrowing temp reference
+                String::from_utf8_lossy(&bytes).into_owned()
+            })
+            .unwrap_or_else(|| "<invalid memory access>".to_string());
+
+        panic!("🔥 Guest panic: {}", msg);
     }
 }

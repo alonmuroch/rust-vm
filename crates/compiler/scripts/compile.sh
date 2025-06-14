@@ -9,17 +9,17 @@ LINKER=$3  # just the file name
 TARGET=$4
 
 LINKER_PATH="$SCRIPT_DIR/$LINKER"
-PROGRAM_CRATE="$SCRIPT_DIR/../../../program"
+PROGRAM_CRATE="$SCRIPT_DIR/../../program"
 
-# === Build libprogram ===
-echo "📦 Building 'program' crate with target: $TARGET"
-cargo build -p program --target "$TARGET"
+# === Build only the library of the 'program' crate ===
+echo "📦 Building 'program' crate (lib only) with target: $TARGET"
+cargo build --manifest-path "$PROGRAM_CRATE/Cargo.toml" --target "$TARGET" --lib
 
 # === Locate the generated .rlib ===
-RLIB=$(find "$SCRIPT_DIR/../../../target/$TARGET/debug/deps" -name 'libprogram-*.rlib' | head -n 1)
+RLIB=$(find "$SCRIPT_DIR/../../../target/$TARGET/debug/deps" -type f -name 'libprogram-*.rlib' | sort | head -n 1)
 
 if [[ -z "$RLIB" ]]; then
-  echo "❌ Could not find libprogram rlib for target $TARGET"
+  echo "❌ Could not find libprogram .rlib for target $TARGET"
   exit 1
 fi
 

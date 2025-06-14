@@ -13,7 +13,6 @@ dependencies = [
 name = "examples"
 version = "0.1.0"
 dependencies = [
- "compiler",
  "program",
 ]
 
@@ -52,9 +51,6 @@ dependencies = [
 [[package]]
 name = "program"
 version = "0.1.0"
-dependencies = [
- "state",
-]
 
 [[package]]
 name = "quote"
