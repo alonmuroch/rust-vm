@@ -5,3 +5,9 @@ edition = "2024"
 
 [dependencies]
 state = { path = "../state" }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

@@ -64,6 +64,10 @@ macro_rules! persist_struct {
                     let key_ptr = $name::key_ptr();
                     let key_len = $name::key_len();
 
+                     if key_len == 0 {
+                        panic!("❌ persistent key for `{}` is empty", stringify!($name));
+                    }
+
                     let mut value_ptr: u32;
                     core::arch::asm!(
                         "li a7, 1",  // set syscall number
@@ -89,6 +93,10 @@ macro_rules! persist_struct {
                 unsafe {
                     let key_ptr = $name::key_ptr();
                     let key_len = $name::key_len();
+
+                    if key_len == 0 {
+                        panic!("❌ persistent key for `{}` is empty", stringify!($name));
+                    }
 
                     let val_buf = self.as_bytes();
                     let mut buf: [u8; core::mem::size_of::<Self>()] = core::mem::zeroed();

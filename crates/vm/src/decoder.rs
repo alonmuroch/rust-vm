@@ -221,36 +221,6 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 
         CompressedOpcode::LuiOrAddi16sp => {
             if rd == 2 {
-                // let bit12 = (hword >> 12) & 0x1;
-                // let bit6  = (hword >> 6)  & 0x1;
-                // let bit5  = (hword >> 5)  & 0x1;
-                // let bit4  = (hword >> 4)  & 0x1;
-                // let bit3  = (hword >> 3)  & 0x1;
-                // let bit2  = (hword >> 2)  & 0x1;
-
-                // println!("hword      = {:#06x}", hword);
-                // println!("bit 12     = {} -> imm[9]", bit12);
-                // println!("bit 6      = {} -> imm[4]", bit6);
-                // println!("bit 5      = {} -> imm[6]", bit5);
-                // println!("bit 4      = {} -> imm[8]", bit4);
-                // println!("bit 3      = {} -> imm[6]", bit3);
-                // println!("bit 2      = {} -> imm[8]", bit2);
-
-                // let imm2 = (
-                //     bit12 << 9 | // imm[5]
-                //     bit6  << 4 | // imm[4]
-                //     bit5  << 6 | // imm[9]
-                //     bit4  << 8 | // imm[8]
-                //     bit3  << 7 | // imm[6]
-                //     bit2  << 5   // imm[8]
-                // ) as i32;
-
-                // println!("assembled 10-bit immediate (unsigned) = {:#05x} ({})", imm2, imm2);
-
-                // let imm = (imm2 << 22) >> 22;
-
-                // println!("sign-extended immediate (signed)     = {}", imm);
-
                 // C.ADDI16SP
                 let imm2 = (
                     ((hword >> 12) & 0x1) << 9  | 
@@ -276,23 +246,27 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         }
 
         CompressedOpcode::Addi4spn => {
-            let rd = 8 + ((hword >> 2) & 0b111) as usize;
+            let _rd = 8 + ((hword >> 2) & 0b111) as i32; // rd' field
 
-            if rd == 0 {
+            if _rd == 0 {
                 return None; // reserved
             }
 
             let imm =
-                ((hword >>  6) & 0b0001) << 2  |  // bit 2
-                ((hword >>  5) & 0b0001) << 3  |  // bit 3
-                ((hword >> 11) & 0b0001) << 4  |  // bit 4
-                ((hword >>  7) & 0b1111) << 6;    // bits 6–9
+                ((hword >> 12) & 0b1) << 5  | // imm[5]  from bit 12
+                ((hword >> 11) & 0b1) << 4  | // imm[4]  from bit 11
+                ((hword >> 10) & 0b1) << 9  | // imm[9]  from bit 10
+                ((hword >>  9) & 0b1) << 8  | // imm[8]  from bit 9
+                ((hword >>  8) & 0b1) << 7  | // imm[7]  from bit 8
+                ((hword >>  7) & 0b1) << 6  | // imm[6]  from bit 7
+                ((hword >>  6) & 0b1) << 2  | // imm[2]  from bit 6
+                ((hword >>  5) & 0b1) << 3;   // imm[3]  from bit 5
 
             if imm == 0 {
                 return None; // nzuimm must be non-zero
             }
 
-            Some(Instruction::Addi4spn { rd, imm: imm as u32 })
+            Some(Instruction::Addi4spn { rd: _rd as usize, imm: imm as u32 })
         }
 
         CompressedOpcode::Jal => {

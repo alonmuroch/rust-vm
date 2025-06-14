@@ -4,7 +4,6 @@ use core::convert::TryInto;
 use std::fs;
 use std::path::Path;
 use compiler::elf::parse_elf_from_bytes;
-use program::Result;
 
 pub const VM_MEMORY_SIZE: usize = 5 * 1024; // 5 KB
 
@@ -18,12 +17,18 @@ struct TestCase<'a> {
     input: &'a [u8],
 }
 
+#[derive(Debug)]
+struct ResultStruct {
+    pub success: bool,
+    pub error_code: u32,
+}
+
 #[test]
 fn test_entrypoint_function() {
     let test_cases = [
         TestCase {
             name: "storage",
-            path: "tests/programs/bin/storage.elf",
+            path: "../examples/bin/storage.elf",
             expected_success: true,
             expected_error_code: 5,
             pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
@@ -59,7 +64,7 @@ fn test_entrypoint_function() {
     }
 }
 
-pub fn extract_and_print_result(vm: &VM, result_ptr: u32) -> Result {
+fn extract_and_print_result(vm: &VM, result_ptr: u32) -> ResultStruct {
     let mem = vm.memory.mem();
     let start = result_ptr as usize;
 
@@ -80,10 +85,8 @@ pub fn extract_and_print_result(vm: &VM, result_ptr: u32) -> Result {
     let error_code = u32::from_le_bytes(mem[start..start + 4].try_into().unwrap());
     let success = mem[start + 4] != 0;
 
-    return Result { error_code, success };
+    ResultStruct { error_code, success }
 }
-
-
 
 pub fn from_hex(hex: &str) -> [u8; 32] {
     assert!(hex.len() == 64, "Hex string must be exactly 64 characters");
@@ -99,12 +102,10 @@ pub fn from_hex(hex: &str) -> [u8; 32] {
 
     let mut bytes = [0u8; 32];
     let hex_bytes = hex.as_bytes();
-    let mut i = 0;
-    while i < 32 {
+    for i in 0..32 {
         let hi = from_hex_char(hex_bytes[i * 2]);
         let lo = from_hex_char(hex_bytes[i * 2 + 1]);
         bytes[i] = (hi << 4) | lo;
-        i += 1;
     }
 
     bytes
@@ -120,28 +121,13 @@ pub fn load_and_run_elf<P: AsRef<Path>>(path: P, vm: &mut VM) {
 
     println!("✅ Parsed ELF: {} ({} sections)", path_str, elf.sections.len());
 
-    for section in &elf.sections {
-        let vma = section.addr as usize;
-        let file_offset = section.addr as usize;
-        let size = section.size as usize;
+    let (code, code_start) = elf.get_flat_code()
+        .unwrap_or_else(|| panic!("❌ No code sections found in ELF {}", path_str));
+    println!("📦 Code size: {} bytes, starting at 0x{:08x}", code.len(), code_start);
+    vm.set_code(code_start as usize, &code);
 
-        if size == 0 {
-            continue; // Skip empty sections
-        }
-
-        match section.name.as_str() {
-            ".text.entrypoint" => {
-                println!("📦 Loading code section: {} at 0x{:08x} ({} bytes)", section.name, vma, size);
-                let data = &bytes[file_offset..file_offset + size];
-                vm.set_code(vma, data);
-            }
-            ".rodata" => {
-                println!("📦 Loading rodata section: {} at 0x{:08x} ({} bytes)", section.name, vma, size);
-                let data = &bytes[file_offset..file_offset + size];
-                vm.set_rodata(vma, data);
-            }
-            _ => {}
-        }
-    }
+    let (rodata, rodata_start) = elf.get_flat_rodata()
+        .unwrap_or_else(|| panic!("❌ No rodata sections found in ELF {}", path_str));
+    println!("📦 Readonly data size: {} bytes, starting at 0x{:08x}", rodata.len(), rodata_start);
+    vm.set_rodata(rodata_start as usize, &rodata);
 }
-

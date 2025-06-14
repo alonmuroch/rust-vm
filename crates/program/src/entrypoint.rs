@@ -26,13 +26,5 @@ macro_rules! entrypoint {
             unsafe { core::arch::asm!("ebreak") };
             loop {}
         }
-
-        #[panic_handler]
-        fn panic(_info: &core::panic::PanicInfo) -> ! {    
-            // soft halt signal to host
-            unsafe { core::arch::asm!("ebreak") };
-            loop {}
-        }
-
     };
 }

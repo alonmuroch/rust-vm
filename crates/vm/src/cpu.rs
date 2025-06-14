@@ -54,6 +54,11 @@ impl CPU {
     }
 
     pub fn next_instruction(&mut self, memory: &Memory) -> Option<(Instruction, u8)> {
+        if self.pc == 1286 {
+            eprintln!("🚨 CPU halted at PC = 0x{:08x}", self.pc);
+            return None;
+        }
+        
         let pc = self.pc as usize;
         let bytes = memory.mem_slice(pc, pc + 4)?;
 
@@ -190,18 +195,27 @@ impl CPU {
                 self.pc = self.pc.wrapping_add(offset as u32);
                 return true;
             }
-            Instruction::Jalr { rd, rs1, offset } => {
-                let target = self.regs[rs1].wrapping_add(offset as u32) & !1;
+           Instruction::Jalr { rd, rs1, offset } => {
+                let base = self.regs[rs1];
+                let target = base.wrapping_add(offset as u32) & !1;
                 let return_address = self.pc + 4;
 
-                // Only write to rd if rd != 0 (x0 is hardwired to zero)
+                println!(
+                    "🪂 JALR: rd = x{}, rs1 = x{}, offset = {}, base = 0x{:08x}, target = 0x{:08x}, return = 0x{:08x}",
+                    rd, rs1, offset, base, target, return_address
+                );
+
                 if rd != 0 {
                     self.regs[rd] = return_address;
+                    println!("↩️  Saved return address 0x{:08x} to x{}", return_address, rd);
+                } else {
+                    println!("🚫 Return address discarded (rd = x0)");
                 }
 
                 self.pc = target;
                 return true;
             }
+
             Instruction::Lui { rd, imm } => self.regs[rd] = (imm << 12) as u32,
             Instruction::Auipc { rd, imm } => {
                 self.regs[rd] = self.pc.wrapping_add((imm << 12) as u32)

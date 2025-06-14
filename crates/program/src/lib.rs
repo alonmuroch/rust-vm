@@ -12,3 +12,14 @@ pub mod storage;
 
 // Re-export so `$crate::Persistent` works in the macro
 pub use storage::Persistent;
+
+#[panic_handler]
+fn panic(_: &core::panic::PanicInfo) -> ! {
+    unsafe {
+        core::arch::asm!(
+            "ebreak",
+            options(nomem, nostack, preserves_flags)
+        );
+    }
+    loop {}
+}
