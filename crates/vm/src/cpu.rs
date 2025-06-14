@@ -200,17 +200,9 @@ impl CPU {
                 let target = base.wrapping_add(offset as u32) & !1;
                 let return_address = self.pc + 4;
 
-                println!(
-                    "🪂 JALR: rd = x{}, rs1 = x{}, offset = {}, base = 0x{:08x}, target = 0x{:08x}, return = 0x{:08x}",
-                    rd, rs1, offset, base, target, return_address
-                );
-
                 if rd != 0 {
                     self.regs[rd] = return_address;
-                    println!("↩️  Saved return address 0x{:08x} to x{}", return_address, rd);
-                } else {
-                    println!("🚫 Return address discarded (rd = x0)");
-                }
+                } 
 
                 self.pc = target;
                 return true;

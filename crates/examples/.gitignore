@@ -1,0 +1,7 @@
+# Ignore all object files and binaries in the bin directory
+bin/*.o
+bin/*.bin
+bin/*.elf
+
+# Do not ignore this .gitignore file
+!.gitignore
