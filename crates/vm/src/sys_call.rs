@@ -26,8 +26,8 @@ impl CPU {
             }
         };
 
-        // Return result in a0
-        self.regs[10] = result;
+        // Return result in a2
+        self.regs[12] = result;
 
         true // continue execution
     }
@@ -36,30 +36,37 @@ impl CPU {
         let key_ptr = args[0] as usize;
         let key_len = args[1] as usize;
 
-        // Safely get the key slice from memory
-        let key_slice_ref = match memory.mem_slice(key_ptr, key_ptr + key_len) {
-            Some(r) => r,
-            None => return 0,
+        let key_slice = {
+            // create a limited scope
+            let key_slice_ref = match memory.mem_slice(key_ptr, key_ptr + key_len) {
+                Some(r) => r,
+                None => return 0,
+            };
+            key_slice_ref.as_ref().to_vec() // clone to avoid borrow
         };
-        let key_slice = key_slice_ref.as_ref();
 
-        // Convert the key slice to a &str
-        let key = match core::str::from_utf8(key_slice) {
+        let key = match core::str::from_utf8(&key_slice) {
             Ok(s) => s,
             Err(_) => return 0,
         };
 
-        println!("🔑 Storage GET key: \"{}\"", key);
+        println!("🔑 Storage GET key: \"{}\" @ 0x{:08x} (len = {})", key, key_ptr, key_len);
 
         // Lookup the value in storage
         if let Some(value) = storage.get(key) {
-            // Prepare buffer: [len (u32 LE)] + [value bytes]
+            // alloc and return real address
             let mut buf = (value.len() as u32).to_le_bytes().to_vec();
             buf.extend_from_slice(value.as_slice());
-
-            // Allocate in guest memory and copy
             let addr = memory.alloc_on_heap(&buf);
-            addr
+
+            println!(
+                "📦 Storage GET value (len = {}) @ 0x{:08x}: {:02x?}",
+                value.len(),
+                addr,
+                value
+            );
+
+            return addr;
         } else {
             println!("❌ Key not found in storage");
             0
@@ -85,7 +92,7 @@ impl CPU {
             Err(_) => return 0,
         };
 
-         println!("🔑 Storage SET key: \"{}\"", key);
+        println!("🔑 Storage SET key: \"{}\" @ 0x{:08x} (len = {})", key, key_ptr, key_len);
 
         let value_slice_ref = match memory.mem_slice(val_ptr, val_ptr + val_len) {
             Some(r) => r,

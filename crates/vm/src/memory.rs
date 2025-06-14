@@ -129,13 +129,21 @@ impl Memory {
     }
 
     pub fn alloc_on_heap(&self, data: &[u8]) -> u32 {
-        let addr = self.next_heap.get();
+        let mut addr = self.next_heap.get();
+
+        // Align to 4 bytes (or 8 if you're storing u64s)
+        let align = 8;
+        addr = (addr + (align - 1)) & !(align - 1);
+
         let end = addr + data.len() as u32;
         assert!(end as usize <= self.size());
+
         self.mem.borrow_mut()[addr as usize..end as usize].copy_from_slice(data);
         self.next_heap.set(end);
+
         addr
-    }
+    }   
+
 
     pub fn stack_top(&self) -> u32 {
         self.size() as u32

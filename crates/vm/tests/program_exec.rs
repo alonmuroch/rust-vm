@@ -4,6 +4,7 @@ use core::convert::TryInto;
 use std::fs;
 use std::path::Path;
 use compiler::elf::parse_elf_from_bytes;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 pub const VM_MEMORY_SIZE: usize = 5 * 1024; // 5 KB
 
@@ -51,9 +52,16 @@ fn test_entrypoint_function() {
         let result_ptr = vm.set_reg_to_data(Register::A3, &[0u8; 5]);
 
         // 3. Run VM
-        vm.run();
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            vm.run(); // this might panic
+        }));
+        // Always dump memory and storage
         vm.dump_memory(0, VM_MEMORY_SIZE);
         vm.dump_storage();
+        if let Err(e) = result {
+            eprintln!("💥 VM panicked: {:?}", e);
+            panic!("VM panicked");
+        }
         
         // 4. Extract result struct
         let res = extract_and_print_result(&vm, result_ptr);
@@ -76,7 +84,6 @@ fn extract_and_print_result(vm: &VM, result_ptr: u32) -> ResultStruct {
     let slice_len = (start + 8).min(mem.len()) - start;
     let raw_slice = &mem[start..start + slice_len];
 
-    print!("Raw memory at 0x{:08x}:", start);
     for byte in raw_slice {
         print!(" {:02x}", byte);
     }

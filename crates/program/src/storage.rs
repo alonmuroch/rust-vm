@@ -27,7 +27,6 @@ macro_rules! persist_struct {
             fn key_len() -> usize {
                 $key_ident.len()
             }
-
             pub fn as_bytes(&self) -> &[u8] {
                 let ptr = self as *const _ as *const u8;
                 let len = core::mem::size_of::<Self>();
@@ -66,7 +65,9 @@ macro_rules! persist_struct {
                     let key_len = $name::key_len();
 
                     if key_len == 0 {
-                        vm_panic!(concat!("❌ persistent key for `", stringify!($name), "` is empty"));
+                        $crate::vm_panic(
+                            concat!("❌ persistent key for `", stringify!($name), "` is empty").as_bytes()
+                        );
                     }
 
                     let mut value_ptr: u32;
@@ -103,7 +104,9 @@ macro_rules! persist_struct {
                     let key_len = $name::key_len();
 
                     if key_len == 0 {
-                        vm_panic!(concat!("❌ persistent key for `", stringify!($name), "` is empty"));
+                        $crate::vm_panic(
+                            concat!("❌ persistent key for `", stringify!($name), "` is empty").as_bytes()
+                        );
                     }
 
                     let val_buf = self.as_bytes();

@@ -58,11 +58,6 @@ impl CPU {
     }
 
     pub fn next_instruction(&mut self, memory: &Memory) -> Option<(Instruction, u8)> {
-        if self.pc == 1286 {
-            eprintln!("🚨 CPU halted at PC = 0x{:08x}", self.pc);
-            return None;
-        }
-        
         let pc = self.pc as usize;
         let bytes = memory.mem_slice(pc, pc + 4)?;
 
