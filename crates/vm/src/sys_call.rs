@@ -2,6 +2,14 @@ use crate::cpu::CPU;
 use crate::memory::Memory;
 use crate::storage::Storage;
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct User {
+    pub id: u64,
+    pub active: bool,
+    pub level: u8,
+}
+
 impl CPU {
     pub fn handle_syscall(&mut self, memory: &Memory, storage: &Storage) -> bool {
         let syscall_id = self.regs[17]; // a7
@@ -21,6 +29,7 @@ impl CPU {
             1 => self.sys_storage_get(args, memory, storage),
             2 => self.sys_storage_set(args, memory, storage),
             3 => self.handle_panic_with_message(memory),
+            4 => Self::sys_log(args, memory),
             _ => {
                 panic!("Unknown syscall: {}", syscall_id);
             }
@@ -92,13 +101,20 @@ impl CPU {
             Err(_) => return 0,
         };
 
-        println!("🔑 Storage SET key: \"{}\" @ 0x{:08x} (len = {})", key, key_ptr, key_len);
-
         let value_slice_ref = match memory.mem_slice(val_ptr, val_ptr + val_len) {
             Some(r) => r,
             None => return 0,
         };
         let value_slice = value_slice_ref.as_ref();
+        
+        println!(
+            "🔑 Storage SET key: \"{}\" @ 0x{:08x} (len = {}) | value: {:02x?}",
+            key,
+            key_ptr,
+            key_len,
+            value_slice
+        );
+
         storage.set(key, value_slice.to_vec());
         0
     }
@@ -117,4 +133,23 @@ impl CPU {
 
         panic!("🔥 Guest panic: {}", msg);
     }
+
+    /// Syscall ID 4: Log message from guest VM
+    pub fn sys_log(args: [u32; 7], memory: &Memory) -> u32 {
+        let ptr = args[0] as usize;
+        let len = args[1] as usize;
+
+        if let Some(slice_ref) = memory.mem_slice(ptr, ptr + len) {
+            let slice = slice_ref.as_ref();
+            match core::str::from_utf8(slice) {
+                Ok(msg) => println!("🪵 Guest Log: {}", msg),
+                Err(_) => println!("🪵 Guest Log: <non-UTF8 data: {:x?}>", slice),
+            }
+        } else {
+            println!("🪵 Guest Log: <invalid memory range>");
+        }
+
+        0
+    }
+
 }

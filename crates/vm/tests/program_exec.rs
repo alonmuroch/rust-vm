@@ -6,7 +6,7 @@ use std::path::Path;
 use compiler::elf::parse_elf_from_bytes;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
-pub const VM_MEMORY_SIZE: usize = 5 * 1024; // 5 KB
+pub const VM_MEMORY_SIZE: usize = 10 * 1024; // 10 KB
 
 #[derive(Debug)]
 struct TestCase<'a> {

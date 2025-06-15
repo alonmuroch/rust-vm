@@ -27,7 +27,8 @@ impl CPU {
                     println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
                 }
                 let old_pc = self.pc;
-                let result = self.execute(instr, memory, storage);
+                let result = self.execute(instr, memory, storage);      
+
                 // bump the PC only if the instruction did not change it
                 if self.pc == old_pc {
                     self.pc = self.pc.wrapping_add(size as u32);
@@ -209,7 +210,7 @@ impl CPU {
 
             Instruction::Lui { rd, imm } => self.regs[rd] = (imm << 12) as u32,
             Instruction::Auipc { rd, imm } => {
-                self.regs[rd] = self.pc.wrapping_add((imm << 12) as u32)
+                self.regs[rd] = self.pc.wrapping_add((imm << 12) as u32);
             }
             Instruction::Mul { rd, rs1, rs2 } => {
                 self.regs[rd] = self.regs[rs1].wrapping_mul(self.regs[rs2])

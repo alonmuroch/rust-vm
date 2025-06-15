@@ -5,6 +5,13 @@ pub mod result;
 pub use pubkey::Pubkey;
 pub use result::Result;
 
+pub mod log;
+#[macro_use]
+pub use crate::log::*;
+
+pub extern crate hex;
+pub extern crate heapless;
+
 #[macro_use] // enables macro use across the crate
 pub mod entrypoint;
 #[macro_use]

@@ -7,4 +7,5 @@ edition = "2024"
 test = false
 
 [dependencies]
-
+hex = { version = "0.4", default-features = false }
+heapless = { version = "0.8", default-features = false }

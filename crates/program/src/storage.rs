@@ -13,7 +13,7 @@ macro_rules! persist_struct {
     ($name:ident, $key_ident:ident, {
         $($field:ident : $type:ty),* $(,)?
     }) => {
-        #[repr(C)]
+        #[repr(C, packed)]
         #[derive(Copy, Clone, Debug)]
         pub struct $name {
             $(pub $field: $type),*
@@ -79,6 +79,8 @@ macro_rules! persist_struct {
                         out("a2") value_ptr,
                     );
 
+                    $crate::logf!("🔑 key_ptr = 0x{:08x}, len = {}", key_ptr as usize, key_len);
+
                     if value_ptr == 0 {
                         return None;
                     }
@@ -97,6 +99,71 @@ macro_rules! persist_struct {
                     Self::from_bytes(value_buf)
                 }
             }
+
+            
+            // fn load() -> Option<Self> {
+            //     unsafe {
+            //         let key_ptr = $name::key_ptr();
+            //         let key_len = $name::key_len();
+
+            //         if key_len == 0 {
+            //             $crate::vm_panic(
+            //                 concat!("❌ persistent key for `", stringify!($name), "` is empty").as_bytes()
+            //             );
+            //         }
+
+            //         let mut value_ptr: u32;
+            //         core::arch::asm!(
+            //             "li a7, 1",  // syscall_storage_read
+            //             "ecall",
+            //             in("a0") key_ptr,
+            //             in("a1") key_len,
+            //             out("a2") value_ptr,
+            //         );
+
+            //         $crate::logf!("🔑 key_ptr = 0x{:08x}, len = {}", key_ptr as usize, key_len);
+            //         $crate::logf!("📥 value_ptr = 0x{:08x}", value_ptr);
+
+            //         if value_ptr == 0 {
+            //             return None;
+            //         }
+
+            //         let len_bytes = core::slice::from_raw_parts(value_ptr as *const u8, 4);
+            //         let value_len = u32::from_le_bytes([
+            //             len_bytes[0],
+            //             len_bytes[1],
+            //             len_bytes[2],
+            //             len_bytes[3],
+            //         ]) as usize;
+
+            //         let data_ptr = (value_ptr + 4) as *const u8;
+            //         $crate::logf!("📦 data_ptr = 0x{:08x}, len = {}", data_ptr as usize, value_len);
+
+            //         // 🧩 Optional: dump raw bytes as hex
+            //         {
+            //             let raw_data = core::slice::from_raw_parts(data_ptr, value_len);
+            //             let mut hex_buf = [0u8; 128];
+
+            //             let hex_len = match $crate::hex::encode_to_slice(raw_data, &mut hex_buf) {
+            //                 Ok(()) => raw_data.len() * 2,
+            //                 Err(_) => 0,
+            //             };
+
+            //             let prefix = b"\xf0\x9f\x93\xa6 raw = 0x";
+            //             let mut final_msg = [0u8; 160];
+
+            //             final_msg[..prefix.len()].copy_from_slice(prefix);
+            //             final_msg[prefix.len()..prefix.len() + hex_len]
+            //                 .copy_from_slice(&hex_buf[..hex_len]);
+
+            //             $crate::log::vm_log(&final_msg[..prefix.len() + hex_len]);
+            //         }
+
+            //         Self::from_bytes(core::slice::from_raw_parts(data_ptr, value_len))
+            //     }
+            // }
+
+
 
             fn store(&self) {
                 unsafe {
