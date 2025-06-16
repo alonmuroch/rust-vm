@@ -186,7 +186,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             })
         },
         Opcode::Auipc => {
-            let imm = (word & 0xfffff000) as i32;
+            let imm = ((word >> 12) & 0xfffff) as i32; // Extract imm[31:12] as signed 20-bit value
             Some(Instruction::Auipc { rd, imm })
         },
         Opcode::System => Some(Instruction::Ecall),
@@ -302,14 +302,20 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         CompressedOpcode::Lwsp => {
             let rd = ((hword >> 7) & 0x1F) as usize;
             if rd == 0 {
-                return None;
+                return None; // rd must not be x0
             }
-            let imm = (((hword >> 2) & 0x7) << 2)   // bits 4:2 -> imm[4:2]
-                    | ((hword >> 12) & 0x1) << 5    // bit 12 -> imm[5]
-                    | ((hword >> 6) & 0x1) << 6;    // bit 6 -> imm[6]
+
+            // Reconstruct immediate as: [7:6][5][4:2]
+            let imm =
+                ((hword >> 2) & 0b11) << 6   // bits 3:2 -> imm[7:6]
+            | ((hword >> 12) & 0x1) << 5   // bit 12   -> imm[5]
+            | ((hword >> 4) & 0b111) << 2; // bits 6:4 -> imm[4:2]
+
             let imm = imm as i32;
-            Some(Instruction::Lw { rd, rs1: 2, offset: imm })
+
+            Some(Instruction::Lw { rd, rs1: 2, offset: imm }) // x2 is sp
         }
+
 
         CompressedOpcode::Beqz | CompressedOpcode::Bnez => {
             let rs1 = 8 + ((hword >> 7) & 0b111) as usize; // rs1' field
