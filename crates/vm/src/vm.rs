@@ -56,6 +56,10 @@ impl VM {
         assert!(start < end, "invalid memory range");
         assert!(end <= self.memory.mem().len(), "range out of bounds");
 
+        let next_heap = self.memory.next_heap.get();
+        println!("--- Memory Dump ---");
+        println!("Next heap pointer: 0x{:08x}", next_heap);
+
         for addr in (start..end).step_by(16) {
             let line = &self.memory.mem()[addr..end.min(addr + 16)];
 
@@ -68,7 +72,9 @@ impl VM {
 
             println!("{:08x}  {:<47}  |{}|", addr, hex_str, ascii);
         }
+        println!("-------------------");
     }
+
 
     pub fn dump_storage(&self) {
         println!("--- Storage Dump ---");
@@ -79,6 +85,27 @@ impl VM {
         }
         println!("--------------------");
     }
+
+    pub fn dump_registers(&self) {
+        println!("--- Register Dump ---");
+
+        const ABI_NAMES: [&str; 32] = [
+            "zero", "ra",  "sp",  "gp",  "tp",  "t0",  "t1",  "t2",
+            "s0",   "s1",  "a0",  "a1",  "a2",  "a3",  "a4",  "a5",
+            "a6",   "a7",  "s2",  "s3",  "s4",  "s5",  "s6",  "s7",
+            "s8",   "s9",  "s10", "s11", "t3",  "t4",  "t5",  "t6",
+        ];
+
+        for i in 0..32 {
+            let name = ABI_NAMES[i];
+            let val = self.cpu.regs[i];
+            println!("x{:02} ({:<4}) = 0x{:08x} ({})", i, name, val, val);
+        }
+
+        println!("pc           = 0x{:08x}", self.cpu.pc);
+        println!("------------------------");
+    }
+
 
     pub fn run(&mut self) {
         // Validate pubkey pointer (A0)

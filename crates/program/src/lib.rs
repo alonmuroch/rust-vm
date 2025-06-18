@@ -36,8 +36,8 @@ pub fn vm_panic(msg: &[u8]) -> ! {
         core::arch::asm!(
             "li a7, 3",
             "ecall",
-            in("x10") msg.as_ptr(), // a0 = x10
-            in("x11") msg.len(),    // a1 = x11
+            in("t0") msg.as_ptr(), 
+            in("t1") msg.len(),    
         );
 
         // Halt execution explicitly

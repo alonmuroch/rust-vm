@@ -211,7 +211,9 @@ impl CPU {
                 return true;
             }
 
-            Instruction::Lui { rd, imm } => self.regs[rd] = (imm << 12) as u32,
+            Instruction::Lui { rd, imm } => {
+                self.regs[rd] = (imm << 12) as u32
+            }
             Instruction::Auipc { rd, imm } => {
                 self.regs[rd] = self.pc.wrapping_add((imm << 12) as u32);
             }

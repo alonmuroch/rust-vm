@@ -1,7 +1,7 @@
 use crate::cpu::CPU;
 use crate::memory::Memory;
 use crate::storage::Storage;
-use core::convert::TryInto;
+use crate::registers::Register;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -21,17 +21,16 @@ enum Arg {
 
 impl CPU {
     pub fn handle_syscall(&mut self, memory: &Memory, storage: &Storage) -> bool {
-        let syscall_id = self.regs[17]; // a7
+        let syscall_id = self.regs[Register::A7 as usize]; // a7
 
-        // Arguments from a0–a6
+        // Arguments from t0–t6
         let args = [
-            self.regs[10], // a0
-            self.regs[11], // a1
-            self.regs[12], // a2
-            self.regs[13], // a3
-            self.regs[14], // a4
-            self.regs[15], // a5
-            self.regs[16], // a6
+            self.regs[Register::T0 as usize],
+            self.regs[Register::T1 as usize],
+            self.regs[Register::T2 as usize],
+            self.regs[Register::T3 as usize],
+            self.regs[Register::T4 as usize],
+            self.regs[Register::T5 as usize],
         ];
 
         let result = match syscall_id {
@@ -44,13 +43,13 @@ impl CPU {
             }
         };
 
-        // Return result in a2
-        self.regs[12] = result;
+        // Return result in t2
+        self.regs[Register::T6 as usize] = result;
 
         true // continue execution
     }
 
-    pub fn sys_storage_get(&mut self, args: [u32; 7], memory: &Memory, storage: &Storage) -> u32 {
+    pub fn sys_storage_get(&mut self, args: [u32; 6], memory: &Memory, storage: &Storage) -> u32 {
         let key_ptr = args[0] as usize;
         let key_len = args[1] as usize;
 
@@ -91,7 +90,7 @@ impl CPU {
         }
     }
 
-    pub fn sys_storage_set(&mut self, args: [u32; 7], memory: &Memory, storage: &Storage) -> u32 {
+    pub fn sys_storage_set(&mut self, args: [u32; 6], memory: &Memory, storage: &Storage) -> u32 {
         let key_ptr = args[0] as usize;
         let key_len = args[1] as usize;
         let val_ptr = args[2] as usize;
@@ -143,7 +142,7 @@ impl CPU {
         panic!("🔥 Guest panic: {}", msg);
     }
 
-    pub fn sys_log(&mut self, args: [u32; 7], memory: &Memory) -> u32 {
+    pub fn sys_log(&mut self, args: [u32; 6], memory: &Memory) -> u32 {
         let [fmt_ptr, fmt_len, arg_ptr, arg_len, ..] = args;
 
         // 1. Load format string

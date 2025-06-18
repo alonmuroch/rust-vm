@@ -179,7 +179,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             })
         },
         Opcode::Lui => {
-            let imm = (word & 0xfffff000) as i32;
+            let imm = ((word >> 12) & 0xFFFFF) as i32;
             Some(Instruction::Lui { 
                 rd,
                 imm: imm as i32, 
@@ -281,16 +281,10 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 
         CompressedOpcode::RegOrJump => {
             match (rs1, rs2) {
-                (0, 0) => Some(Instruction::Ebreak),
-                (1, 0) => Some(Instruction::Ret),
-                (_, 0) => Some(Instruction::Jr { rs1 }),
-                (_, _) => {
-                    if rs1 == rs2 {
-                        Some(Instruction::Mv { rd: rs1, rs2 })
-                    } else {
-                        Some(Instruction::Add { rd: rs1, rs1, rs2 })
-                    }
-                }
+                    (0, 0) => Some(Instruction::Ebreak),
+                    (1, 0) => Some(Instruction::Ret),                // C.RET (alias of JR x1)
+                    (_, 0) => Some(Instruction::Jr { rs1 }),         // C.JR
+                    (_, _) => Some(Instruction::Mv { rd: rs1, rs2 }),// C.MV (rd ≠ 0, rs2 ≠ 0)
             }
         }
 

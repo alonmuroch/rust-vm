@@ -74,9 +74,9 @@ macro_rules! persist_struct {
                     core::arch::asm!(
                         "li a7, 1",  // syscall_storage_read
                         "ecall",
-                        in("a0") key_ptr,
-                        in("a1") key_len,
-                        out("a2") value_ptr,
+                        in("t0") key_ptr,
+                        in("t1") key_len,
+                        out("t2") value_ptr,
                     );
 
                     // $crate::logf!("🔑 key_ptr = 0x%x, len = %d", key_ptr as u32, key_len as u32);
@@ -125,10 +125,10 @@ macro_rules! persist_struct {
                     core::arch::asm!(
                         "li a7, 2", // syscall_storage_write
                         "ecall",
-                        in("a0") key_ptr,
-                        in("a1") key_len,
-                        in("a2") val_ptr,
-                        in("a3") val_len,
+                        in("t0") key_ptr,
+                        in("t1") key_len,
+                        in("t2") val_ptr,
+                        in("t3") val_len,
                         options(readonly, nostack, preserves_flags)
                     );
                 }
