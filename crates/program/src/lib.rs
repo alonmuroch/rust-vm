@@ -10,7 +10,6 @@ pub mod log;
 pub use crate::log::*;
 
 pub extern crate hex;
-pub extern crate heapless;
 
 #[macro_use] // enables macro use across the crate
 pub mod entrypoint;

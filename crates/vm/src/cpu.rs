@@ -191,7 +191,10 @@ impl CPU {
                 }
             }
             Instruction::Jal { rd, offset } => {
-                self.regs[rd] = self.pc + 4;
+                // forbidden by the RISC-V spec
+                if rd != 0 {
+                    self.regs[rd] = self.pc + 4;
+                }
                 self.pc = self.pc.wrapping_add(offset as u32);
                 return true;
             }
