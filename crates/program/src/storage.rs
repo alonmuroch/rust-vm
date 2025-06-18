@@ -79,9 +79,7 @@ macro_rules! persist_struct {
                         out("t2") value_ptr,
                     );
 
-                    // $crate::logf!("🔑 key_ptr = 0x%x, len = %d", key_ptr as u32, key_len as u32);
-                    // $crate::logf!(b"hello!");
-                    $crate::logf!(b"load operation and len=%d",  key_len  as u32);
+                    $crate::logf!(b"key_ptr = %d, len = %d", key_ptr as u32, key_len as u32);
 
                     if value_ptr == 0 {
                         return None;
