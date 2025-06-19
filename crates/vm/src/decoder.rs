@@ -382,14 +382,15 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         CompressedOpcode::Swsp => {
             let rs2 = ((hword >> 2) & 0x1F) as usize;
 
-            // let imm_4_2 = ((hword >> 6) & 0x7) << 2;
-            // let imm_5   = ((hword >> 12) & 0x1) << 5;
-            // let imm_7_6 = ((hword >> 7) & 0x3) << 6;
+            // Offset encoding: imm[5|4:2|7:6]
+            let imm = (((hword >> 7) & 0x1) << 5)     // bit 12 -> imm[5]
+                    | (((hword >> 9) & 0x7) << 2)     // bits 6:4 -> imm[4:2]
+                    | (((hword >> 7) & 0x3) << 6);    // bits 3:2 -> imm[7:6]
 
-            let offset = ((hword >> 7) & 0b11_1111) as i32;
+            let offset = imm as i32;
 
             Some(Instruction::Sw {
-                rs1: 2, // stack pointer (sp = x2)
+                rs1: 2, // sp
                 rs2,
                 offset,
             })
