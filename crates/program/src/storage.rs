@@ -76,16 +76,12 @@ macro_rules! persist_struct {
                         "ecall",
                         in("t0") key_ptr,
                         in("t1") key_len,
-                        out("t2") value_ptr,
+                        out("t6") value_ptr,
                     );
-
-                    $crate::logf!(b"before value_ptr = %d", value_ptr);
 
                     if value_ptr == 0 {
                         return None;
                     }
-
-                    // $crate::logf!(b"after");
 
                     let len_bytes = core::slice::from_raw_parts(value_ptr as *const u8, 4);
                     let value_len = u32::from_le_bytes([
@@ -95,12 +91,16 @@ macro_rules! persist_struct {
                         len_bytes[3],
                     ]) as usize;
 
+                        
+                    if value_len == 0 {
+                        $crate::require(value_len > 0, b"Decoded value len is 0 for bytes");
+                        return None;
+                    }    
+
                     let data_ptr = (value_ptr + 4) as *const u8;
-
-                    // $crate::logf!(b"value ptr = %d val length = %d, data ptr = %d", value_ptr as u32, value_len as u32, data_ptr as u32);
-
                     let value_buf = core::slice::from_raw_parts(data_ptr, value_len);
 
+                
                     Self::from_bytes(value_buf)
                 }
             }

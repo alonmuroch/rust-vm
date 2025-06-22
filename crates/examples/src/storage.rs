@@ -2,7 +2,7 @@
 #![no_main]
 
 extern crate program;
-use program::{entrypoint, Pubkey, Result, vm_panic};
+use program::{entrypoint, Pubkey, Result, vm_panic, require};
 use program::persist_struct;
 use core::convert::TryInto;
 
@@ -54,9 +54,7 @@ fn my_vm_entry(_caller: Pubkey, _data: &[u8]) -> Result {
         Some(u) => u,
         None => User { id: 0, active: false, level: 0 },
     };
-    if reloaded_user.level != 4 {
-        vm_panic(b"User level must be 4");
-    }
+    require(reloaded_user.level == 4, b"Input data must be at least 8 bytes long");
 
     // // --- Config ---
     // let mut config = match Config::load() {
@@ -91,7 +89,7 @@ fn my_vm_entry(_caller: Pubkey, _data: &[u8]) -> Result {
 
     Result {
         success: true,
-        error_code:1,//error_code,
+        error_code:0,//error_code,
     }
 }
 

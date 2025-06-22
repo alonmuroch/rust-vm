@@ -27,14 +27,14 @@ struct ResultStruct {
 #[test]
 fn test_entrypoint_function() {
     let test_cases = [
-        // TestCase {
-        //     name: "storage",
-        //     path: "../examples/bin/storage.elf",
-        //     expected_success: true,
-        //     expected_error_code: 5,
-        //     pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
-        //     input: &[],
-        // },
+        TestCase {
+            name: "storage",
+            path: "../examples/bin/storage.elf",
+            expected_success: true,
+            expected_error_code: 0,
+            pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+            input: &[],
+        },
         TestCase {
             name: "simple",
             path: "../examples/bin/simple.elf",
