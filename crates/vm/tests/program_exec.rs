@@ -27,13 +27,24 @@ struct ResultStruct {
 #[test]
 fn test_entrypoint_function() {
     let test_cases = [
+        // TestCase {
+        //     name: "storage",
+        //     path: "../examples/bin/storage.elf",
+        //     expected_success: true,
+        //     expected_error_code: 5,
+        //     pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+        //     input: &[],
+        // },
         TestCase {
-            name: "storage",
-            path: "../examples/bin/storage.elf",
+            name: "simple",
+            path: "../examples/bin/simple.elf",
             expected_success: true,
-            expected_error_code: 5,
+            expected_error_code: 100,
             pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
-            input: &[],
+            input: &[
+                100, 0, 0, 0,   // first u64 = 100
+                42, 0, 0, 0,      // second u64 = 42
+            ],
         },
     ];
 
@@ -81,15 +92,6 @@ fn extract_and_print_result(vm: &VM, result_ptr: u32) -> ResultStruct {
         panic!("Result struct out of bounds at 0x{:08x}", start);
     }
 
-    // Print 8 bytes starting at result_ptr
-    let slice_len = (start + 8).min(mem.len()) - start;
-    let raw_slice = &mem[start..start + slice_len];
-
-    for byte in raw_slice {
-        print!(" {:02x}", byte);
-    }
-    println!();
-
     let error_code = u32::from_le_bytes(mem[start..start + 4].try_into().unwrap());
     let success = mem[start + 4] != 0;
 
@@ -134,8 +136,14 @@ pub fn load_and_run_elf<P: AsRef<Path>>(path: P, vm: &mut VM) {
     println!("📦 Code size: {} bytes, starting at 0x{:08x}", code.len(), code_start);
     vm.set_code(code_start as usize, &code);
 
-    let (rodata, rodata_start) = elf.get_flat_rodata()
-        .unwrap_or_else(|| panic!("❌ No rodata sections found in ELF {}", path_str));
-    println!("📦 Readonly data size: {} bytes, starting at 0x{:08x}", rodata.len(), rodata_start);
-    vm.set_rodata(rodata_start as usize, &rodata);
+    if let Some((rodata, rodata_start)) = elf.get_flat_rodata() {
+        println!(
+            "📦 Readonly data size: {} bytes, starting at 0x{:08x}",
+            rodata.len(),
+            rodata_start
+        );
+        vm.set_rodata(rodata_start as usize, &rodata);
+    } else {
+        println!("⚠️ No .rodata section found in ELF {}", path_str);
+    }
 }

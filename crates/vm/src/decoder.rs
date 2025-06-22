@@ -289,8 +289,8 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         }
 
         CompressedOpcode::Slli => {
-            let shamt = ((hword >> 2) & 0b11111) as i32;
-            Some(Instruction::Addi { rd, rs1, imm: shamt }) // emulate as ADDI with left shift beforehand
+            let shamt = ((hword >> 2) & 0b11111) as u8;
+            Some(Instruction::Slli { rd, rs1, shamt: shamt }) // emulate as ADDI with left shift beforehand
         }
 
         CompressedOpcode::Lwsp => {
@@ -382,10 +382,12 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         CompressedOpcode::Swsp => {
             let rs2 = ((hword >> 2) & 0x1F) as usize;
 
-            // Offset encoding: imm[5|4:2|7:6]
-            let imm = (((hword >> 7) & 0x1) << 5)     // bit 12 -> imm[5]
-                    | (((hword >> 9) & 0x7) << 2)     // bits 6:4 -> imm[4:2]
-                    | (((hword >> 7) & 0x3) << 6);    // bits 3:2 -> imm[7:6]
+            let imm = (((hword >> 12) & 0x1) << 5) | // bit 12 → imm[5]
+                (((hword >> 11) & 0x1) << 4) | // bit 11 → imm[4]
+                (((hword >> 10) & 0x1) << 3) | // bit 10 → imm[3]
+                (((hword >>  9) & 0x1) << 2) | // bit 9  → imm[2]
+                (((hword >>  8) & 0x1) << 7) | // bit 8  → imm[7]
+                (((hword >>  7) & 0x1) << 6);  // bit 7  → imm[6]
 
             let offset = imm as i32;
 

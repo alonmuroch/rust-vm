@@ -45,6 +45,19 @@ impl VM {
     pub fn set_reg_to_data(&mut self, reg: Register, data: &[u8]) -> u32 {
         let addr = self.alloc_and_write(data);
         self.cpu.regs[reg as usize] = addr;
+
+        println!(
+            "📥 set reg x{} to addr 0x{:08x} (len = {})",
+            reg as u32,
+            addr,
+            data.len()
+        );
+        println!(
+            "📦 data written to 0x{:08x}: {:02x?}",
+            addr,
+            data
+        );
+
         addr
     }
 

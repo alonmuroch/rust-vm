@@ -46,3 +46,10 @@ pub fn vm_panic(msg: &[u8]) -> ! {
 
     loop {}
 }
+
+/// Requires the given condition to be true. If not, triggers a VM panic with the given message.
+pub fn require(condition: bool, msg: &[u8]) {
+    if !condition {
+        vm_panic(msg);
+    }
+}

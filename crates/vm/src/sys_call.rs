@@ -77,10 +77,10 @@ impl CPU {
             let addr = memory.alloc_on_heap(&buf);
 
             println!(
-                "📦 Storage GET value (len = {}) @ 0x{:08x}: {:02x?}",
-                value.len(),
+                "📦 Storage GET buffer (total = {}) @ 0x{:08x}: {:02x?}",
+                buf.len(),
                 addr,
-                value
+                buf
             );
 
             return addr;
