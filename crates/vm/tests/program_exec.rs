@@ -32,7 +32,7 @@ fn test_entrypoint_function() {
             expected_error_code: 0,
             transaction: Transaction {
                 to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                from: to_pubkey("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+                from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                 data: vec![], // input data
                 value: 0,
                 nonce: 0,
@@ -45,7 +45,7 @@ fn test_entrypoint_function() {
             expected_error_code: 100,
             transaction: Transaction {
                 to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                from: to_pubkey("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+                from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                 data: vec![
                     100, 0, 0, 0,   // first u64 = 100
                     42, 0, 0, 0,      // second u64 = 42
@@ -88,29 +88,6 @@ fn extract_and_print_result(vm: &VM, result_ptr: u32) -> ResultStruct {
     let success = mem[start + 4] != 0;
 
     ResultStruct { error_code, success }
-}
-
-pub fn to_pubkey(hex: &str) -> [u8; 32] {
-    assert!(hex.len() == 64, "Hex string must be exactly 64 characters");
-
-    fn from_hex_char(c: u8) -> u8 {
-        match c {
-            b'0'..=b'9' => c - b'0',
-            b'a'..=b'f' => c - b'a' + 10,
-            b'A'..=b'F' => c - b'A' + 10,
-            _ => panic!("Invalid hex character"),
-        }
-    }
-
-    let mut bytes = [0u8; 32];
-    let hex_bytes = hex.as_bytes();
-    for i in 0..32 {
-        let hi = from_hex_char(hex_bytes[i * 2]);
-        let lo = from_hex_char(hex_bytes[i * 2 + 1]);
-        bytes[i] = (hi << 4) | lo;
-    }
-
-    bytes
 }
 
 pub fn to_address(hex: &str) -> [u8; 20] {
