@@ -27,14 +27,14 @@ persist_struct!(User, PERSIST_USER, {
 
 // Struct 2: Config
 persist_struct!(Config, PERSIST_CONFIG, {
-    retries: u32,
-    timeout_ms: u16,
+    retries: u64,
+    timeout_ms: u64,
 });
 
 // Struct 3: Session stats
 persist_struct!(Session, PERSIST_SESSION, {
     tx_count: u64,
-    last_error: u32,
+    last_error: u64,
     completed: bool,
 });
 
@@ -46,7 +46,12 @@ fn my_vm_entry(_caller: Pubkey, _data: &[u8]) -> Result {
     };
 
     user.level = 4;
+    user.id = 40000;
     user.store();
+
+    // ... change local copy ...
+    user.level = 5;
+    user.id = 40001;
 
     // ... later ...
 
@@ -54,20 +59,31 @@ fn my_vm_entry(_caller: Pubkey, _data: &[u8]) -> Result {
         Some(u) => u,
         None => User { id: 0, active: false, level: 0 },
     };
-    require(reloaded_user.level == 4, b"Input data must be at least 8 bytes long");
+    require(reloaded_user.level == 4, b"user level must be 4");
+    require(reloaded_user.id == 40000, b"user id must be 40000");
 
-    // // --- Config ---
-    // let mut config = match Config::load() {
-    //     Some(c) => c,
-    //     None => Config { retries: 2, timeout_ms: 3000 },
-    // };
+    // --- Config ---
+    let mut config = match Config::load() {
+        Some(c) => c,
+        None => Config { retries: 2, timeout_ms: 3000 },
+    };
 
-    // // ... later ...
+    config.retries = 13;
+    config.timeout_ms = 100000;
+    config.store();
 
-    // let reloaded_config = match Config::load() {
-    //     Some(c) => c,
-    //     None => Config { retries: 2, timeout_ms: 3000 },
-    // };
+    // ... change local copy ...
+    config.retries = 15;
+    config.timeout_ms = 103000;
+
+    // ... later ...
+
+    let reloaded_config = match Config::load() {
+        Some(c) => c,
+        None => Config { retries: 2, timeout_ms: 3000 },
+    };
+    require(reloaded_config.retries == 13, b"config retries must be 13");
+    require(reloaded_config.timeout_ms == 100000, b"config timeout_ms must be 100000");
 
     // // --- Session ---
     // let mut session = match Session::load() {
