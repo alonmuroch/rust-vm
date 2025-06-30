@@ -3,8 +3,10 @@ use crate::cpu::CPU;
 use crate::registers::Register;
 use crate::memory::{Memory};
 use crate::global::Config;
+use crate::transaction::Transaction;
 use storage::{Storage};
 use state::State;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 pub struct VM {
     pub cpu: CPU,
@@ -123,16 +125,15 @@ impl VM {
         println!("------------------------");
     }
 
+    pub fn run_tx(&mut self, tx: Transaction) -> u32 {
+        // to address
+        let _address_ptr: u32 = self.set_reg_to_data(Register::A0, &tx.to);
 
-    pub fn run(&mut self) {
-        // Validate pubkey pointer (A0)
-        let pubkey_ptr = self.cpu.regs[Register::A0 as usize] as usize;
-        if pubkey_ptr == 0 {
-            panic!("Entrypoint: pubkey pointer is not set");
-        }
+        // from address
+        let _pubkey_ptr = self.set_reg_to_data(Register::A1, &tx.from);
 
-        // Validate input length (A2)
-        let input_len = self.cpu.regs[Register::A2 as usize] as usize;
+        // input data
+        let input_len = tx.data.len();
         if input_len > Config::MAX_INPUT_LEN {
             panic!(
                 "Entrypoint: input length {} exceeds MAX_INPUT_LEN ({})",
@@ -140,16 +141,27 @@ impl VM {
                 Config::MAX_INPUT_LEN
             );
         }
+        let _input_ptr = self.set_reg_to_data(Register::A2, &tx.data);
+        self.set_reg_u32(Register::A3, input_len as u32);
 
-        // Validate result pointer (A3)
-        let result_ptr = self.cpu.regs[Register::A3 as usize] as usize;
-        if result_ptr == 0 {
-            panic!("Entrypoint: result pointer is not set");
-        }
-        if result_ptr >= self.memory.mem().len() {
-            panic!("Entrypoint: result pointer is out of memory bounds");
+        // result pointer
+        let result_ptr = self.set_reg_to_data(Register::A4, &[0u8; 5]);
+
+        // run the VM
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            self.raw_run(); // this might panic
+        }));
+        if let Err(e) = result {
+            eprintln!("💥 VM panicked: {:?}", e);
+            panic!("VM panicked");
         }
 
+        return result_ptr;
+    }
+
+    /// Starts program execution without initializing registers or setting up state.
+    /// This assumes the VM is already configured and simply jumps to the program counter.
+    fn raw_run(&mut self) {
         while self.cpu.step(&self.memory, &self.storage) {}
     }
 } 

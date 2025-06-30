@@ -1,10 +1,9 @@
 use vm::vm::VM;
-use vm::registers::Register;
+use vm::transaction::Transaction;
 use core::convert::TryInto;
 use std::fs;
 use std::path::Path;
 use compiler::elf::parse_elf_from_bytes;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 pub const VM_MEMORY_SIZE: usize = 10 * 1024; // 10 KB
 
@@ -14,9 +13,7 @@ struct TestCase<'a> {
     path: &'a str,
     expected_success: bool,
     expected_error_code: u32,
-    pubkey: [u8; 32], // caller address
-    address: [u8; 20], // contract address
-    input: &'a [u8],
+    transaction: Transaction,
 }
 
 #[derive(Debug)]
@@ -33,22 +30,30 @@ fn test_entrypoint_function() {
             path: "../examples/bin/storage.elf",
             expected_success: true,
             expected_error_code: 0,
-            pubkey: to_pubkey("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
-            address: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0"),
-            input: &[],
+            transaction: Transaction {
+                to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                from: to_pubkey("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+                data: vec![], // input data
+                value: 0,
+                nonce: 0,
+            },
         },
-        // TestCase {
-        //     name: "simple",
-        //     path: "../examples/bin/simple.elf",
-        //     expected_success: true,
-        //     expected_error_code: 100,
-        //     pubkey: to_pubkey("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
-        //     address: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0"),
-        //     input: &[
-        //         100, 0, 0, 0,   // first u64 = 100
-        //         42, 0, 0, 0,      // second u64 = 42
-        //     ],
-        // },
+        TestCase {
+            name: "simple",
+            path: "../examples/bin/simple.elf",
+            expected_success: true,
+            expected_error_code: 100,
+            transaction: Transaction {
+                to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                from: to_pubkey("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+                data: vec![
+                    100, 0, 0, 0,   // first u64 = 100
+                    42, 0, 0, 0,      // second u64 = 42
+                ], // input data
+                value: 0,
+                nonce: 0,
+            },
+        },
     ];
 
     for case in test_cases {
@@ -58,28 +63,11 @@ fn test_entrypoint_function() {
         let mut vm = VM::new(VM_MEMORY_SIZE);
         load_and_run_elf(case.path, &mut vm);
         vm.cpu.verbose = true;
-
-        // 2. Inject input registers
-        let _address_ptr = vm.set_reg_to_data(Register::A0, &case.address);
-        let _pubkey_ptr = vm.set_reg_to_data(Register::A1, &case.pubkey);
-        let _input_ptr = vm.set_reg_to_data(Register::A2, case.input);
-        vm.set_reg_u32(Register::A3, case.input.len() as u32);
-        let result_ptr = vm.set_reg_to_data(Register::A4, &[0u8; 5]);
+ 
+        // 2. Run VM
+        let result_ptr = vm.run_tx(case.transaction);
         
-        // 3. Run VM
-        let result = catch_unwind(AssertUnwindSafe(|| {
-            vm.run(); // this might panic
-        }));
-        // Always dump memory and storage
-        vm.dump_memory(0, VM_MEMORY_SIZE);
-        vm.dump_storage();
-        vm.dump_registers();
-        if let Err(e) = result {
-            eprintln!("💥 VM panicked: {:?}", e);
-            panic!("VM panicked");
-        }
-        
-        // 4. Extract result struct
+        // 3. Extract result struct
         let res = extract_and_print_result(&vm, result_ptr);
         println!("Success: {}, Error code: {}\n", res.success, res.error_code);
 
