@@ -2,7 +2,9 @@
 
 pub mod pubkey;
 pub mod result;
+pub mod address;
 pub use pubkey::Pubkey;
+pub use address::Address;
 pub use result::Result;
 
 pub mod log;

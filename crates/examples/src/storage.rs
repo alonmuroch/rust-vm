@@ -2,7 +2,7 @@
 #![no_main]
 
 extern crate program;
-use program::{entrypoint, Pubkey, Result, vm_panic, require};
+use program::{entrypoint, Pubkey, Address, Result, vm_panic, require};
 use program::persist_struct;
 use core::convert::TryInto;
 
@@ -38,7 +38,7 @@ persist_struct!(Session, PERSIST_SESSION, {
     completed: bool,
 });
 
-fn my_vm_entry(_caller: Pubkey, _data: &[u8]) -> Result {
+fn my_vm_entry(_self_address: Address, _caller: Pubkey, _data: &[u8]) -> Result {
     // --- User ---
     let mut user = match User::load() {
         Some(u) => u,

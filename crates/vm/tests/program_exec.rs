@@ -14,7 +14,8 @@ struct TestCase<'a> {
     path: &'a str,
     expected_success: bool,
     expected_error_code: u32,
-    pubkey: [u8; 32],
+    pubkey: [u8; 32], // caller address
+    address: [u8; 20], // contract address
     input: &'a [u8],
 }
 
@@ -32,7 +33,8 @@ fn test_entrypoint_function() {
             path: "../examples/bin/storage.elf",
             expected_success: true,
             expected_error_code: 0,
-            pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+            pubkey: to_pubkey("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+            address: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0"),
             input: &[],
         },
         // TestCase {
@@ -40,7 +42,8 @@ fn test_entrypoint_function() {
         //     path: "../examples/bin/simple.elf",
         //     expected_success: true,
         //     expected_error_code: 100,
-        //     pubkey: from_hex("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+        //     pubkey: to_pubkey("e4a3c7f85d2b6e91fa78cd3210b45f6ae913d07c2ba9961e4f5c88a2de3091bc"),
+        //     address: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0"),
         //     input: &[
         //         100, 0, 0, 0,   // first u64 = 100
         //         42, 0, 0, 0,      // second u64 = 42
@@ -57,11 +60,12 @@ fn test_entrypoint_function() {
         vm.cpu.verbose = true;
 
         // 2. Inject input registers
-        let _pubkey_ptr = vm.set_reg_to_data(Register::A0, &case.pubkey);
-        let _input_ptr = vm.set_reg_to_data(Register::A1, case.input);
-        vm.set_reg_u32(Register::A2, case.input.len() as u32);
-        let result_ptr = vm.set_reg_to_data(Register::A3, &[0u8; 5]);
-
+        let _address_ptr = vm.set_reg_to_data(Register::A0, &case.address);
+        let _pubkey_ptr = vm.set_reg_to_data(Register::A1, &case.pubkey);
+        let _input_ptr = vm.set_reg_to_data(Register::A2, case.input);
+        vm.set_reg_u32(Register::A3, case.input.len() as u32);
+        let result_ptr = vm.set_reg_to_data(Register::A4, &[0u8; 5]);
+        
         // 3. Run VM
         let result = catch_unwind(AssertUnwindSafe(|| {
             vm.run(); // this might panic
@@ -98,7 +102,7 @@ fn extract_and_print_result(vm: &VM, result_ptr: u32) -> ResultStruct {
     ResultStruct { error_code, success }
 }
 
-pub fn from_hex(hex: &str) -> [u8; 32] {
+pub fn to_pubkey(hex: &str) -> [u8; 32] {
     assert!(hex.len() == 64, "Hex string must be exactly 64 characters");
 
     fn from_hex_char(c: u8) -> u8 {
@@ -113,6 +117,29 @@ pub fn from_hex(hex: &str) -> [u8; 32] {
     let mut bytes = [0u8; 32];
     let hex_bytes = hex.as_bytes();
     for i in 0..32 {
+        let hi = from_hex_char(hex_bytes[i * 2]);
+        let lo = from_hex_char(hex_bytes[i * 2 + 1]);
+        bytes[i] = (hi << 4) | lo;
+    }
+
+    bytes
+}
+
+pub fn to_address(hex: &str) -> [u8; 20] {
+    assert!(hex.len() == 40, "Hex string must be exactly 40 characters");
+
+    fn from_hex_char(c: u8) -> u8 {
+        match c {
+            b'0'..=b'9' => c - b'0',
+            b'a'..=b'f' => c - b'a' + 10,
+            b'A'..=b'F' => c - b'A' + 10,
+            _ => panic!("Invalid hex character"),
+        }
+    }
+
+    let mut bytes = [0u8; 20];
+    let hex_bytes = hex.as_bytes();
+    for i in 0..20 {
         let hi = from_hex_char(hex_bytes[i * 2]);
         let lo = from_hex_char(hex_bytes[i * 2 + 1]);
         bytes[i] = (hi << 4) | lo;

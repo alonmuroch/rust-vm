@@ -2,9 +2,9 @@
 #![no_main]
 
 extern crate program;
-use program::{entrypoint, Pubkey, Result, logf, require};
+use program::{entrypoint, Pubkey, Address, Result, logf, require};
 
-fn my_vm_entry(_caller: Pubkey, data: &[u8]) -> Result {
+fn my_vm_entry(_self_address: Address, _caller: Pubkey, data: &[u8]) -> Result {
     require(data.len() == 8, b"Input data must be at least 8 bytes long");
 
     let mut first_bytes = [0u8; 4];
