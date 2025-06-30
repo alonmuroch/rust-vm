@@ -9,3 +9,4 @@ pub mod memory;
 pub mod global;
 pub mod sys_call;
 pub mod transaction;
+pub mod execution_context;

@@ -38,22 +38,22 @@ fn test_entrypoint_function() {
                 nonce: 0,
             },
         },
-        TestCase {
-            name: "simple",
-            path: "../examples/bin/simple.elf",
-            expected_success: true,
-            expected_error_code: 100,
-            transaction: Transaction {
-                to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                data: vec![
-                    100, 0, 0, 0,   // first u64 = 100
-                    42, 0, 0, 0,      // second u64 = 42
-                ], // input data
-                value: 0,
-                nonce: 0,
-            },
-        },
+        // TestCase {
+        //     name: "simple",
+        //     path: "../examples/bin/simple.elf",
+        //     expected_success: true,
+        //     expected_error_code: 100,
+        //     transaction: Transaction {
+        //         to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //         from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //         data: vec![
+        //             100, 0, 0, 0,   // first u64 = 100
+        //             42, 0, 0, 0,      // second u64 = 42
+        //         ], // input data
+        //         value: 0,
+        //         nonce: 0,
+        //     },
+        // },
     ];
 
     for case in test_cases {

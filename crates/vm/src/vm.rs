@@ -4,6 +4,7 @@ use crate::registers::Register;
 use crate::memory::{Memory};
 use crate::global::Config;
 use crate::transaction::Transaction;
+use crate::execution_context::{ExecutionContext, ContextStack};
 use storage::{Storage};
 use state::State;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -13,6 +14,7 @@ pub struct VM {
     pub memory: Memory,
     pub storage: Rc<Storage>,
     pub state: State,
+    pub execution_context: ContextStack, // Optional execution context for future use
 }
 
 impl VM {
@@ -30,8 +32,9 @@ impl VM {
 
         let storage = Rc::new(Storage::new());
         let state = State::new_from_storage(Rc::clone(&storage));
+        let execution_context: ContextStack = ContextStack::new();    
 
-        Self { cpu, memory, storage, state }
+        Self { cpu, memory, storage, state, execution_context}
     }
 
     pub fn set_code(&mut self, addr: usize, code: &[u8]) {
@@ -147,6 +150,9 @@ impl VM {
         // result pointer
         let result_ptr = self.set_reg_to_data(Register::A4, &[0u8; 5]);
 
+        // set context stack with the transaction's from and to addresses
+        self.execution_context.push(tx.from, tx.to);
+
         // run the VM
         let result = catch_unwind(AssertUnwindSafe(|| {
             self.raw_run(); // this might panic
@@ -154,6 +160,14 @@ impl VM {
         if let Err(e) = result {
             eprintln!("💥 VM panicked: {:?}", e);
             panic!("VM panicked");
+        }
+
+        // pop top of context stack
+        self.execution_context.pop();
+
+        // verify context stack empty
+        if self.execution_context.current().is_some() {
+            panic!("Execution context stack is not empty after transaction execution");
         }
 
         return result_ptr;
