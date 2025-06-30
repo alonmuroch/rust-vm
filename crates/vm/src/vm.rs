@@ -14,7 +14,7 @@ pub struct VM {
     pub memory: Memory,
     pub storage: Rc<Storage>,
     pub state: State,
-    pub execution_context: ContextStack, // Optional execution context for future use
+    pub context_stack: ContextStack, // Optional execution context for future use
 }
 
 impl VM {
@@ -34,7 +34,7 @@ impl VM {
         let state = State::new_from_storage(Rc::clone(&storage));
         let execution_context: ContextStack = ContextStack::new();    
 
-        Self { cpu, memory, storage, state, execution_context}
+        Self { cpu, memory, storage, state, context_stack: execution_context}
     }
 
     pub fn set_code(&mut self, addr: usize, code: &[u8]) {
@@ -151,7 +151,7 @@ impl VM {
         let result_ptr = self.set_reg_to_data(Register::A4, &[0u8; 5]);
 
         // set context stack with the transaction's from and to addresses
-        self.execution_context.push(tx.from, tx.to);
+        self.context_stack.push(tx.from, tx.to);
 
         // run the VM
         let result = catch_unwind(AssertUnwindSafe(|| {
@@ -163,10 +163,10 @@ impl VM {
         }
 
         // pop top of context stack
-        self.execution_context.pop();
+        self.context_stack.pop();
 
         // verify context stack empty
-        if self.execution_context.current().is_some() {
+        if self.context_stack.current().is_some() {
             panic!("Execution context stack is not empty after transaction execution");
         }
 
@@ -176,6 +176,6 @@ impl VM {
     /// Starts program execution without initializing registers or setting up state.
     /// This assumes the VM is already configured and simply jumps to the program counter.
     fn raw_run(&mut self) {
-        while self.cpu.step(&self.memory, &self.storage) {}
+        while self.cpu.step(&self.memory, &self.storage, &self.context_stack) {}
     }
 } 

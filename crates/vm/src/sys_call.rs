@@ -2,6 +2,7 @@ use crate::cpu::CPU;
 use crate::memory::Memory;
 use storage::Storage;
 use crate::registers::Register;
+use crate::execution_context::{ExecutionContext, ContextStack};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -20,7 +21,7 @@ enum Arg {
 }
 
 impl CPU {
-    pub fn handle_syscall(&mut self, memory: &Memory, storage: &Storage) -> bool {
+    pub fn handle_syscall(&mut self, memory: &Memory, storage: &Storage, _context_stack: &ContextStack) -> bool {
         let syscall_id = self.regs[Register::A7 as usize]; // a7
 
         // Arguments from t0–t6
