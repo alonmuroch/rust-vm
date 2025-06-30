@@ -4,7 +4,8 @@ members = [
   "crates/state", 
   "crates/program", 
   "crates/compiler",
-  "crates/examples",
+  "crates/examples", 
+  "crates/storage",
 ]
 
 [profile.release]

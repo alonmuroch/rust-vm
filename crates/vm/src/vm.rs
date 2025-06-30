@@ -1,13 +1,16 @@
+use std::rc::Rc;
 use crate::cpu::CPU;
 use crate::registers::Register;
 use crate::memory::{Memory};
 use crate::global::Config;
-use crate::storage::{self, Storage};
+use storage::{Storage};
+use state::State;
 
 pub struct VM {
     pub cpu: CPU,
     pub memory: Memory,
-    pub storage: Storage,
+    pub storage: Rc<Storage>,
+    pub state: State,
 }
 
 impl VM {
@@ -23,9 +26,10 @@ impl VM {
             verbose: false,
         };
 
-        let storage = Storage::new();
+        let storage = Rc::new(Storage::new());
+        let state = State::new_from_storage(Rc::clone(&storage));
 
-        Self { cpu, memory, storage }
+        Self { cpu, memory, storage, state }
     }
 
     pub fn set_code(&mut self, addr: usize, code: &[u8]) {

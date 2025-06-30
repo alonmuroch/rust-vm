@@ -1,6 +1,6 @@
 use crate::cpu::CPU;
 use crate::memory::Memory;
-use crate::storage::Storage;
+use storage::Storage;
 use crate::registers::Register;
 
 #[repr(C)]

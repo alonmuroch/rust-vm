@@ -93,6 +93,13 @@ dependencies = [
 [[package]]
 name = "state"
 version = "0.1.0"
+dependencies = [
+ "storage",
+]
+
+[[package]]
+name = "storage"
+version = "0.1.0"
 
 [[package]]
 name = "syn"
@@ -116,4 +123,6 @@ name = "vm"
 version = "0.1.0"
 dependencies = [
  "compiler",
+ "state",
+ "storage",
 ]

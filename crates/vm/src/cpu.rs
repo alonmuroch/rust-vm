@@ -1,7 +1,7 @@
 use crate::decoder::{decode_full, decode_compressed};
 use crate::instruction::Instruction;
 use crate::memory::Memory;
-use crate::storage::Storage;
+use storage::Storage;
 
 pub struct CPU {
     pub pc: u32,

@@ -8,3 +8,5 @@ edition = "2018"
 
 [dependencies]
 compiler = { path = "../compiler" }  # adjust path as needed
+state = { path = "../state" }  # adjust path as needed
+storage = { path = "../storage" }  # adjust path as needed
