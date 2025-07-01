@@ -1,0 +1,9 @@
+[package]
+name = "avm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+state = { path = "../state" }  # adjust path as needed
+storage = { path = "../storage" }  # adjust path as needed
+vm = { path = "../vm" }  # adjust path as needed

@@ -2,7 +2,7 @@ use std::rc::Rc;
 use std::cell::{RefCell, Cell};
 use std::convert::TryInto;
 
-pub struct Memory {
+pub struct MemoryPage {
     mem: Rc<RefCell<Vec<u8>>>,
     pub next_heap: Cell<u32>,
 }
@@ -11,7 +11,7 @@ pub const CODE_SIZE_LIMIT: usize = 0x1000;
 pub const RO_DATA_SIZE_LIMIT: usize = 0x400;
 pub const HEAP_START_ADDR: usize = CODE_SIZE_LIMIT + RO_DATA_SIZE_LIMIT + 0x100;
 
-impl Memory {
+impl MemoryPage {
     pub fn new(memory_size: usize) -> Self {
         Self {
             mem: Rc::new(RefCell::new(vec![0u8; memory_size])),

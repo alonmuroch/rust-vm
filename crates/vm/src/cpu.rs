@@ -1,8 +1,8 @@
 use crate::decoder::{decode_full, decode_compressed};
 use crate::instruction::Instruction;
-use crate::memory::Memory;
+use crate::memory_page::MemoryPage;
 use storage::Storage;
-use crate::execution_context::{ExecutionContext, ContextStack};
+use crate::context::{ExecutionContext};
 
 pub struct CPU {
     pub pc: u32,
@@ -21,14 +21,14 @@ impl CPU {
         }
     }
 
-    pub fn step(&mut self, memory: &Memory, storage: &Storage, context_stack: &ContextStack) -> bool {
+    pub fn step(&mut self, memory: &MemoryPage, storage: &Storage, context: &ExecutionContext) -> bool {
         match self.next_instruction(memory) {
             Some((instr, size)) => {
                 if self.verbose {
                     println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
                 }
                 let old_pc = self.pc;
-                let result = self.execute(instr, memory, storage, context_stack);      
+                let result = self.execute(instr, memory, storage, context);      
 
                 // bump the PC only if the instruction did not change it
                 if self.pc == old_pc {
@@ -59,7 +59,7 @@ impl CPU {
         }
     }
 
-    pub fn next_instruction(&mut self, memory: &Memory) -> Option<(Instruction, u8)> {
+    pub fn next_instruction(&mut self, memory: &MemoryPage) -> Option<(Instruction, u8)> {
         let pc = self.pc as usize;
         let bytes = memory.mem_slice(pc, pc + 4)?;
 
@@ -80,7 +80,7 @@ impl CPU {
         }
     }
 
-    pub fn execute(&mut self, instr: Instruction, memory: &Memory, storage: &Storage, context_stack: &ContextStack) -> bool {
+    pub fn execute(&mut self, instr: Instruction, memory: &MemoryPage, storage: &Storage, context: &ExecutionContext) -> bool {
         match instr {
             Instruction::Add { rd, rs1, rs2 } => {
                 self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2])
@@ -240,7 +240,7 @@ impl CPU {
             }
             Instruction::Remu { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] % self.regs[rs2],
             Instruction::Ecall => {
-                return self.handle_syscall(memory, storage, context_stack);
+                return self.handle_syscall(memory, storage, context);
             }
             Instruction::Ebreak => {
                 return false

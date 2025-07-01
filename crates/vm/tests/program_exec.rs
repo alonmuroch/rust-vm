@@ -1,3 +1,4 @@
+use vm::context;
 use vm::vm::VM;
 use vm::transaction::Transaction;
 use core::convert::TryInto;
@@ -60,7 +61,8 @@ fn test_entrypoint_function() {
         println!("--- Running entrypoint for `{}` ---", case.name);
 
         // 1. Create VM and load ELF using compiler crate
-        let mut vm = VM::new(VM_MEMORY_SIZE);
+        let context: context::ExecutionContext = context::ExecutionContext::new(case.transaction.to, case.transaction.from);
+        let mut vm = VM::new(VM_MEMORY_SIZE, context);
         load_and_run_elf(case.path, &mut vm);
         vm.cpu.verbose = true;
  

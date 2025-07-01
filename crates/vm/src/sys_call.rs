@@ -1,8 +1,8 @@
 use crate::cpu::CPU;
-use crate::memory::Memory;
+use crate::memory_page::MemoryPage;
 use storage::Storage;
 use crate::registers::Register;
-use crate::execution_context::{ExecutionContext, ContextStack};
+use crate::context::{ExecutionContext};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -21,7 +21,7 @@ enum Arg {
 }
 
 impl CPU {
-    pub fn handle_syscall(&mut self, memory: &Memory, storage: &Storage, _context_stack: &ContextStack) -> bool {
+    pub fn handle_syscall(&mut self, memory: &MemoryPage, storage: &Storage, _context: &ExecutionContext) -> bool {
         let syscall_id = self.regs[Register::A7 as usize]; // a7
 
         // Arguments from t0–t6
@@ -50,7 +50,7 @@ impl CPU {
         true // continue execution
     }
 
-    pub fn sys_storage_get(&mut self, args: [u32; 6], memory: &Memory, storage: &Storage) -> u32 {
+    pub fn sys_storage_get(&mut self, args: [u32; 6], memory: &MemoryPage, storage: &Storage) -> u32 {
         let key_ptr = args[0] as usize;
         let key_len = args[1] as usize;
 
@@ -91,7 +91,7 @@ impl CPU {
         }
     }
 
-    pub fn sys_storage_set(&mut self, args: [u32; 6], memory: &Memory, storage: &Storage) -> u32 {
+    pub fn sys_storage_set(&mut self, args: [u32; 6], memory: &MemoryPage, storage: &Storage) -> u32 {
         let key_ptr = args[0] as usize;
         let key_len = args[1] as usize;
         let val_ptr = args[2] as usize;
@@ -128,7 +128,7 @@ impl CPU {
         0
     }
 
-    fn sys_panic_with_message(&mut self, memory: &Memory) -> u32 {
+    fn sys_panic_with_message(&mut self, memory: &MemoryPage) -> u32 {
         let msg_ptr = self.regs[10] as usize; // a0
         let msg_len = self.regs[11] as usize; // a1
 
@@ -143,7 +143,7 @@ impl CPU {
         panic!("🔥 Guest panic: {}", msg);
     }
 
-    pub fn sys_log(&mut self, args: [u32; 6], memory: &Memory) -> u32 {
+    pub fn sys_log(&mut self, args: [u32; 6], memory: &MemoryPage) -> u32 {
         let [fmt_ptr, fmt_len, arg_ptr, arg_len, ..] = args;
 
         // 1. Load format string

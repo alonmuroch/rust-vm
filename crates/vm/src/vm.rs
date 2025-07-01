@@ -1,25 +1,26 @@
 use std::rc::Rc;
+use std::task::Context;
 use crate::cpu::CPU;
 use crate::registers::Register;
-use crate::memory::{Memory};
+use crate::memory_page::{MemoryPage};
 use crate::global::Config;
 use crate::transaction::Transaction;
-use crate::execution_context::{ExecutionContext, ContextStack};
+use crate::context::{ExecutionContext};
 use storage::{Storage};
 use state::State;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 pub struct VM {
     pub cpu: CPU,
-    pub memory: Memory,
+    pub memory: MemoryPage,
     pub storage: Rc<Storage>,
     pub state: State,
-    pub context_stack: ContextStack, // Optional execution context for future use
+    pub context: ExecutionContext,
 }
 
 impl VM {
-    pub fn new(memory_size: usize) -> Self {
-        let memory = Memory::new(memory_size);
+    pub fn new(memory_size: usize, context: ExecutionContext) -> Self {
+        let memory = MemoryPage::new(memory_size);
 
         let mut regs = [0u32; 32];
         regs[Register::Sp as usize] = memory.stack_top();
@@ -32,9 +33,8 @@ impl VM {
 
         let storage = Rc::new(Storage::new());
         let state = State::new_from_storage(Rc::clone(&storage));
-        let execution_context: ContextStack = ContextStack::new();    
 
-        Self { cpu, memory, storage, state, context_stack: execution_context}
+        Self { cpu, memory, storage, state, context: context}
     }
 
     pub fn set_code(&mut self, addr: usize, code: &[u8]) {
@@ -150,9 +150,6 @@ impl VM {
         // result pointer
         let result_ptr = self.set_reg_to_data(Register::A4, &[0u8; 5]);
 
-        // set context stack with the transaction's from and to addresses
-        self.context_stack.push(tx.from, tx.to);
-
         // run the VM
         let result = catch_unwind(AssertUnwindSafe(|| {
             self.raw_run(); // this might panic
@@ -162,20 +159,12 @@ impl VM {
             panic!("VM panicked");
         }
 
-        // pop top of context stack
-        self.context_stack.pop();
-
-        // verify context stack empty
-        if self.context_stack.current().is_some() {
-            panic!("Execution context stack is not empty after transaction execution");
-        }
-
         return result_ptr;
     }
 
     /// Starts program execution without initializing registers or setting up state.
     /// This assumes the VM is already configured and simply jumps to the program counter.
     fn raw_run(&mut self) {
-        while self.cpu.step(&self.memory, &self.storage, &self.context_stack) {}
+        while self.cpu.step(&self.memory, &self.storage, &self.context) {}
     }
 } 
