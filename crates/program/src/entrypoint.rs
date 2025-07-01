@@ -1,4 +1,3 @@
-
 #[macro_export]
 macro_rules! entrypoint {
     ($func:path) => {
@@ -14,13 +13,13 @@ macro_rules! entrypoint {
                 let slice = core::slice::from_raw_parts(address_ptr, 20);
                 let mut array = [0u8; 20];
                 array.copy_from_slice(slice);
-                $crate::address::Address(array)
+                $crate::types::address::Address(array)
             };
             let from = {
                 let slice = core::slice::from_raw_parts(pubkey_ptr, 20);
                 let mut array = [0u8; 20];
                 array.copy_from_slice(slice);
-                $crate::address::Address(array)
+                $crate::types::address::Address(array)
             };
            
             let input = {

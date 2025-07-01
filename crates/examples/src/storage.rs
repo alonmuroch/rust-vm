@@ -2,7 +2,8 @@
 #![no_main]
 
 extern crate program;
-use program::{entrypoint, Address, Result, vm_panic, require};
+use program::{entrypoint, Result, vm_panic, require};
+use program::types::address::Address; 
 use program::persist_struct;
 use core::convert::TryInto;
 

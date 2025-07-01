@@ -1,8 +1,6 @@
 #![no_std]  
 
 pub mod result;
-pub mod address;
-pub use address::Address;
 pub use result::Result;
 
 pub mod log;
@@ -10,6 +8,7 @@ pub mod log;
 pub use crate::log::*;
 
 pub extern crate hex;
+pub extern crate types;
 
 #[macro_use] // enables macro use across the crate
 pub mod entrypoint;

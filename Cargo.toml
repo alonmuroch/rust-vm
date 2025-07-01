@@ -5,7 +5,7 @@ members = [
   "crates/program", 
   "crates/compiler",
   "crates/examples", 
-  "crates/storage", "crates/avm",
+  "crates/storage", "crates/avm", "crates/types",
 ]
 
 [profile.release]

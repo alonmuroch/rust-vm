@@ -1,12 +1,14 @@
-use vm::context;
-use vm::vm::VM;
-use vm::transaction::Transaction;
 use core::convert::TryInto;
 use std::fs;
 use std::path::Path;
 use compiler::elf::parse_elf_from_bytes;
+use avm::transaction::Transaction;
+use types::address::Address;
+use types::result::Result;
+use avm::avm::AVM;
 
 pub const VM_MEMORY_SIZE: usize = 10 * 1024; // 10 KB
+pub const MAX_MEMORY_PAGES: usize = 1; 
 
 #[derive(Debug)]
 struct TestCase<'a> {
@@ -15,12 +17,6 @@ struct TestCase<'a> {
     expected_success: bool,
     expected_error_code: u32,
     transaction: Transaction,
-}
-
-#[derive(Debug)]
-struct ResultStruct {
-    pub success: bool,
-    pub error_code: u32,
 }
 
 #[test]
@@ -61,16 +57,15 @@ fn test_entrypoint_function() {
         println!("--- Running entrypoint for `{}` ---", case.name);
 
         // 1. Create VM and load ELF using compiler crate
-        let context: context::ExecutionContext = context::ExecutionContext::new(case.transaction.to, case.transaction.from);
-        let mut vm = VM::new(VM_MEMORY_SIZE, context);
-        load_and_run_elf(case.path, &mut vm);
-        vm.cpu.verbose = true;
+        // let context: ExecutionContext = ExecutionContext::new(case.transaction.to, case.transaction.from);
+        let mut avm = AVM::new(MAX_MEMORY_PAGES, VM_MEMORY_SIZE);
+        load_and_run_elf(case.path, &mut avm);
+        // vm.cpu.verbose = true;
  
         // 2. Run VM
-        let result_ptr = vm.run_tx(case.transaction);
+        let res = avm.run_tx(case.transaction);
         
-        // 3. Extract result struct
-        let res = extract_and_print_result(&vm, result_ptr);
+        // 3. Print result
         println!("Success: {}, Error code: {}\n", res.success, res.error_code);
 
         assert_eq!(res.success, case.expected_success, "Expected success = {} but got {}", case.expected_success, res.success);
@@ -78,21 +73,7 @@ fn test_entrypoint_function() {
     }
 }
 
-fn extract_and_print_result(vm: &VM, result_ptr: u32) -> ResultStruct {
-    let mem = vm.memory.mem();
-    let start = result_ptr as usize;
-
-    if start + 5 > mem.len() {
-        panic!("Result struct out of bounds at 0x{:08x}", start);
-    }
-
-    let error_code = u32::from_le_bytes(mem[start..start + 4].try_into().unwrap());
-    let success = mem[start + 4] != 0;
-
-    ResultStruct { error_code, success }
-}
-
-pub fn to_address(hex: &str) -> [u8; 20] {
+pub fn to_address(hex: &str) -> Address {
     assert!(hex.len() == 40, "Hex string must be exactly 40 characters");
 
     fn from_hex_char(c: u8) -> u8 {
@@ -115,7 +96,7 @@ pub fn to_address(hex: &str) -> [u8; 20] {
     bytes
 }
 
-pub fn load_and_run_elf<P: AsRef<Path>>(path: P, vm: &mut VM) {
+pub fn load_and_run_elf<P: AsRef<Path>>(path: P, vm: &mut AVM) {
     let path_str = path.as_ref().display();
     let bytes = fs::read(&path)
         .unwrap_or_else(|_| panic!("❌ Failed to read ELF file from {}", path_str));

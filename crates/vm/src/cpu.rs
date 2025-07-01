@@ -2,7 +2,6 @@ use crate::decoder::{decode_full, decode_compressed};
 use crate::instruction::Instruction;
 use crate::memory_page::MemoryPage;
 use storage::Storage;
-use crate::context::{ExecutionContext};
 
 pub struct CPU {
     pub pc: u32,
@@ -21,14 +20,14 @@ impl CPU {
         }
     }
 
-    pub fn step(&mut self, memory: &MemoryPage, storage: &Storage, context: &ExecutionContext) -> bool {
+    pub fn step(&mut self, memory: &MemoryPage, storage: &Storage) -> bool {
         match self.next_instruction(memory) {
             Some((instr, size)) => {
                 if self.verbose {
                     println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
                 }
                 let old_pc = self.pc;
-                let result = self.execute(instr, memory, storage, context);      
+                let result = self.execute(instr, memory, storage);      
 
                 // bump the PC only if the instruction did not change it
                 if self.pc == old_pc {
@@ -80,7 +79,7 @@ impl CPU {
         }
     }
 
-    pub fn execute(&mut self, instr: Instruction, memory: &MemoryPage, storage: &Storage, context: &ExecutionContext) -> bool {
+    pub fn execute(&mut self, instr: Instruction, memory: &MemoryPage, storage: &Storage) -> bool {
         match instr {
             Instruction::Add { rd, rs1, rs2 } => {
                 self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2])
@@ -240,7 +239,7 @@ impl CPU {
             }
             Instruction::Remu { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] % self.regs[rs2],
             Instruction::Ecall => {
-                return self.handle_syscall(memory, storage, context);
+                return self.handle_syscall(memory, storage);
             }
             Instruction::Ebreak => {
                 return false

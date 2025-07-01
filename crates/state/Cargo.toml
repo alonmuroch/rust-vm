@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 storage = { path = "../storage" }  # adjust path as needed
+types = { path = "../types" }  # adjust path as needed

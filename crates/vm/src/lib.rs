@@ -6,7 +6,4 @@ pub mod vm;
 pub mod cpu;
 pub mod registers;
 pub mod memory_page;
-pub mod global;
 pub mod sys_call;
-pub mod transaction;
-pub mod context;

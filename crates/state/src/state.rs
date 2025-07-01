@@ -1,7 +1,8 @@
 use std::rc::Rc;
 use std::collections::HashMap;
 use storage::Storage;
-use crate::{Address, Account, Code};
+use crate::{Account, Code};
+use types::address::Address;
 
 #[derive(Clone, Debug)]
 pub struct State {
@@ -9,6 +10,10 @@ pub struct State {
 }
 
 impl State {
+    pub fn new() -> Self {
+        Self { accounts: HashMap::new() }
+    }
+
     /// Construct a State from an existing Storage instance
     pub fn new_from_storage(_storage: Rc<Storage>) -> Self {
         Self { accounts: HashMap::new() }
@@ -26,6 +31,11 @@ impl State {
             storage: HashMap::new(),
         })
     }
+
+    pub fn is_contract(&self, _addr: Address) -> bool {
+        // self.accounts.get(addr).map_or(false, |acc| acc.code.is_some())
+        return true;
+    }   
 
     pub fn deploy_contract(&mut self, addr: Address, code: Code) {
         let acc = self.accounts.entry(addr).or_insert_with(|| Account {

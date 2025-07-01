@@ -8,3 +8,4 @@ test = false
 
 [dependencies]
 hex = { version = "0.4", default-features = false }
+types = { path = "../types" } 

@@ -1,27 +1,17 @@
 use std::rc::Rc;
-use std::task::Context;
 use crate::cpu::CPU;
 use crate::registers::Register;
 use crate::memory_page::{MemoryPage};
-use crate::global::Config;
-use crate::transaction::Transaction;
-use crate::context::{ExecutionContext};
 use storage::{Storage};
-use state::State;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 pub struct VM {
     pub cpu: CPU,
-    pub memory: MemoryPage,
+    pub memory: Rc<MemoryPage>,
     pub storage: Rc<Storage>,
-    pub state: State,
-    pub context: ExecutionContext,
 }
 
 impl VM {
-    pub fn new(memory_size: usize, context: ExecutionContext) -> Self {
-        let memory = MemoryPage::new(memory_size);
-
+    pub fn new(memory: Rc<MemoryPage>) -> Self {
         let mut regs = [0u32; 32];
         regs[Register::Sp as usize] = memory.stack_top();
 
@@ -32,9 +22,7 @@ impl VM {
         };
 
         let storage = Rc::new(Storage::new());
-        let state = State::new_from_storage(Rc::clone(&storage));
-
-        Self { cpu, memory, storage, state, context: context}
+        Self { cpu, memory, storage}
     }
 
     pub fn set_code(&mut self, addr: usize, code: &[u8]) {
@@ -128,43 +116,9 @@ impl VM {
         println!("------------------------");
     }
 
-    pub fn run_tx(&mut self, tx: Transaction) -> u32 {
-        // to address
-        let _address_ptr: u32 = self.set_reg_to_data(Register::A0, &tx.to);
-
-        // from address
-        let _pubkey_ptr = self.set_reg_to_data(Register::A1, &tx.from);
-
-        // input data
-        let input_len = tx.data.len();
-        if input_len > Config::MAX_INPUT_LEN {
-            panic!(
-                "Entrypoint: input length {} exceeds MAX_INPUT_LEN ({})",
-                input_len,
-                Config::MAX_INPUT_LEN
-            );
-        }
-        let _input_ptr = self.set_reg_to_data(Register::A2, &tx.data);
-        self.set_reg_u32(Register::A3, input_len as u32);
-
-        // result pointer
-        let result_ptr = self.set_reg_to_data(Register::A4, &[0u8; 5]);
-
-        // run the VM
-        let result = catch_unwind(AssertUnwindSafe(|| {
-            self.raw_run(); // this might panic
-        }));
-        if let Err(e) = result {
-            eprintln!("💥 VM panicked: {:?}", e);
-            panic!("VM panicked");
-        }
-
-        return result_ptr;
-    }
-
     /// Starts program execution without initializing registers or setting up state.
     /// This assumes the VM is already configured and simply jumps to the program counter.
-    fn raw_run(&mut self) {
-        while self.cpu.step(&self.memory, &self.storage, &self.context) {}
+    pub fn raw_run(&mut self) {
+        while self.cpu.step(&self.memory, &self.storage) {}
     }
 } 
