@@ -1,11 +1,11 @@
-use core::convert::TryInto;
 use std::fs;
 use std::path::Path;
 use compiler::elf::parse_elf_from_bytes;
 use avm::transaction::Transaction;
 use types::address::Address;
-use types::result::Result;
 use avm::avm::AVM;
+use state::State;
+use avm::global::Config;
 
 pub const VM_MEMORY_SIZE: usize = 10 * 1024; // 10 KB
 pub const MAX_MEMORY_PAGES: usize = 1; 
@@ -59,7 +59,7 @@ fn test_entrypoint_function() {
         // 1. Create VM and load ELF using compiler crate
         // let context: ExecutionContext = ExecutionContext::new(case.transaction.to, case.transaction.from);
         let mut avm = AVM::new(MAX_MEMORY_PAGES, VM_MEMORY_SIZE);
-        load_and_run_elf(case.path, &mut avm);
+        populate_state(case.path, case.transaction.to, &mut avm.state);
         // vm.cpu.verbose = true;
  
         // 2. Run VM
@@ -93,10 +93,10 @@ pub fn to_address(hex: &str) -> Address {
         bytes[i] = (hi << 4) | lo;
     }
 
-    bytes
+    Address::new(bytes)
 }
 
-pub fn load_and_run_elf<P: AsRef<Path>>(path: P, vm: &mut AVM) {
+pub fn populate_state<P: AsRef<Path>>(path: P, address: Address, state: &mut State) {
     let path_str = path.as_ref().display();
     let bytes = fs::read(&path)
         .unwrap_or_else(|_| panic!("❌ Failed to read ELF file from {}", path_str));
@@ -106,19 +106,44 @@ pub fn load_and_run_elf<P: AsRef<Path>>(path: P, vm: &mut AVM) {
 
     println!("✅ Parsed ELF: {} ({} sections)", path_str, elf.sections.len());
 
-    let (code, code_start) = elf.get_flat_code()
-        .unwrap_or_else(|| panic!("❌ No code sections found in ELF {}", path_str));
-    println!("📦 Code size: {} bytes, starting at 0x{:08x}", code.len(), code_start);
-    vm.set_code(code_start as usize, &code);
+    let (code, code_start) = elf
+    .get_flat_code()
+    .unwrap_or_else(|| panic!("❌ No code sections found in ELF {}", path_str));
 
-    if let Some((rodata, rodata_start)) = elf.get_flat_rodata() {
+    let (rodata, rodata_start) = elf
+        .get_flat_rodata()
+        .unwrap_or_else(|| {
+            println!("⚠️ No .rodata section found in ELF {}", path_str);
+            (vec![], usize::MAX as u64)
+        });
+
+    // assert sizes
+    assert!(code.len() <= Config::CODE_SIZE_LIMIT, "code size exceeds limit");
+    assert!(rodata.len() <= Config::RO_DATA_SIZE_LIMIT, "read only data size exceeds limit");
+
+    let total_len = rodata_start + rodata.len() as u64; // assumes rodata is after code
+
+    // Initialize memory with 0x00
+    let mut combined = vec![0u8; total_len as usize];
+
+    // Copy code
+    combined[code_start as usize..code_start as usize + code.len()].copy_from_slice(&code);
+    println!(
+        "📦 Code size: {} bytes, starting at 0x{:08x}",
+        code.len(),
+        code_start
+    );
+
+    // Copy rodata (if it exists)
+    if rodata_start > 0 {
+        combined[rodata_start as usize..rodata_start as usize + rodata.len()].copy_from_slice(&rodata);
         println!(
             "📦 Readonly data size: {} bytes, starting at 0x{:08x}",
             rodata.len(),
             rodata_start
         );
-        vm.set_rodata(rodata_start as usize, &rodata);
-    } else {
-        println!("⚠️ No .rodata section found in ELF {}", path_str);
     }
+
+    // deploy state
+    state.deploy_contract(address, combined);
 }

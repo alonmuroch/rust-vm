@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::collections::HashMap;
 use storage::Storage;
-use crate::{Account, Code};
+use crate::{Account};
 use types::address::Address;
 
 #[derive(Clone, Debug)]
@@ -27,7 +27,7 @@ impl State {
         self.accounts.entry(*addr).or_insert_with(|| Account {
             nonce: 0,
             balance: 0,
-            code: None,
+            code: Vec::new(),
             storage: HashMap::new(),
         })
     }
@@ -37,13 +37,13 @@ impl State {
         return true;
     }   
 
-    pub fn deploy_contract(&mut self, addr: Address, code: Code) {
+    pub fn deploy_contract(&mut self, addr: Address, code: Vec<u8>) {
         let acc = self.accounts.entry(addr).or_insert_with(|| Account {
             nonce: 0,
             balance: 0,
-            code: None,
+            code: Vec::new(),
             storage: HashMap::new(),
         });
-        acc.code = Some(code);
+        acc.code = code;
     }
 }

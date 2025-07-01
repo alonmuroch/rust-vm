@@ -2,4 +2,7 @@ pub struct Config;
 
 impl Config {
     pub const MAX_INPUT_LEN: usize = 1024;
+    pub const CODE_SIZE_LIMIT: usize = 0x1000;
+    pub const RO_DATA_SIZE_LIMIT: usize = 0x400;
+    pub const HEAP_START_ADDR: usize = Self::CODE_SIZE_LIMIT + Self::RO_DATA_SIZE_LIMIT + 0x100;
 }

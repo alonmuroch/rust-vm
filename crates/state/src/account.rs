@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use crate::{StorageKey, StorageValue, Code};
+use crate::{StorageKey, StorageValue};
 
 #[derive(Clone, Debug)]
 pub struct Account {
     pub nonce: u64,
     pub balance: u128,
-    pub code: Option<Code>,
+    pub code: Vec<u8>,
     pub storage: HashMap<StorageKey, StorageValue>,
 }
 
