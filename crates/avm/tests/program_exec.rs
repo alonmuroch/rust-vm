@@ -66,6 +66,7 @@ fn test_entrypoint_function() {
         let res = avm.run_tx(case.transaction);
         
         // 3. Print result
+        avm.state.pretty_print();
         println!("Success: {}, Error code: {}\n", res.success, res.error_code);
 
         assert_eq!(res.success, case.expected_success, "Expected success = {} but got {}", case.expected_success, res.success);

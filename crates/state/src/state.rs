@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use storage::Storage;
 use crate::{Account};
 use types::address::Address;
+use hex::encode as hex_encode;
 
 #[derive(Clone, Debug)]
 pub struct State {
@@ -28,7 +29,6 @@ impl State {
             nonce: 0,
             balance: 0,
             code: Vec::new(),
-            storage: HashMap::new(),
         })
     }
 
@@ -42,8 +42,19 @@ impl State {
             nonce: 0,
             balance: 0,
             code: Vec::new(),
-            storage: HashMap::new(),
         });
         acc.code = code;
+    }
+
+    pub fn pretty_print(&self) {
+        println!("--- State Dump ---");
+        for (addr, acc) in &self.accounts {
+            println!("  🔑 Address: 0x{}", hex_encode(addr.0));
+            println!("      - Balance: {}", acc.balance);
+            println!("      - Nonce: {}", acc.nonce);
+            println!("      - Code size: {} bytes", acc.code.len());
+            println!();
+        }
+        println!("--------------------");
     }
 }
