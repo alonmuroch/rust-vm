@@ -71,6 +71,15 @@ impl AVM {
             memory_page,
         );
 
+        // Set the code for the VM to execute
+        let account = self.state.get_account(&to).expect("Contract code not found");
+        if account.is_contract == false {
+            panic!("destination address {} is not a contract", to);
+        }
+        let code_slice: &[u8] = &account.code;
+        vm.set_code(Config::PROGRAM_START_ADDR, code_slice);  
+        vm.cpu.verbose = true;
+
         // to address
         let _address_ptr: u32 = vm.set_reg_to_data(Register::A0, to.0.as_ref());
 

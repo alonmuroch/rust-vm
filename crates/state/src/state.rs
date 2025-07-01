@@ -29,6 +29,7 @@ impl State {
             nonce: 0,
             balance: 0,
             code: Vec::new(),
+            is_contract: false,
         })
     }
 
@@ -42,8 +43,10 @@ impl State {
             nonce: 0,
             balance: 0,
             code: Vec::new(),
+            is_contract: false,
         });
         acc.code = code;
+        acc.is_contract = true;
     }
 
     pub fn pretty_print(&self) {

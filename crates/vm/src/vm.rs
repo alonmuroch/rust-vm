@@ -25,14 +25,9 @@ impl VM {
         Self { cpu, memory, storage}
     }
 
-    pub fn set_code(&mut self, addr: usize, code: &[u8]) {
-        self.memory.write_code(addr, code);
-        self.cpu.pc = addr as u32;
-    }
-
-
-    pub fn set_rodata(&mut self, addr: usize, data: &[u8]) {
-        self.memory.write_rodata(addr, data);
+    pub fn set_code(&mut self, start_addr: u32, code: &[u8]) {
+        self.memory.write_code(0, code);
+        self.cpu.pc = start_addr;
     }
 
     pub fn alloc_and_write(&mut self, data: &[u8]) -> u32 {
@@ -60,6 +55,10 @@ impl VM {
 
     pub fn set_reg_u32(&mut self, reg: Register, data: u32) {
         self.cpu.regs[reg as usize] = data;
+    }
+
+    pub fn dump_all_memory(&self) {
+        self.dump_memory(0, self.memory.mem().len());
     }
 
     pub fn dump_memory(&self, start: usize, end: usize) {

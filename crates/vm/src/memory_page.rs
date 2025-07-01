@@ -127,6 +127,7 @@ impl MemoryPage {
         let end = start_addr + data.len();
         mem[start_addr..end].copy_from_slice(data);
     }
+    
 
     pub fn alloc_on_heap(&self, data: &[u8]) -> u32 {
         let mut addr = self.next_heap.get();
