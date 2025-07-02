@@ -2,6 +2,8 @@ use crate::cpu::CPU;
 use crate::memory_page::MemoryPage;
 use storage::Storage;
 use crate::registers::Register;
+use std::rc::Rc;
+use core::cell::RefCell;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -20,7 +22,7 @@ enum Arg {
 }
 
 impl CPU {
-    pub fn handle_syscall(&mut self, memory: &MemoryPage, storage: &Storage) -> bool {
+    pub fn handle_syscall(&mut self, memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> bool {
         let syscall_id = self.regs[Register::A7 as usize]; // a7
 
         // Arguments from t0–t6
@@ -49,13 +51,15 @@ impl CPU {
         true // continue execution
     }
 
-    pub fn sys_storage_get(&mut self, args: [u32; 6], memory: &MemoryPage, storage: &Storage) -> u32 {
+    pub fn sys_storage_get(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
         let key_ptr = args[0] as usize;
         let key_len = args[1] as usize;
 
+        let borrowed_memory = memory.borrow();
+
         let key_slice = {
             // create a limited scope
-            let key_slice_ref = match memory.mem_slice(key_ptr, key_ptr + key_len) {
+            let key_slice_ref = match borrowed_memory.mem_slice(key_ptr, key_ptr + key_len) {
                 Some(r) => r,
                 None => return 0,
             };
@@ -70,11 +74,11 @@ impl CPU {
         println!("🔑 Storage GET key: \"{}\" @ 0x{:08x} (len = {})", key, key_ptr, key_len);
 
         // Lookup the value in storage
-        if let Some(value) = storage.get(key) {
+        if let Some(value) = storage.borrow().get(key) {
             // alloc and return real address
             let mut buf = (value.len() as u32).to_le_bytes().to_vec();
             buf.extend_from_slice(value.as_slice());
-            let addr = memory.alloc_on_heap(&buf);
+            let addr = borrowed_memory.alloc_on_heap(&buf);
 
             println!(
                 "📦 Storage GET buffer (total = {}) @ 0x{:08x}: {:02x?}",
@@ -90,14 +94,16 @@ impl CPU {
         }
     }
 
-    pub fn sys_storage_set(&mut self, args: [u32; 6], memory: &MemoryPage, storage: &Storage) -> u32 {
+    pub fn sys_storage_set(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
         let key_ptr = args[0] as usize;
         let key_len = args[1] as usize;
         let val_ptr = args[2] as usize;
         let val_len = args[3] as usize;
 
+        let borrowed_memory = memory.borrow();
+
         // Safely get the key slice from memory
-        let key_slice_ref = match memory.mem_slice(key_ptr, key_ptr + key_len) {
+        let key_slice_ref = match borrowed_memory.mem_slice(key_ptr, key_ptr + key_len) {
             Some(r) => r,
             None => return 0,
         };
@@ -109,7 +115,7 @@ impl CPU {
             Err(_) => return 0,
         };
 
-        let value_slice_ref = match memory.mem_slice(val_ptr, val_ptr + val_len) {
+        let value_slice_ref = match borrowed_memory.mem_slice(val_ptr, val_ptr + val_len) {
             Some(r) => r,
             None => return 0,
         };
@@ -123,15 +129,16 @@ impl CPU {
             value_slice
         );
 
-        storage.set(key, value_slice.to_vec());
+        storage.borrow_mut().set(key, value_slice.to_vec());
         0
     }
 
-    fn sys_panic_with_message(&mut self, memory: &MemoryPage) -> u32 {
+    fn sys_panic_with_message(&mut self, memory: Rc<RefCell<MemoryPage>>) -> u32 {
         let msg_ptr = self.regs[10] as usize; // a0
         let msg_len = self.regs[11] as usize; // a1
 
         let msg = memory
+            .borrow()
             .mem_slice(msg_ptr, msg_ptr + msg_len)
             .map(|bytes| {
                 // Convert to String to avoid borrowing temp reference
@@ -142,11 +149,13 @@ impl CPU {
         panic!("🔥 Guest panic: {}", msg);
     }
 
-    pub fn sys_log(&mut self, args: [u32; 6], memory: &MemoryPage) -> u32 {
+    pub fn sys_log(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>) -> u32 {
         let [fmt_ptr, fmt_len, arg_ptr, arg_len, ..] = args;
 
+        let borrowed_memory = memory.borrow();
+
         // 1. Load format string
-        let fmt_slice = match memory.mem_slice(fmt_ptr as usize, (fmt_ptr + fmt_len) as usize) {
+        let fmt_slice = match borrowed_memory.mem_slice(fmt_ptr as usize, (fmt_ptr + fmt_len) as usize) {
             Some(s) => s,
             None => {
                 println!("⚠️ invalid format string @ 0x{:08x}", fmt_ptr);
@@ -165,7 +174,7 @@ impl CPU {
         };
 
         // 2. Load raw u32 argument buffer
-        let args_bytes_slice = memory.mem_slice(arg_ptr as usize, (arg_ptr + arg_len) as usize);
+        let args_bytes_slice = borrowed_memory.mem_slice(arg_ptr as usize, (arg_ptr + arg_len) as usize);
         let args_bytes_holder;
         let args_bytes: &[u8] = if let Some(slice) = args_bytes_slice {
             args_bytes_holder = slice;
@@ -197,7 +206,7 @@ impl CPU {
                 's' => {
                     let ptr = next() as usize;
                     let len = next() as usize;
-                    match memory.mem_slice(ptr, ptr + len) {
+                    match borrowed_memory.mem_slice(ptr, ptr + len) {
                         Some(slice) => {
                             let s_ptr = core::str::from_utf8(slice.as_ref());
                             args.push(match s_ptr {
@@ -215,7 +224,7 @@ impl CPU {
                 'b' => {
                     let ptr = next() as usize;
                     let len = next() as usize;
-                    match memory.mem_slice(ptr, ptr + len) {
+                    match borrowed_memory.mem_slice(ptr, ptr + len) {
                         Some(slice) => {
                             args.push(Arg::Bytes(slice.to_vec()));
                         }

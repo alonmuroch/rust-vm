@@ -13,9 +13,15 @@ pub struct Storage {
 }
 
 impl Storage {
+    /// Create new Storage with an empty map
     pub fn new() -> Self {
+        Self::with_map(BTreeMap::new())
+    }
+
+    /// Create new Storage with a pre-populated map
+    pub fn with_map(initial: BTreeMap<String, Vec<u8>>) -> Self {
         Self {
-            map: RefCell::new(BTreeMap::new()),
+            map: RefCell::new(initial),
         }
     }
 

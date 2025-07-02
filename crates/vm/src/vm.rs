@@ -1,4 +1,6 @@
+use core::borrow;
 use std::rc::Rc;
+use core::cell::RefCell;
 use crate::cpu::CPU;
 use crate::registers::Register;
 use crate::memory_page::{MemoryPage};
@@ -6,14 +8,14 @@ use storage::{Storage};
 
 pub struct VM {
     pub cpu: CPU,
-    pub memory: Rc<MemoryPage>,
-    pub storage: Rc<Storage>,
+    pub memory: Rc<RefCell<MemoryPage>>,
+    pub storage: Rc<RefCell<Storage>>,
 }
 
 impl VM {
-    pub fn new(memory: Rc<MemoryPage>) -> Self {
+    pub fn new(memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> Self {
         let mut regs = [0u32; 32];
-        regs[Register::Sp as usize] = memory.stack_top();
+        regs[Register::Sp as usize] = memory.borrow().stack_top();
 
         let cpu = CPU {
             pc: 0,
@@ -21,17 +23,16 @@ impl VM {
             verbose: false,
         };
 
-        let storage = Rc::new(Storage::new());
         Self { cpu, memory, storage}
     }
 
     pub fn set_code(&mut self, start_addr: u32, code: &[u8]) {
-        self.memory.write_code(0, code);
+        self.memory.borrow_mut().write_code(0, code);
         self.cpu.pc = start_addr;
     }
 
     pub fn alloc_and_write(&mut self, data: &[u8]) -> u32 {
-        self.memory.alloc_on_heap(data)
+        self.memory.borrow_mut().alloc_on_heap(data)
     }
 
     pub fn set_reg_to_data(&mut self, reg: Register, data: &[u8]) -> u32 {
@@ -58,19 +59,21 @@ impl VM {
     }
 
     pub fn dump_all_memory(&self) {
-        self.dump_memory(0, self.memory.mem().len());
+        self.dump_memory(0, self.memory.borrow().mem().len());
     }
 
     pub fn dump_memory(&self, start: usize, end: usize) {
-        assert!(start < end, "invalid memory range");
-        assert!(end <= self.memory.mem().len(), "range out of bounds");
+        let borrowed_memory = self.memory.borrow();
 
-        let next_heap = self.memory.next_heap.get();
+        assert!(start < end, "invalid memory range");
+        assert!(end <= borrowed_memory.mem().len(), "range out of bounds");
+
+        let next_heap = borrowed_memory.next_heap.get();
         println!("--- Memory Dump ---");
         println!("Next heap pointer: 0x{:08x}", next_heap);
 
         for addr in (start..end).step_by(16) {
-            let line = &self.memory.mem()[addr..end.min(addr + 16)];
+            let line = &borrowed_memory.mem()[addr..end.min(addr + 16)];
 
             let hex: Vec<String> = line.iter().map(|b| format!("{:02x}", b)).collect();
             let hex_str = hex.join(" ");
@@ -87,7 +90,7 @@ impl VM {
 
     pub fn dump_storage(&self) {
         println!("--- Storage Dump ---");
-        for (key, value) in self.storage.map.borrow().iter() {
+        for (key, value) in self.storage.borrow().map.borrow().iter() {
             let key_str = key;
             let value_hex: Vec<String> = value.iter().map(|b| format!("{:02x}", b)).collect();
             println!("Key: {:<20} | Value ({} bytes): {}", key_str, value.len(), value_hex.join(" "));
@@ -118,6 +121,6 @@ impl VM {
     /// Starts program execution without initializing registers or setting up state.
     /// This assumes the VM is already configured and simply jumps to the program counter.
     pub fn raw_run(&mut self) {
-        while self.cpu.step(&self.memory, &self.storage) {}
+        while self.cpu.step(Rc::clone(&self.memory), Rc::clone(&self.storage)) {}
     }
 } 

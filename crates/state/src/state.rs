@@ -4,6 +4,7 @@ use storage::Storage;
 use crate::{Account};
 use types::address::Address;
 use hex::encode as hex_encode;
+use alloc::collections::BTreeMap;
 
 #[derive(Clone, Debug)]
 pub struct State {
@@ -30,6 +31,7 @@ impl State {
             balance: 0,
             code: Vec::new(),
             is_contract: false,
+            storage: BTreeMap::new(),
         })
     }
 
@@ -44,6 +46,7 @@ impl State {
             balance: 0,
             code: Vec::new(),
             is_contract: false,
+            storage: BTreeMap::new(),
         });
         acc.code = code;
         acc.is_contract = true;
@@ -55,7 +58,13 @@ impl State {
             println!("  🔑 Address: 0x{}", hex_encode(addr.0));
             println!("      - Balance: {}", acc.balance);
             println!("      - Nonce: {}", acc.nonce);
+            println!("      - Is contract?: {}", acc.is_contract);
             println!("      - Code size: {} bytes", acc.code.len());
+            println!("      - Storage:");
+            for (key, value) in &acc.storage {
+                let value_hex: Vec<String> = value.iter().map(|b| format!("{:02x}", b)).collect();
+                println!("          Key: {:<20} | Value ({} bytes): {}", key, value.len(), value_hex.join(" "));
+            }
             println!();
         }
         println!("--------------------");

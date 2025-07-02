@@ -11,6 +11,7 @@ use types::address::Address;
 use types::result::Result;
 use std::{panic::{catch_unwind, AssertUnwindSafe}, usize};
 use std::rc::Rc;
+use core::cell::RefCell;
 
 pub struct AVM {
     /// Stack of execution contexts (for nested contract calls)
@@ -46,8 +47,13 @@ impl AVM {
         return self.extract_result(result_ptr);
     }
 
-    fn extract_result(& self, result_ptr: u32) -> Result {
-        let page = self.memory_manager.first_page().expect("No memory page allocated");
+    fn extract_result(&self, result_ptr: u32) -> Result {
+        let page_rc = self.memory_manager.first_page().expect("No memory page allocated");
+
+        // Borrow the MemoryPage
+        let page = page_rc.borrow();
+
+        // Call the mem() method on the borrowed page
         let mem = page.mem();
         let start = result_ptr as usize;
 
@@ -61,32 +67,28 @@ impl AVM {
         Result { error_code, success }
     }
 
+
     /// Handles calling a new contract, spinning up a fresh VM with its own memory page
     pub fn call_contract(&mut self, from: Address, to: Address, input_data: Vec<u8>) -> u32 {
-        // Allocate a fresh memory page for the new VM
-        let memory_page: Rc<MemoryPage> = self.memory_manager.new_page();
-
-        // Instantiate and run the child VM
-        let mut vm = VM::new(
-            memory_page,
-        );
-
-        // Set the code for the VM to execute
-        let account = self.state.get_account(&to).expect("Contract code not found");
-        if account.is_contract == false {
+        // Get mutable reference to the contract account
+        let account = self.state.get_account_mut(&to);
+        if !account.is_contract {
             panic!("destination address {} is not a contract", to);
         }
-        let code_slice: &[u8] = &account.code;
-        vm.set_code(Config::PROGRAM_START_ADDR, code_slice);  
+
+        // Allocate memory and clone storage
+        let memory_page = self.memory_manager.new_page();
+        let storage = Rc::new(RefCell::new(Storage::with_map(account.storage.clone())));
+
+        // Create and configure child VM
+        let mut vm = VM::new(memory_page, storage.clone());
+        vm.set_code(Config::PROGRAM_START_ADDR, &account.code);
         vm.cpu.verbose = true;
 
-        // to address
-        let _address_ptr: u32 = vm.set_reg_to_data(Register::A0, to.0.as_ref());
-
-        // from address
+        // Set registers
+        let _address_ptr = vm.set_reg_to_data(Register::A0, to.0.as_ref());
         let _pubkey_ptr = vm.set_reg_to_data(Register::A1, from.0.as_ref());
 
-        // input data
         let input_len = input_data.len();
         if input_len > Config::MAX_INPUT_LEN {
             panic!(
@@ -95,26 +97,32 @@ impl AVM {
                 Config::MAX_INPUT_LEN
             );
         }
+
         let _input_ptr = vm.set_reg_to_data(Register::A2, &input_data);
         vm.set_reg_u32(Register::A3, input_len as u32);
 
-        // result pointer
         let result_ptr = vm.set_reg_to_data(Register::A4, &[0u8; 5]);
 
-        // run the VM
+        // Run the VM safely
         let result = catch_unwind(AssertUnwindSafe(|| {
-            vm.raw_run(); // this might panic
+            vm.raw_run();
         }));
+
         if let Err(e) = result {
             eprintln!("💥 VM panicked: {:?}", e);
             panic!("VM panicked");
         }
 
-        // Pop the context when finished
+        // Copy storage back into account (clone the updated map)
+        let updated_map = storage.borrow().map.borrow().clone();
+        account.storage = updated_map;
+
+        // Pop context if using a stack
         self.context_stack.pop();
 
-        return result_ptr;
+        result_ptr
     }
+
 
     /// Peek the current active execution context
     pub fn current_context(&self) -> Option<&ExecutionContext> {

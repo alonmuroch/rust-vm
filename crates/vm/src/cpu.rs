@@ -2,6 +2,8 @@ use crate::decoder::{decode_full, decode_compressed};
 use crate::instruction::Instruction;
 use crate::memory_page::MemoryPage;
 use storage::Storage;
+use std::rc::Rc;
+use core::cell::RefCell;
 
 pub struct CPU {
     pub pc: u32,
@@ -20,47 +22,57 @@ impl CPU {
         }
     }
 
-    pub fn step(&mut self, memory: &MemoryPage, storage: &Storage) -> bool {
-        match self.next_instruction(memory) {
+    pub fn step(&mut self, memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> bool {
+        let instr = self.next_instruction(Rc::clone(&memory));
+        match  instr{
             Some((instr, size)) => {
-                if self.verbose {
-                    println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
-                }
-                let old_pc = self.pc;
-                let result = self.execute(instr, memory, storage);      
-
-                // bump the PC only if the instruction did not change it
-                if self.pc == old_pc {
-                    self.pc = self.pc.wrapping_add(size as u32);
-                }
-                result
+                self.run_instruction(instr, size,Rc::clone(&memory), storage)
             }
             None => {
-                if let Some(slice_ref) = memory.mem_slice(self.pc as usize, self.pc as usize + 4) {
-                    let hex_dump = slice_ref.iter()
-                        .map(|b| format!("{:02x}", b)) // still needs deref
-                        .collect::<Vec<_>>()
-                        .join(" ");
-
-                    eprintln!(
-                        "🚨 Unknown or invalid instruction at PC = 0x{:08x} (bytes: [{}])",
-                        self.pc,
-                        hex_dump
-                    );
-                } else {
-                    eprintln!(
-                        "🚨 Unknown or invalid instruction at PC = 0x{:08x} (could not read memory)",
-                        self.pc
-                    );
-                }
-                false
+                self.unknown_instruction(Rc::clone(&memory), storage)
             }
         }
     }
 
-    pub fn next_instruction(&mut self, memory: &MemoryPage) -> Option<(Instruction, u8)> {
+    fn run_instruction(&mut self, instr: Instruction, size: u8, memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> bool {
+        if self.verbose {
+            println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
+        }
+        let old_pc = self.pc;
+        let result = self.execute(instr, memory, storage);      
+
+        // bump the PC only if the instruction did not change it
+        if self.pc == old_pc {
+            self.pc = self.pc.wrapping_add(size as u32);
+        }
+        result
+    }
+
+    fn unknown_instruction(&mut self, memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> bool {
+        if let Some(slice_ref) = memory.borrow().mem_slice(self.pc as usize, self.pc as usize + 4) {
+            let hex_dump = slice_ref.iter()
+                .map(|b| format!("{:02x}", b)) // still needs deref
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            eprintln!(
+                "🚨 Unknown or invalid instruction at PC = 0x{:08x} (bytes: [{}])",
+                self.pc,
+                hex_dump
+            );
+        } else {
+            eprintln!(
+                "🚨 Unknown or invalid instruction at PC = 0x{:08x} (could not read memory)",
+                self.pc
+            );
+        }
+        false
+    }
+
+    pub fn next_instruction(&mut self, memory: Rc<RefCell<MemoryPage>>) -> Option<(Instruction, u8)> {
         let pc = self.pc as usize;
-        let bytes = memory.mem_slice(pc, pc + 4)?;
+        let mem_ref = memory.borrow();
+        let bytes = mem_ref.mem_slice(pc, pc + 4)?;
 
         if bytes.len() < 2 {
             return None;
@@ -79,7 +91,7 @@ impl CPU {
         }
     }
 
-    pub fn execute(&mut self, instr: Instruction, memory: &MemoryPage, storage: &Storage) -> bool {
+    pub fn execute(&mut self, instr: Instruction, memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> bool {
         match instr {
             Instruction::Add { rd, rs1, rs2 } => {
                 self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2])
@@ -126,31 +138,31 @@ impl CPU {
             }
             Instruction::Lw { rd, rs1, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                self.regs[rd] = memory.load_u32(addr);
+                self.regs[rd] = memory.borrow().load_u32(addr);
             }
             Instruction::Lbu { rd, rs1, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                let byte = memory.load_byte(addr);
+                let byte = memory.borrow().load_byte(addr);
                 self.regs[rd] = byte as u32;
             }
             Instruction::Lh { rd, rs1, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                let halfword = memory.load_halfword(addr); // returns u16
+                let halfword = memory.borrow().load_halfword(addr); // returns u16
                 let value = (halfword as i16) as i32 as u32; // sign-extend to 32-bit
                 self.regs[rd] = value;
             }
 
             Instruction::Sh { rs1, rs2, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                memory.store_u16(addr, (self.regs[rs2] & 0xFFFF) as u16);
+                memory.borrow_mut().store_u16(addr, (self.regs[rs2] & 0xFFFF) as u16);
             }
             Instruction::Sw { rs1, rs2, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                memory.store_u32(addr, self.regs[rs2]);
+                memory.borrow_mut().store_u32(addr, self.regs[rs2]);
             }
             Instruction::Sb { rs1, rs2, offset } => {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                memory.store_u8(addr, (self.regs[rs2] & 0xFF) as u8);
+                memory.borrow_mut().store_u8(addr, (self.regs[rs2] & 0xFF) as u8);
             }
         
             Instruction::Beq { rs1, rs2, offset } => {
