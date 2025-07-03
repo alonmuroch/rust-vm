@@ -47,16 +47,29 @@ pub use panic::vm_panic;
 /// letting invalid conditions cause undefined behavior later, we fail fast with
 /// a clear error message. This makes debugging much easier.
 /// 
+/// DEFENSIVE PROGRAMMING PRINCIPLES:
+/// - Validate all inputs at function boundaries
+/// - Check preconditions before performing operations
+/// - Provide clear, actionable error messages
+/// - Fail fast to prevent cascading errors
+/// - Assume all external data is potentially malicious
+/// 
 /// SECURITY CONSIDERATIONS:
 /// - Always validate inputs before processing them
 /// - Provide clear error messages for debugging
 /// - Fail fast to prevent cascading errors
 /// - In production VMs, you might want to log these failures for monitoring
+/// - Consider rate limiting to prevent denial-of-service attacks
+/// 
+/// REAL-WORLD ANALOGY: This is like a bouncer at a club checking IDs. Instead
+/// of letting people in and then dealing with problems later, you check
+/// everything upfront and turn away anyone who doesn't meet the requirements.
 /// 
 /// USAGE EXAMPLES:
 /// - require(data.len() >= 8, b"insufficient data");
 /// - require(account.balance >= amount, b"insufficient funds");
 /// - require(selector < MAX_SELECTORS, b"invalid selector");
+/// - require(caller == owner, b"unauthorized access");
 /// 
 /// PARAMETERS:
 /// - condition: Boolean expression that must be true for execution to continue

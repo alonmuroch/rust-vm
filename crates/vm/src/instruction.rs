@@ -2,6 +2,38 @@
 /// (Integer, Multiplication, Atomic, and Compressed extensions).
 /// Each variant corresponds to a decoded instruction
 /// from either a 32-bit or 16-bit RISC-V word.
+/// 
+/// EDUCATIONAL PURPOSE: This enum represents the complete instruction set
+/// that our RISC-V virtual machine can execute. Understanding this structure
+/// helps students learn about:
+/// - CPU instruction formats and encoding
+/// - Different types of operations (arithmetic, memory, control flow)
+/// - How high-level programming constructs map to machine instructions
+/// 
+/// RISC-V INSTRUCTION FORMATS:
+/// - R-type: Register operations (add, sub, and, or, etc.)
+/// - I-type: Immediate operations (addi, lw, jalr, etc.)
+/// - S-type: Store operations (sw, sh, sb)
+/// - B-type: Branch operations (beq, bne, blt, etc.)
+/// - U-type: Upper immediate operations (lui, auipc)
+/// - J-type: Jump operations (jal)
+/// 
+/// INSTRUCTION CATEGORIES:
+/// - ARITHMETIC: Basic math operations (add, sub, mul, div)
+/// - LOGICAL: Bit manipulation (and, or, xor, shifts)
+/// - MEMORY: Load and store operations
+/// - CONTROL FLOW: Branches and jumps
+/// - SYSTEM: Environment calls and breakpoints
+/// - ATOMIC: Thread-safe memory operations
+/// - COMPRESSED: 16-bit versions of common instructions
+/// 
+/// REAL-WORLD CONTEXT: In actual RISC-V processors, these instructions
+/// are encoded as binary data. The decoder converts these binary patterns
+/// into this enum structure, which makes them easier to work with in our VM.
+/// 
+/// PERFORMANCE IMPLICATIONS: Different instruction types have different
+/// execution costs. Memory operations are typically slower than register
+/// operations, and branches can cause pipeline stalls in real CPUs.
 #[derive(Debug)]
 pub enum Instruction {
     // ===== RV32I =====

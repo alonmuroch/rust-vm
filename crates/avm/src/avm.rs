@@ -29,10 +29,26 @@ use core::cell::RefCell;
 /// - Contracts can call other contracts (nested execution)
 /// - All state changes are atomic (all succeed or all fail)
 /// 
+/// REAL-WORLD BLOCKCHAIN COMPARISON:
+/// This AVM is inspired by Ethereum's EVM but simplified for educational purposes:
+/// - Ethereum has more complex gas accounting and pricing
+/// - Real blockchains have more sophisticated memory management
+/// - Production VMs include additional security features like reentrancy protection
+/// - Gas limits and execution timeouts prevent infinite loops
+/// 
+/// VIRTUAL MACHINE LAYERS:
+/// The AVM operates at multiple abstraction levels:
+/// 1. Transaction Layer: Processes blockchain transactions
+/// 2. Contract Layer: Executes smart contract bytecode
+/// 3. Memory Layer: Manages contract memory allocation
+/// 4. Storage Layer: Provides persistent data storage
+/// 5. State Layer: Maintains global blockchain state
+/// 
 /// SECURITY CONSIDERATIONS:
 /// - Panic handling prevents one bad contract from crashing the entire system
 /// - Memory isolation between contracts prevents interference
 /// - Input validation prevents resource exhaustion attacks
+/// - Context tracking prevents unauthorized cross-contract access
 pub struct AVM {
     /// Stack of execution contexts for nested contract calls.
     /// 
@@ -95,9 +111,24 @@ impl AVM {
     /// - CreateAccount: Deploy a new smart contract
     /// - ProgramCall: Execute an existing smart contract
     /// 
+    /// TRANSACTION PROCESSING FLOW:
+    /// 1. Validate transaction format and parameters
+    /// 2. Check account existence and permissions
+    /// 3. Execute the appropriate operation based on transaction type
+    /// 4. Update global state with the results
+    /// 5. Return success/failure status
+    /// 
+    /// ATOMICITY: All state changes within a transaction are atomic - either
+    /// all succeed or all fail. This ensures data consistency even if the
+    /// system crashes during transaction processing.
+    /// 
     /// ERROR HANDLING: Uses catch_unwind to prevent panics from crashing the entire
     /// system. This is crucial in blockchain systems where one bad transaction
     /// shouldn't affect others.
+    /// 
+    /// GAS ACCOUNTING: In real blockchains, each operation costs gas, and
+    /// transactions have gas limits. This implementation is simplified and
+    /// doesn't include gas accounting.
     /// 
     /// RETURN VALUE: Returns a Result indicating success/failure and any error codes
     pub fn run_tx(&mut self, tx: Transaction) -> Result {

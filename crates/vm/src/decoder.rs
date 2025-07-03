@@ -17,6 +17,24 @@ use crate::isa_compressed::CompressedOpcode;
 /// instructions have bottom 2 bits = 0b11. This allows the decoder to quickly
 /// determine which format to use.
 ///
+/// BINARY FORMAT ANALYSIS:
+/// The decoder examines the binary pattern of instruction bytes to determine:
+/// 1. Whether it's a compressed (16-bit) or regular (32-bit) instruction
+/// 2. What operation to perform (opcode)
+/// 3. Which registers to use (rs1, rs2, rd)
+/// 4. What immediate values to use (offsets, constants)
+///
+/// MEMORY EFFICIENCY: Compressed instructions save 50% of memory space
+/// for common operations. This is especially important in embedded systems
+/// where memory is limited and expensive.
+///
+/// DECODING STRATEGY: The function uses a two-step approach:
+/// 1. Quick format detection using the bottom 2 bits
+/// 2. Detailed decoding based on the detected format
+///
+/// ERROR HANDLING: Returns None for invalid or unrecognized instructions.
+/// This allows the CPU to handle malformed code gracefully.
+///
 /// PARAMETERS:
 /// - bytes: Raw instruction bytes from memory (at least 2 bytes)
 ///
@@ -65,8 +83,34 @@ pub fn decode(bytes: &[u8]) -> Option<(Instruction, u8)> {
 /// 6:0    opcode  (7 bits) - operation code
 /// ```
 ///
+/// INSTRUCTION TYPE ANALYSIS:
+/// The opcode field determines the instruction type and how to interpret
+/// the remaining fields:
+/// - R-type: Register operations (add, sub, and, or, etc.)
+/// - I-type: Immediate operations (addi, lw, jalr, etc.)
+/// - S-type: Store operations (sw, sh, sb)
+/// - B-type: Branch operations (beq, bne, blt, etc.)
+/// - U-type: Upper immediate operations (lui, auipc)
+/// - J-type: Jump operations (jal)
+///
 /// IMMEDIATE EXTRACTION: Different instruction types pack immediate values
 /// in different bit positions. This function extracts them correctly for each type.
+/// - I-type: 12-bit immediate in bits 31:20
+/// - S-type: 12-bit immediate split across bits 31:25 and 11:7
+/// - B-type: 13-bit immediate split across bits 31:25 and 11:8
+/// - U-type: 20-bit immediate in bits 31:12
+/// - J-type: 21-bit immediate split across bits 31:12 and 20:12
+///
+/// BIT MANIPULATION TECHNIQUES:
+/// The function uses bit shifting and masking to extract fields:
+/// - (word >> n) & mask: Extract n bits starting at position n
+/// - (word as i32) >> 20: Sign-extend 12-bit immediate
+/// - ((a << n) | b) << m >> m: Combine split fields and sign-extend
+///
+/// FUNCTION CODES: The funct3 and funct7 fields provide additional
+/// information to distinguish between similar operations:
+/// - funct3: Used for immediate operations and memory operations
+/// - funct7: Used for register-register operations
 ///
 /// PARAMETERS:
 /// - word: 32-bit instruction word from memory

@@ -18,9 +18,28 @@ use alloc::collections::BTreeMap;
 /// - All state changes are atomic (all succeed or all fail)
 /// - State persists between transactions
 /// 
+/// REAL-WORLD BLOCKCHAIN COMPARISON:
+/// This is a simplified version of Ethereum's state management. In Ethereum:
+/// - State is stored in a Merkle Patricia Trie for efficient proofs
+/// - Accounts have additional fields like storage root and code hash
+/// - State changes are tracked for rollback capability
+/// - Gas costs are associated with state operations
+/// 
 /// DATA STRUCTURE: Uses a HashMap for O(1) account lookups by address.
 /// In production blockchains, this would be a more sophisticated data structure
 /// like a Merkle tree for efficient state proofs.
+/// 
+/// MEMORY MANAGEMENT: All accounts are kept in memory for fast access.
+/// In production systems, only frequently accessed accounts would be in memory,
+/// with the rest stored on disk or in a database.
+/// 
+/// THREAD SAFETY: This implementation is not thread-safe. In a real blockchain,
+/// the state would need to handle concurrent access from multiple transactions
+/// and validators.
+/// 
+/// PERSISTENCE: The state can be reconstructed from storage, though the current
+/// implementation is simplified. Real blockchains use sophisticated persistence
+/// mechanisms to ensure data durability and recovery.
 #[derive(Clone, Debug)]
 pub struct State {
     /// Maps addresses to their corresponding accounts.
@@ -82,6 +101,22 @@ impl State {
     /// 
     /// ACCOUNT CREATION: If the account doesn't exist, it creates a new one
     /// with default values (0 balance, 0 nonce, no code, not a contract).
+    /// 
+    /// LAZY INITIALIZATION: This pattern is common in blockchain systems
+    /// because it saves storage space - accounts only exist when they're
+    /// actually used. This is different from traditional databases where
+    /// you might pre-allocate space for all possible accounts.
+    /// 
+    /// DEFAULT VALUES EXPLANATION:
+    /// - nonce: 0 - No transactions have been sent from this account yet
+    /// - balance: 0 - No funds have been transferred to this account
+    /// - code: Vec::new() - No smart contract code deployed
+    /// - is_contract: false - This is a regular account, not a contract
+    /// - storage: BTreeMap::new() - No persistent storage allocated
+    /// 
+    /// MEMORY EFFICIENCY: Using BTreeMap for storage provides ordered
+    /// iteration and efficient lookups while using less memory than HashMap
+    /// for small datasets.
     /// 
     /// USAGE: Use this when you need to modify account data (e.g., update
     /// balance, deploy code, modify storage).

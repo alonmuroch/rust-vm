@@ -18,9 +18,28 @@ use core::cell::RefCell;
 /// - Register x0 is always hardwired to zero
 /// - The PC is separate from the general registers
 /// 
+/// REAL CPU COMPARISON: This is a simplified model of a real CPU. In actual
+/// hardware, a CPU has many more components:
+/// - Arithmetic Logic Unit (ALU) for mathematical operations
+/// - Control Unit for instruction decoding and control flow
+/// - Cache memory for faster data access
+/// - Pipeline stages for parallel instruction processing
+/// - Memory Management Unit (MMU) for virtual memory
+/// 
+/// VIRTUAL MACHINE CONTEXT: In a VM, we simulate these components in software.
+/// This allows us to run programs written for one architecture (RISC-V) on
+/// different hardware (like x86 or ARM). The VM provides an abstraction layer
+/// that makes the underlying hardware details transparent to the running program.
+/// 
 /// MEMORY MANAGEMENT: We use Rc<RefCell<>> for shared mutable access to memory
 /// and storage, which allows the CPU to read/write memory while maintaining
 /// Rust's safety guarantees.
+/// 
+/// PERFORMANCE CONSIDERATIONS: This is an interpretive VM, meaning each
+/// instruction is decoded and executed one at a time. Real CPUs use techniques
+/// like pipelining, out-of-order execution, and just-in-time compilation to
+/// achieve much higher performance. However, this simple approach is perfect
+/// for learning and understanding how CPUs work at a fundamental level.
 pub struct CPU {
     /// Program Counter - points to the next instruction to execute
     /// EDUCATIONAL: In real CPUs, this is a special register that automatically
@@ -65,10 +84,27 @@ impl CPU {
     /// 2. Decode: Figure out what the instruction does
     /// 3. Execute: Perform the operation
     /// 
+    /// INSTRUCTION CYCLE DETAILS:
+    /// - FETCH: The CPU reads the instruction from memory at the address
+    ///   pointed to by the Program Counter (PC)
+    /// - DECODE: The instruction is analyzed to determine what operation
+    ///   to perform and what operands (registers, memory addresses) to use
+    /// - EXECUTE: The actual operation is performed (arithmetic, memory access,
+    ///   control flow, etc.)
+    /// 
+    /// ERROR HANDLING: If an invalid instruction is encountered, the CPU
+    /// handles it gracefully by calling unknown_instruction() which provides
+    /// debugging information and halts execution safely.
+    /// 
     /// RETURN VALUE: Returns true if execution should continue, false to halt
     /// 
     /// MEMORY ACCESS: Uses shared references to memory and storage to allow
     /// the CPU to read/write while maintaining Rust's safety guarantees.
+    /// 
+    /// REAL-WORLD ANALOGY: This is like a factory assembly line where each
+    /// worker (instruction) performs a specific task. The conveyor belt (PC)
+    /// moves to the next task automatically, unless a task specifically
+    /// redirects the flow (like a branch or jump instruction).
     pub fn step(&mut self, memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> bool {
         // EDUCATIONAL: Step 1 - Fetch and decode the next instruction
         let instr = self.next_instruction(Rc::clone(&memory));
