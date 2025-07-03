@@ -21,3 +21,27 @@ pub struct Transaction {
     pub value: u64,               // amount/value sent
     pub nonce: u64,               // transaction nonce
 }
+
+/// Holds a set of transactions to be processed as a unit
+#[derive(Debug, Clone)]
+pub struct TransactionBundle {
+    pub transactions: Vec<Transaction>,
+}
+
+impl TransactionBundle {
+    pub fn new(transactions: Vec<Transaction>) -> Self {
+        TransactionBundle { transactions }
+    }
+
+    pub fn add_transaction(&mut self, tx: Transaction) {
+        self.transactions.push(tx);
+    }
+
+    pub fn len(&self) -> usize {
+        self.transactions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.transactions.is_empty()
+    }
+}

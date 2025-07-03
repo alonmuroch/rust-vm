@@ -120,7 +120,6 @@ impl AVM {
         // Create and configure child VM
         let mut vm = VM::new(memory_page, storage.clone());
         vm.set_code(Config::PROGRAM_START_ADDR, &account.code);
-        vm.cpu.verbose = true;
 
         // Set registers
         let _address_ptr = vm.set_reg_to_data(Register::A0, to.0.as_ref());
