@@ -1,23 +1,34 @@
-#![no_std]  
+#![no_std]
 
+/* --------------------------------- Imports --------------------------------- */
+
+// External crates
+pub extern crate hex;
+pub extern crate types;
+
+/* --------------------------------- Modules --------------------------------- */
+
+// Result module
 pub mod result;
 pub use result::Result;
 
+// Logging macros
 pub mod log;
 #[macro_use]
 pub use crate::log::*;
 
-pub extern crate hex;
-pub extern crate types;
-
-#[macro_use] // enables macro use across the crate
+// Entrypoint macro
+#[macro_use]
 pub mod entrypoint;
+
+// Persistent storage system
 #[macro_use]
 pub mod storage;
+pub use storage::Persistent; // Allow `$crate::Persistent` in macros
 
-// Re-export so `$crate::Persistent` works in the macro
-pub use storage::Persistent;
+/* ----------------------------- Panic Handlers ----------------------------- */
 
+/// Default panic handler for the guest program.
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
     unsafe {
@@ -29,24 +40,25 @@ fn panic(_: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
+/// Triggers a custom VM panic with a message (via syscall).
 pub fn vm_panic(msg: &[u8]) -> ! {
     unsafe {
-        // Syscall number 3 = custom "panic with message"
+        // Syscall 3 = panic with message
         core::arch::asm!(
-            "li a7, 3",
-            "ecall",
+            "li a7, 3",           // syscall number
+            "ecall",              // trigger it
             in("t0") msg.as_ptr(), 
-            in("t1") msg.len(),    
+            in("t1") msg.len(),
         );
 
-        // Halt execution explicitly
         core::arch::asm!("ebreak", options(nomem, nostack));
     }
-
     loop {}
 }
 
-/// Requires the given condition to be true. If not, triggers a VM panic with the given message.
+/* --------------------------- Assertion Utilities -------------------------- */
+
+/// Aborts execution if condition is false, printing `msg`.
 pub fn require(condition: bool, msg: &[u8]) {
     if !condition {
         vm_panic(msg);
