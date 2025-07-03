@@ -5,7 +5,7 @@ use vm::registers::Register;
 use state::{State, Account};
 use crate::transaction::{TransactionType, Transaction};
 use crate::global::Config;
-use crate::execution_context::ExecutionContext;
+use crate::execution_context::{ExecutionContext, ContextStack};
 use types::address::Address;
 use types::result::Result;
 use std::{panic::{catch_unwind, AssertUnwindSafe}, usize};
@@ -55,7 +55,7 @@ pub struct AVM {
     /// EDUCATIONAL: This implements a call stack similar to how functions
     /// call other functions in programming. Each context tracks who called
     /// whom and with what data. This is crucial for debugging and gas accounting.
-    pub context_stack: Vec<ExecutionContext>,
+    pub context_stack: ContextStack,
 
     /// Manages allocation of memory pages for contract execution.
     /// 
@@ -94,7 +94,7 @@ impl AVM {
     /// process transactions and execute contracts.
     pub fn new(max_pages: usize, page_size: usize) -> Self {
         Self {
-            context_stack: Vec::new(),
+            context_stack: ContextStack::new(),
             memory_manager: MemoryPageManager::new(max_pages, page_size),
             storage: Storage::new(),
             state: State::new(),
@@ -161,6 +161,12 @@ impl AVM {
 
                 // EDUCATIONAL: Call the contract and extract the result
                 let result_ptr = self.call_contract(tx.from, tx.to, tx.data);
+
+                // verify context stack is empty
+                if !self.context_stack.is_empty() {
+                    panic!("context stack is not empty after tx execution");
+                }
+
                 self.extract_result(result_ptr)
             }
         }
@@ -273,22 +279,26 @@ impl AVM {
         if !account.is_contract {
             panic!("destination address {} is not a contract", to);
         }
-
+        
         // EDUCATIONAL: Allocate memory and clone storage for isolation
         let memory_page = self.memory_manager.new_page();
         let storage = Rc::new(RefCell::new(Storage::with_map(account.storage.clone())));
 
         // EDUCATIONAL: Create and configure child VM
-        let mut vm = VM::new(memory_page, storage.clone());
+        let mut vm: VM = VM::new(memory_page, storage.clone());
         vm.set_code(Config::PROGRAM_START_ADDR, &account.code);
+
+        // add new context execution
+        self.context_stack.push(from, to, input_data, vm);
+        let context = self.context_stack.current().expect("missing execution context");
 
         // EDUCATIONAL: Set up function parameters in registers
         // This follows the RISC-V calling convention
-        let _address_ptr = vm.set_reg_to_data(Register::A0, to.0.as_ref());      // Contract address
-        let _pubkey_ptr = vm.set_reg_to_data(Register::A1, from.0.as_ref());     // Caller address
+        let _address_ptr = context.vm.borrow_mut().set_reg_to_data(Register::A0, to.0.as_ref());      // Contract address
+        let _pubkey_ptr = context.vm.borrow_mut().set_reg_to_data(Register::A1, from.0.as_ref());     // Caller address
 
         // EDUCATIONAL: Validate input size to prevent resource exhaustion
-        let input_len = input_data.len();
+        let input_len = context.input_data.len();
         if input_len > Config::MAX_INPUT_LEN {
             panic!(
                 "Entrypoint: input length {} exceeds MAX_INPUT_LEN ({})",
@@ -298,13 +308,13 @@ impl AVM {
         }
 
         // EDUCATIONAL: Set up input data and result pointer
-        let _input_ptr = vm.set_reg_to_data(Register::A2, &input_data);          // Input data
-        vm.set_reg_u32(Register::A3, input_len as u32);                          // Input length
-        let result_ptr = vm.set_reg_to_data(Register::A4, &[0u8; 5]);           // Result buffer
+        let _input_ptr = context.vm.borrow_mut().set_reg_to_data(Register::A2, &context.input_data);          // Input data
+        context.vm.borrow_mut().set_reg_u32(Register::A3, input_len as u32);                          // Input length
+        let result_ptr = context.vm.borrow_mut().set_reg_to_data(Register::A4, &[0u8; 5]);           // Result buffer
 
         // EDUCATIONAL: Run the VM safely with panic handling
         let result = catch_unwind(AssertUnwindSafe(|| {
-            vm.raw_run();
+            context.vm.borrow_mut().raw_run();
         }));
 
         // EDUCATIONAL: Handle VM panics gracefully
@@ -332,6 +342,6 @@ impl AVM {
     /// USAGE: Typically used by debugging tools or for implementing features
     /// like gas accounting or call tracing.
     pub fn current_context(&self) -> Option<&ExecutionContext> {
-        self.context_stack.last()
+        self.context_stack.current()
     }
 }

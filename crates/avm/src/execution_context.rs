@@ -1,4 +1,7 @@
 use types::address::Address;
+use std::rc::Rc;
+use std::cell::RefCell;
+use vm::vm::VM;
 
 /// Represents a single execution context during contract calls.
 #[derive(Debug, Clone)]
@@ -10,11 +13,20 @@ pub struct ExecutionContext {
     pub to: Address,
 
     // Data passed to the contract call
-    pub input_data: Vec<u8>, 
+    pub input_data: Rc<Vec<u8>>, 
+
+    // Memory page
+    pub vm: Rc<RefCell<VM>>,
 }
+
 impl ExecutionContext {
-    pub fn new(from: Address, to: Address, input_data: Vec<u8>) -> Self {
-        Self { from, to, input_data }
+    pub fn new(
+        from: Address,
+         to: Address,
+         input_data: Vec<u8>,
+         vm: VM,
+    ) -> Self {
+        Self { from, to, input_data: Rc::new(input_data), vm: Rc::new(RefCell::new(vm)) }
     }
 }
 
@@ -31,8 +43,8 @@ impl ContextStack {
     }
 
     /// Push a new context onto the stack (e.g., when a contract calls another).
-    pub fn push(&mut self, from: Address, to: Address, input_data: Vec<u8>) {
-        self.stack.push(ExecutionContext { from, to, input_data });
+    pub fn push(&mut self, from: Address, to: Address, input_data: Vec<u8>, vm: VM,) {
+        self.stack.push(ExecutionContext { from, to, input_data:Rc::new(input_data), vm:Rc::new(RefCell::new(vm)) });
     }
 
     /// Pop the most recent context off the stack (e.g., when returning from a call).
@@ -43,5 +55,9 @@ impl ContextStack {
     /// Peek at the current execution context without modifying the stack.
     pub fn current(&self) -> Option<&ExecutionContext> {
         self.stack.last()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
     }
 }

@@ -2,6 +2,7 @@ use std::rc::Rc;
 use std::cell::{RefCell, Cell};
 use std::convert::TryInto;
 
+#[derive(Debug, Clone)]
 pub struct MemoryPage {
     mem: Rc<RefCell<Vec<u8>>>,
     pub next_heap: Cell<u32>,

@@ -18,6 +18,12 @@ pub struct User {
     pub level: u8,      // User privilege level (0 = normal, 1 = admin, etc.)
 }
 
+
+
+pub const SYSCALL_STORAGE_GET: u32 = 1;
+pub const SYSCALL_STORAGE_SET: u32 = 2;
+pub const SYSCALL_PANIC: u32 = 3;
+pub const SYSCALL_LOG: u32 = 4;
 /// Represents different types of arguments that can be passed to system calls.
 /// 
 /// EDUCATIONAL: This enum demonstrates how to handle different data types
@@ -68,10 +74,10 @@ impl CPU {
 
         // EDUCATIONAL: Dispatch to the appropriate system call handler
         let result = match syscall_id {
-            1 => self.sys_storage_get(args, memory, storage),
-            2 => self.sys_storage_set(args, memory, storage),
-            3 => self.sys_panic_with_message(memory),
-            4 => self.sys_log(args, memory),
+            SYSCALL_STORAGE_GET => self.sys_storage_get(args, memory, storage),
+            SYSCALL_STORAGE_SET => self.sys_storage_set(args, memory, storage),
+            SYSCALL_PANIC => self.sys_panic_with_message(memory),
+            SYSCALL_LOG => self.sys_log(args, memory),
             _ => {
                 // EDUCATIONAL: Unknown system calls should panic
                 panic!("Unknown syscall: {}", syscall_id);

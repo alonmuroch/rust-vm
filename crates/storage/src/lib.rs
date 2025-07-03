@@ -38,7 +38,7 @@ use alloc::string::String;
 /// THREAD SAFETY: The current implementation is not thread-safe. In a
 /// real blockchain, storage would need to handle concurrent access
 /// from multiple transactions and validators.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Storage {
     /// Internal key-value storage using BTreeMap for ordered iteration
     /// 

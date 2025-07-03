@@ -21,6 +21,7 @@ use storage::{Storage};
 /// MEMORY MANAGEMENT: Uses Rc<RefCell<>> for shared mutable access to memory
 /// and storage, allowing the VM to manage resources efficiently while maintaining
 /// Rust's safety guarantees.
+#[derive(Debug)]
 pub struct VM {
     /// The CPU that executes RISC-V instructions
     pub cpu: CPU,
