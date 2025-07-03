@@ -4,47 +4,106 @@ use crate::isa_compressed::CompressedOpcode;
 
 /// Unified decoder for either 16-bit compressed or 32-bit instruction.
 ///
-/// - Expects 4 bytes (`[u8; 4]`)
-/// - Returns decoded `Instruction` and how many bytes were consumed (2 or 4)
+/// EDUCATIONAL PURPOSE: This function demonstrates the first step of the
+/// instruction cycle - instruction decoding. It takes raw bytes from memory
+/// and converts them into structured instruction objects that the CPU can execute.
+///
+/// RISC-V INSTRUCTION FORMATS:
+/// - 32-bit instructions: Standard RISC-V instructions
+/// - 16-bit compressed instructions: Space-saving variants (RV32C extension)
+///
+/// COMPRESSED INSTRUCTION DETECTION:
+/// RISC-V compressed instructions have bottom 2 bits != 0b11, while regular
+/// instructions have bottom 2 bits = 0b11. This allows the decoder to quickly
+/// determine which format to use.
+///
+/// PARAMETERS:
+/// - bytes: Raw instruction bytes from memory (at least 2 bytes)
+///
+/// RETURNS: Some((instruction, size)) if successful, None if invalid
+/// - instruction: The decoded instruction object
+/// - size: Number of bytes consumed (2 for compressed, 4 for regular)
 pub fn decode(bytes: &[u8]) -> Option<(Instruction, u8)> {
+    // EDUCATIONAL: Need at least 2 bytes to read the first 16 bits
     if bytes.len() < 2 {
         return None;
     }
 
+    // EDUCATIONAL: Read the first 16 bits to check if it's compressed
     let hword = u16::from_le_bytes([bytes[0], bytes[1]]);
+    
+    // EDUCATIONAL: Check bottom 2 bits to determine instruction format
+    // 0b11 = regular 32-bit instruction, anything else = compressed
     let is_compressed = (hword & 0b11) != 0b11;
 
     if is_compressed {
+        // EDUCATIONAL: Decode as 16-bit compressed instruction
         decode_compressed(hword).map(|inst| (inst, 2))
     } else if bytes.len() >= 4 {
+        // EDUCATIONAL: Decode as 32-bit regular instruction
         let word = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
         decode_full(word).map(|inst| (inst, 4))
     } else {
+        // EDUCATIONAL: Not enough bytes for a 32-bit instruction
         None
     }
 }
 
+/// Decodes a 32-bit RISC-V instruction into an Instruction object.
+///
+/// EDUCATIONAL PURPOSE: This function demonstrates RISC-V instruction encoding.
+/// RISC-V uses a fixed 32-bit instruction format with specific bit fields
+/// for different instruction components.
+///
+/// RISC-V INSTRUCTION FORMAT:
+/// ```
+/// 31:25  funct7  (7 bits) - function code for register-register ops
+/// 24:20  rs2     (5 bits) - second source register
+/// 19:15  rs1     (5 bits) - first source register  
+/// 14:12  funct3  (3 bits) - function code for immediate ops
+/// 11:7   rd      (5 bits) - destination register
+/// 6:0    opcode  (7 bits) - operation code
+/// ```
+///
+/// IMMEDIATE EXTRACTION: Different instruction types pack immediate values
+/// in different bit positions. This function extracts them correctly for each type.
+///
+/// PARAMETERS:
+/// - word: 32-bit instruction word from memory
+///
+/// RETURNS: Some(instruction) if valid, None if unrecognized
 pub fn decode_full(word: u32) -> Option<Instruction> {
+    // EDUCATIONAL: Extract opcode from bottom 7 bits
     let opcode = Opcode::from_u8((word & 0x7f) as u8)?;
 
-    let rd = ((word >> 7) & 0x1f) as usize;
-    let funct3 = ((word >> 12) & 0x07) as u8;
-    let rs1 = ((word >> 15) & 0x1f) as usize;
-    let rs2 = ((word >> 20) & 0x1f) as usize;
-    let funct7 = ((word >> 25) & 0x7f) as u8;
+    // EDUCATIONAL: Extract register fields and function codes
+    let rd = ((word >> 7) & 0x1f) as usize;      // Destination register
+    let funct3 = ((word >> 12) & 0x07) as u8;    // Function code for immediate ops
+    let rs1 = ((word >> 15) & 0x1f) as usize;    // First source register
+    let rs2 = ((word >> 20) & 0x1f) as usize;    // Second source register
+    let funct7 = ((word >> 25) & 0x7f) as u8;    // Function code for register-register ops
 
     match opcode {
+        // EDUCATIONAL: Register-register operations (R-type)
+        // These instructions use rs1, rs2, and rd registers
         Opcode::Op => match (funct3, funct7) {
+            // EDUCATIONAL: Basic arithmetic operations
             (0x0, 0x00) => Some(Instruction::Add { rd, rs1, rs2 }),
             (0x0, 0x20) => Some(Instruction::Sub { rd, rs1, rs2 }),
+            
+            // EDUCATIONAL: Logical operations
             (0x1, 0x00) => Some(Instruction::Sll { rd, rs1, rs2 }),
-            (0x2, 0x00) => Some(Instruction::Slt { rd, rs1, rs2 }),
-            (0x3, 0x00) => Some(Instruction::Sltu { rd, rs1, rs2 }),
             (0x4, 0x00) => Some(Instruction::Xor { rd, rs1, rs2 }),
             (0x5, 0x00) => Some(Instruction::Srl { rd, rs1, rs2 }),
             (0x5, 0x20) => Some(Instruction::Sra { rd, rs1, rs2 }),
             (0x6, 0x00) => Some(Instruction::Or { rd, rs1, rs2 }),
             (0x7, 0x00) => Some(Instruction::And { rd, rs1, rs2 }),
+            
+            // EDUCATIONAL: Comparison operations
+            (0x2, 0x00) => Some(Instruction::Slt { rd, rs1, rs2 }),
+            (0x3, 0x00) => Some(Instruction::Sltu { rd, rs1, rs2 }),
+            
+            // EDUCATIONAL: Extended arithmetic (M extension)
             (0x0, 0x01) => Some(Instruction::Mul { rd, rs1, rs2 }),
             (0x1, 0x01) => Some(Instruction::Mulh { rd, rs1, rs2 }),
             (0x2, 0x01) => Some(Instruction::Mulhsu { rd, rs1, rs2 }),
@@ -55,21 +114,33 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             (0x7, 0x01) => Some(Instruction::Remu { rd, rs1, rs2 }),
             _ => None,
         },
+        
+        // EDUCATIONAL: Immediate operations (I-type)
+        // These instructions use rs1, immediate, and rd
         Opcode::OpImm => {
+            // EDUCATIONAL: Sign-extend 12-bit immediate from bits 31:20
             let imm = (word as i32) >> 20;
             match funct3 {
+                // EDUCATIONAL: Basic immediate arithmetic
                 0x0 => Some(Instruction::Addi { rd, rs1, imm }),
+                
+                // EDUCATIONAL: Immediate comparisons
                 0x2 => Some(Instruction::Slti { rd, rs1, imm }),
                 0x3 => Some(Instruction::Sltiu { rd, rs1, imm }),
+                
+                // EDUCATIONAL: Immediate logical operations
                 0x4 => Some(Instruction::Xori { rd, rs1, imm }),
                 0x6 => Some(Instruction::Ori { rd, rs1, imm }),
                 0x7 => Some(Instruction::Andi { rd, rs1, imm }),
+                
+                // EDUCATIONAL: Immediate shifts (use only bottom 5 bits of immediate)
                 0x1 => Some(Instruction::Slli { 
                     rd,
                     rs1,
-                    shamt: (imm & 0x1f) as u8,
+                    shamt: (imm & 0x1f) as u8,  // Only bottom 5 bits for shift amount
                 }),
                 0x5 => match funct7 {
+                    // EDUCATIONAL: Logical vs arithmetic right shift
                     0x00 => Some(Instruction::Srli { 
                         rd,
                         rs1,
@@ -86,40 +157,49 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             }
 
         },
+        
+        // EDUCATIONAL: Load operations (I-type)
+        // Load data from memory into register
         Opcode::Load => {
+            // EDUCATIONAL: Sign-extend 12-bit immediate for address offset
             let imm = (word as i32) >> 20;
             match funct3 {
-                0x1 => Some(Instruction::Lh {  // ← new case
+                0x1 => Some(Instruction::Lh {  // Load halfword (16-bit)
                     rd,
                     rs1,
                     offset: imm,
                 }),
-                0x2 => Some(Instruction::Lw { 
+                0x2 => Some(Instruction::Lw {  // Load word (32-bit)
                     rd, 
                     rs1, 
                     offset: imm, 
                 }),
-                0x4 => Some(Instruction::Lbu { rd, rs1, offset: imm }),
+                0x4 => Some(Instruction::Lbu { rd, rs1, offset: imm }), // Load byte unsigned
                 _ => None,
             }
         },
+        
+        // EDUCATIONAL: Store operations (S-type)
+        // Store data from register to memory
         Opcode::Store => {
+            // EDUCATIONAL: S-type immediates are split across the instruction
+            // imm[11:5] is in bits 31:25, imm[4:0] is in bits 11:7
             let imm11_5 = ((word >> 25) & 0x7f) << 5;
             let imm4_0 = (word >> 7) & 0x1f;
             let imm = ((imm11_5 | imm4_0) as i32) << 20 >> 20; // sign-extend 12-bit
 
             match funct3 {
-                0x0 => Some(Instruction::Sb { 
+                0x0 => Some(Instruction::Sb {  // Store byte (8-bit)
                     rs1, 
                     rs2, 
                     offset: imm,
                 }),
-                0x1 => Some(Instruction::Sh { 
+                0x1 => Some(Instruction::Sh {  // Store halfword (16-bit)
                     rs1, 
                     rs2, 
                     offset: imm,
                 }),
-                0x2 => Some(Instruction::Sw { 
+                0x2 => Some(Instruction::Sw {  // Store word (32-bit)
                     rs1, 
                     rs2, 
                     offset: imm,
@@ -127,35 +207,39 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 _ => None,
             }
         },
+        
+        // EDUCATIONAL: Branch operations (B-type)
+        // Conditional jumps based on register comparison
         Opcode::Branch => {
+            // EDUCATIONAL: B-type immediates are also split and sign-extended
             let imm = extract_branch_offset(word);
             match funct3 {
-                0x0 => Some(Instruction::Beq { 
+                0x0 => Some(Instruction::Beq {  // Branch if equal
                     rs1, 
                     rs2, 
                     offset: imm, 
                 }),
-                0x1 => Some(Instruction::Bne { 
+                0x1 => Some(Instruction::Bne {  // Branch if not equal
                     rs1, 
                     rs2, 
                     offset: imm, 
                 }),
-                0x4 => Some(Instruction::Blt { 
+                0x4 => Some(Instruction::Blt {  // Branch if less than (signed)
                     rs1, 
                     rs2, 
                     offset: imm, 
                 }),
-                0x5 => Some(Instruction::Bge { 
+                0x5 => Some(Instruction::Bge {  // Branch if greater/equal (signed)
                     rs1, 
                     rs2, 
                     offset: imm, 
                 }),
-                0x6 => Some(Instruction::Bltu {
+                0x6 => Some(Instruction::Bltu {  // Branch if less than (unsigned)
                     rs1,
                     rs2,
                     offset: imm,
                 }),
-                0x7 => Some(Instruction::Bgeu {
+                0x7 => Some(Instruction::Bgeu {  // Branch if greater/equal (unsigned)
                     rs1,
                     rs2,
                     offset: imm,
@@ -163,14 +247,22 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 _ => None,
             }
         },
+        
+        // EDUCATIONAL: Jump and Link (J-type)
+        // Unconditional jump with return address saved
         Opcode::Jal => {
+            // EDUCATIONAL: J-type immediates are 20-bit signed values
             let imm = extract_jal_offset(word);
             Some(Instruction::Jal { 
                 rd, 
                 offset: imm, 
             })
         },
+        
+        // EDUCATIONAL: Jump and Link Register (I-type)
+        // Indirect jump with return address saved
         Opcode::Jalr => {
+            // EDUCATIONAL: 12-bit signed immediate for address offset
             let imm = (word as i32) >> 20;
             Some(Instruction::Jalr { 
                 rd, 
@@ -178,22 +270,48 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 offset: imm, 
             })
         },
+        
+        // EDUCATIONAL: Load Upper Immediate (U-type)
+        // Load 20-bit immediate into upper bits of register
         Opcode::Lui => {
+            // EDUCATIONAL: 20-bit immediate goes into bits 31:12
             let imm = ((word >> 12) & 0xFFFFF) as i32;
             Some(Instruction::Lui { 
                 rd,
                 imm: imm as i32, 
             })
         },
+        
+        // EDUCATIONAL: Add Upper Immediate to PC (U-type)
+        // PC-relative addressing for position-independent code
         Opcode::Auipc => {
-            let imm = ((word >> 12) & 0xfffff) as i32; // Extract imm[31:12] as signed 20-bit value
+            // EDUCATIONAL: 20-bit immediate added to PC (bits 31:12)
+            let imm = ((word >> 12) & 0xfffff) as i32;
             Some(Instruction::Auipc { rd, imm })
         },
+        
+        // EDUCATIONAL: System instructions
+        // Special operations like system calls
         Opcode::System => Some(Instruction::Ecall),
     }
 }
 
 /// Decode a 16-bit RISC-V compressed instruction into a full Instruction.
+///
+/// EDUCATIONAL PURPOSE: This demonstrates RISC-V compressed instruction decoding.
+/// Compressed instructions save memory by using shorter encodings for common
+/// operations, but they're more complex to decode.
+///
+/// COMPRESSED INSTRUCTION FORMATS:
+/// - CI: Compressed Immediate (addi, li, etc.)
+/// - CL: Compressed Load (lw, etc.)
+/// - CS: Compressed Store (sw, etc.)
+/// - CJ: Compressed Jump (jal, etc.)
+/// - CB: Compressed Branch (beqz, etc.)
+///
+/// REGISTER MAPPING: Compressed instructions use a subset of registers
+/// (x8-x15) to save bits, and have special encodings for common registers
+/// like x0 (zero), x1 (ra), x2 (sp).
 ///
 /// This function currently supports a minimal set:
 /// - C.ADDI, C.LI, C.LW, C.SW, C.JAL, C.JR, C.RET
