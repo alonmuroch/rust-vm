@@ -89,8 +89,14 @@ impl AVM {
             panic!("account already exists");
         }
 
-        // Optional: Charge from `from` account for account creation
-        // self.charge_for_deployment(from, &data)?; // not shown here
+        let max = Config::CODE_SIZE_LIMIT + Config::RO_DATA_SIZE_LIMIT;
+        if data.len() > max {
+            panic!(
+                "❌ Code size ({}) exceeds CODE_SIZE_LIMIT ({} bytes)",
+                data.len(),
+                max
+            );
+        }
 
         // Create and insert new account with code
         let account = Account {

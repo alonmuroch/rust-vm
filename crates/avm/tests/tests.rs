@@ -1,4 +1,5 @@
 use avm::transaction::{TransactionType, TransactionBundle, Transaction};
+use avm::router::{encode_router_calls,HostFuncCall};
 use types::address::Address;
 use once_cell::sync::Lazy;
 
@@ -14,7 +15,7 @@ pub struct TestCase<'a> {
 pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
     vec![
         TestCase {
-            name: "storage",
+            name: "account create (storage)",
             path: "../examples/bin/storage.elf",
             expected_success: true,
             expected_error_code: 0,
@@ -37,7 +38,67 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 },
             ]),
         },
-        // You can add more test cases here
+
+        TestCase {
+            name: "account create (simple)",
+            path: "../examples/bin/simple.elf",
+            expected_success: true,
+            expected_error_code: 100,
+            bundle: TransactionBundle::new(vec![
+                Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: vec![],
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: vec![
+                        100, 0, 0, 0,   // first u64 = 100
+                        42, 0, 0, 0,      // second u64 = 42
+                    ], 
+                    value: 0,
+                    nonce: 0,
+                },
+            ]),
+        },
+
+        TestCase {
+            name: "multi function (simple)",
+            path: "../examples/bin/multi_func.elf",
+            expected_success: true,
+            expected_error_code: 100,
+            bundle: TransactionBundle::new(vec![
+                Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: vec![],
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: encode_router_calls(&[
+                        HostFuncCall {
+                            selector: 0x01,
+                            args: vec![
+                                100, 0, 0, 0, // first = 100
+                                42, 0, 0, 0,  // second = 42
+                            ],
+                        }
+                    ]),
+                    value: 0,
+                    nonce: 0,
+                },
+            ]),
+        },
     ]
 });
 

@@ -17,6 +17,7 @@ pub const MAX_MEMORY_PAGES: usize = 1;
 fn test_entrypoint_function() {
     for case in TEST_CASES.iter() {
         let transactions = case.bundle.transactions.clone();
+        let mut avm = AVM::new(MAX_MEMORY_PAGES, VM_MEMORY_SIZE);
         for tx in transactions {
             match tx.tx_type {
                 TransactionType::Transfer => {
@@ -25,16 +26,11 @@ fn test_entrypoint_function() {
 
                 TransactionType::ProgramCall => {
                     println!("--- Program call test `{}` ---", case.name);
-
-                    // 1. Create VM and load ELF using compiler crate
-                    let mut avm = AVM::new(MAX_MEMORY_PAGES, VM_MEMORY_SIZE);
-                    populate_state(case.path, tx.to, &mut avm.state);
-                    // vm.cpu.verbose = true;
             
-                    // 2. Run VM
+                    // 1. Run VM
                     let res = avm.run_tx(tx);
                     
-                    // 3. Print result
+                    // 2. Print result
                     avm.state.pretty_print();
                     println!("Success: {}, Error code: {}\n", res.success, res.error_code);
 
@@ -44,17 +40,14 @@ fn test_entrypoint_function() {
 
                 TransactionType::CreateAccount => {
                     println!("--- Account create test `{}` ---", case.name);
-
-                    // 1. Create VM and load ELF using compiler crate
-                    let mut avm = AVM::new(MAX_MEMORY_PAGES, VM_MEMORY_SIZE);
-
-                    // 2. get code
+                    // 1. get code
                     let code = get_program_code(case.path);
 
-                    // 3. set into tx
+                    // 2. set into tx
                     let mut tx_cpy = tx.clone();
                     tx_cpy.data = code;
 
+                    // 3. run and get result
                     let res = avm.run_tx(tx_cpy);
                     avm.state.pretty_print();
                     println!("Success: {}, Error code: {}\n", res.success, res.error_code);
