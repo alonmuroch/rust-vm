@@ -7,8 +7,10 @@ use program::{entrypoint, Result, vm_panic, require};
 use program::types::address::Address;
 use program::router::{route, FuncCall};
 
+pub const MAX_ROUTING_CALLS: usize = 4;
+
 fn my_vm_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
-    route(data, 4, |call| match call.selector {
+    route(data, MAX_ROUTING_CALLS, |call| match call.selector {
         0x01 => compare(call.args),
         0x02 => other(call.args),
         _ => vm_panic(b"unknown selector"),
