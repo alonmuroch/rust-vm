@@ -14,8 +14,8 @@ panic = "abort"
 
 [[bin]]
 name = "simple"
-path = "simple.rs"
+path = "src/simple.rs"
 
 [[bin]]
 name = "storage"
-path = "storage.rs"
+path = "src/storage.rs"
