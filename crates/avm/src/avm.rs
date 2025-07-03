@@ -1,10 +1,9 @@
 use crate::memory_page_manager::MemoryPageManager;
 use storage::Storage;
 use vm::vm::VM;
-use vm::memory_page::MemoryPage;
 use vm::registers::Register;
-use state::State;
-use crate::transaction::Transaction;
+use state::{State, Account};
+use crate::transaction::{TransactionType, Transaction};
 use crate::global::Config;
 use crate::execution_context::ExecutionContext;
 use types::address::Address;
@@ -38,14 +37,31 @@ impl AVM {
     }
 
     pub fn run_tx(&mut self, tx: Transaction) -> Result {
-        let result_ptr = if self.state.is_contract(tx.to) {
-            self.call_contract(tx.from, tx.to, tx.data)
-        } else {
-            panic!("Entrypoint: destination address {} is not a contract", tx.to);  
-        };
+        match tx.tx_type {
+            TransactionType::Transfer => {
+                panic!("regular call not implemented");
+            }
 
-        return self.extract_result(result_ptr);
+            TransactionType::CreateAccount => {
+                let result = catch_unwind(AssertUnwindSafe(|| {
+                    self.create_account(tx.from, tx.to, tx.data);
+                }));
+                if let Err(e) = result {
+                    return Result{error_code: 0, success: false};
+                } else {
+                    return Result{error_code: 1, success: true};
+                }
+            }
+
+            TransactionType::ProgramCall => {
+                assert!(self.state.is_contract(tx.to), "destination address is not a contract");
+
+                let result_ptr = self.call_contract(tx.from, tx.to, tx.data);
+                self.extract_result(result_ptr)
+            }
+        }
     }
+
 
     fn extract_result(&self, result_ptr: u32) -> Result {
         let page_rc = self.memory_manager.first_page().expect("No memory page allocated");
@@ -65,6 +81,27 @@ impl AVM {
         let success = mem[start + 4] != 0;
 
         Result { error_code, success }
+    }
+
+   pub fn create_account(&mut self, _from: Address, to: Address, data: Vec<u8>) {
+        // Check that the target address is not already in use
+        if self.state.accounts.contains_key(&to) {
+            panic!("account already exists");
+        }
+
+        // Optional: Charge from `from` account for account creation
+        // self.charge_for_deployment(from, &data)?; // not shown here
+
+        // Create and insert new account with code
+        let account = Account {
+            code: data,
+            storage: Default::default(),
+            balance: 0,
+            nonce: 0,
+            is_contract: true,
+        };
+
+        self.state.accounts.insert(to, account);
     }
 
 

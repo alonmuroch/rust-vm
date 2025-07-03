@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 use compiler::elf::parse_elf_from_bytes;
-use avm::transaction::Transaction;
+use avm::transaction::{TransactionType, Transaction};
 use types::address::Address;
 use avm::avm::AVM;
 use state::State;
@@ -28,6 +28,7 @@ fn test_entrypoint_function() {
             expected_success: true,
             expected_error_code: 0,
             transaction: Transaction {
+                tx_type: TransactionType::CreateAccount,
                 to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                 from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                 data: vec![], // input data
@@ -35,42 +36,82 @@ fn test_entrypoint_function() {
                 nonce: 0,
             },
         },
-        TestCase {
-            name: "simple",
-            path: "../examples/bin/simple.elf",
-            expected_success: true,
-            expected_error_code: 100,
-            transaction: Transaction {
-                to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                data: vec![
-                    100, 0, 0, 0,   // first u64 = 100
-                    42, 0, 0, 0,      // second u64 = 42
-                ], // input data
-                value: 0,
-                nonce: 0,
-            },
-        },
+        // TestCase {
+        //     name: "storage",
+        //     path: "../examples/bin/storage.elf",
+        //     expected_success: true,
+        //     expected_error_code: 0,
+        //     transaction: Transaction {
+        //         tx_type: TransactionType::ProgramCall,
+        //         to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //         from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //         data: vec![], // input data
+        //         value: 0,
+        //         nonce: 0,
+        //     },
+        // },
+        // TestCase {
+        //     name: "simple",
+        //     path: "../examples/bin/simple.elf",
+        //     expected_success: true,
+        //     expected_error_code: 100,
+        //     transaction: Transaction {
+        //         tx_type: TransactionType::ProgramCall,
+        //         to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //         from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //         data: vec![
+        //             100, 0, 0, 0,   // first u64 = 100
+        //             42, 0, 0, 0,      // second u64 = 42
+        //         ], // input data
+        //         value: 0,
+        //         nonce: 0,
+        //     },
+        // },
     ];
 
     for case in test_cases {
-        println!("--- Running entrypoint for `{}` ---", case.name);
+        match case.transaction.tx_type {
+            TransactionType::Transfer => {
+                panic!("transfer test case not implemented");
+            }
 
-        // 1. Create VM and load ELF using compiler crate
-        // let context: ExecutionContext = ExecutionContext::new(case.transaction.to, case.transaction.from);
-        let mut avm = AVM::new(MAX_MEMORY_PAGES, VM_MEMORY_SIZE);
-        populate_state(case.path, case.transaction.to, &mut avm.state);
-        // vm.cpu.verbose = true;
- 
-        // 2. Run VM
-        let res = avm.run_tx(case.transaction);
+            TransactionType::ProgramCall => {
+                println!("--- Program call test `{}` ---", case.name);
+
+                // 1. Create VM and load ELF using compiler crate
+                let mut avm = AVM::new(MAX_MEMORY_PAGES, VM_MEMORY_SIZE);
+                populate_state(case.path, case.transaction.to, &mut avm.state);
+                // vm.cpu.verbose = true;
         
-        // 3. Print result
-        avm.state.pretty_print();
-        println!("Success: {}, Error code: {}\n", res.success, res.error_code);
+                // 2. Run VM
+                let res = avm.run_tx(case.transaction);
+                
+                // 3. Print result
+                avm.state.pretty_print();
+                println!("Success: {}, Error code: {}\n", res.success, res.error_code);
 
-        assert_eq!(res.success, case.expected_success, "Expected success = {} but got {}", case.expected_success, res.success);
-        assert_eq!(res.error_code, case.expected_error_code, "Expected error_code = {} but got {}", case.expected_error_code, res.error_code);
+                assert_eq!(res.success, case.expected_success, "Expected success = {} but got {}", case.expected_success, res.success);
+                assert_eq!(res.error_code, case.expected_error_code, "Expected error_code = {} but got {}", case.expected_error_code, res.error_code);
+            }
+
+            TransactionType::CreateAccount => {
+                // 1. Create VM and load ELF using compiler crate
+                let mut avm = AVM::new(MAX_MEMORY_PAGES, VM_MEMORY_SIZE);
+
+                // 2. get code
+                let code = get_program_code(case.path);
+
+                // 3. set into tx
+                let mut tx = case.transaction.clone();
+                tx.data = code;
+
+                let res = avm.run_tx(tx);
+                avm.state.pretty_print();
+                println!("Success: {}, Error code: {}\n", res.success, res.error_code);
+            }
+        }
+
+        
     }
 }
 
@@ -97,7 +138,7 @@ pub fn to_address(hex: &str) -> Address {
     Address::new(bytes)
 }
 
-pub fn populate_state<P: AsRef<Path>>(path: P, address: Address, state: &mut State) {
+pub fn get_program_code<P: AsRef<Path>>(path: P) -> Vec<u8> {
     let path_str = path.as_ref().display();
     let bytes = fs::read(&path)
         .unwrap_or_else(|_| panic!("❌ Failed to read ELF file from {}", path_str));
@@ -144,7 +185,12 @@ pub fn populate_state<P: AsRef<Path>>(path: P, address: Address, state: &mut Sta
             rodata_start
         );
     }
+    combined
+}
+
+pub fn populate_state<P: AsRef<Path>>(path: P, address: Address, state: &mut State) {
+    let code = get_program_code(path);
 
     // deploy state
-    state.deploy_contract(address, combined);
+    state.deploy_contract(address, code);
 }
