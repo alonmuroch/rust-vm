@@ -5,16 +5,6 @@ use core::fmt;
 pub struct Address(pub [u8; 20]);
 
 impl Address {
-    pub fn new(bytes: [u8; 20]) -> Self {
-        Self(bytes)
-    }
-
-    pub fn from_slice(slice: &[u8]) -> Self {
-        let mut bytes = [0u8; 20];
-        bytes.copy_from_slice(&slice[..20]);
-        Address::new(bytes)
-    }
-
     pub fn to_bytes(&self) -> [u8; 20] {
         self.0
     }

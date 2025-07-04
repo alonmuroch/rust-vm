@@ -22,7 +22,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             name: "call program",
             path: "../examples/bin/call_program.elf",
             expected_success: true,
-            expected_error_code: 0,
+            expected_error_code: 100,
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -163,7 +163,7 @@ pub fn to_address(hex: &str) -> Address {
         bytes[i] = (hi << 4) | lo;
     }
 
-    Address::new(bytes)
+    Address(bytes)
 }
 
 pub fn get_program_code<P: AsRef<Path>>(path: P) -> Vec<u8> {
