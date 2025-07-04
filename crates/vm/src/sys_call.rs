@@ -111,15 +111,15 @@ impl CPU {
         let borrowed_memory = memory.borrow();
 
         // === Read guest memory ===
-        let to_slice = match borrowed_memory.mem_slice(to_ptr, 20) {
+        let to_slice = match borrowed_memory.mem_slice(to_ptr, to_ptr + 20) {
             Some(r) => r,
             None => return 0, // Error: invalid to_ptr
         };
-        let from_slice = match borrowed_memory.mem_slice(from_ptr, 20) {
+        let from_slice = match borrowed_memory.mem_slice(from_ptr, from_ptr + 20) {
             Some(r) => r,
             None => return 0, // Error: invalid from_ptr
         };
-        let input_slice = match borrowed_memory.mem_slice(input_ptr, input_len) {
+        let input_slice = match borrowed_memory.mem_slice(input_ptr, input_ptr + input_len) {
             Some(r) => r,
             None => return 0, // Error: invalid input_ptr
         };

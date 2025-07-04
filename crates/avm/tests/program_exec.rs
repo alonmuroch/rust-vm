@@ -11,7 +11,7 @@ use avm::global::Config;
 use crate::tests::TEST_CASES;
 
 pub const VM_MEMORY_SIZE: usize = 10 * 1024; // 10 KB
-pub const MAX_MEMORY_PAGES: usize = 1; 
+pub const MAX_MEMORY_PAGES: usize = 10; 
 
 #[test]
 fn test_entrypoint_function() {
