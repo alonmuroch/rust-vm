@@ -18,6 +18,9 @@ pub use result::Result;
 // Logging macros
 pub mod log;
 
+// Contract call func
+pub mod call_contract;
+
 // Entrypoint macro
 #[macro_use]
 pub mod entrypoint;

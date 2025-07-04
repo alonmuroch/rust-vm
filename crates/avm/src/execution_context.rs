@@ -43,7 +43,7 @@ impl ContextStack {
     }
 
     /// Push a new context onto the stack (e.g., when a contract calls another).
-    pub fn push(&mut self, from: Address, to: Address, input_data: Vec<u8>, vm: VM,) {
+    pub fn push(&mut self, from: Address, to: Address, input_data: Vec<u8>, vm: VM) {
         self.stack.push(ExecutionContext { from, to, input_data:Rc::new(input_data), vm:Rc::new(RefCell::new(vm)) });
     }
 

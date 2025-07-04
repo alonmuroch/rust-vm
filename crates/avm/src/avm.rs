@@ -6,6 +6,8 @@ use state::{State, Account};
 use crate::transaction::{TransactionType, Transaction};
 use crate::global::Config;
 use crate::execution_context::{ExecutionContext, ContextStack};
+use vm::host_interface::HostInterface;
+use crate::host_interface::HostShim;
 use types::address::Address;
 use types::result::Result;
 use std::{panic::{catch_unwind, AssertUnwindSafe}, usize};
@@ -49,6 +51,7 @@ use core::cell::RefCell;
 /// - Memory isolation between contracts prevents interference
 /// - Input validation prevents resource exhaustion attacks
 /// - Context tracking prevents unauthorized cross-contract access
+#[derive(Debug)]
 pub struct AVM {
     /// Stack of execution contexts for nested contract calls.
     /// 
@@ -274,6 +277,15 @@ impl AVM {
     /// - a3: Input data length
     /// - a4: Result pointer (where to write the result)
     pub fn call_contract(&mut self, from: Address, to: Address, input_data: Vec<u8>) -> u32 {
+        // SAFETY NOTE:
+        // This line creates a HostShim containing a raw pointer (*mut AVM) to self.
+        // Even though raw pointers don't participate in Rust's borrow checker,
+        // calling `HostShim::new(self)` still *temporarily borrows* `self` as `&mut AVM`
+        // during this line. If `self` is already mutably borrowed (e.g. for pushing to context_stack,
+        // accessing state, or memory_manager), this will cause a compile-time error due to overlapping mutable borrows.
+        // To avoid this, ensure all other mutable uses of `self` happen *before* or *after* this line.
+        let shim = HostShim::new(self);
+
         // EDUCATIONAL: Get mutable reference to the contract account
         let account = self.state.get_account_mut(&to);
         if !account.is_contract {
@@ -285,7 +297,13 @@ impl AVM {
         let storage = Rc::new(RefCell::new(Storage::with_map(account.storage.clone())));
 
         // EDUCATIONAL: Create and configure child VM
-        let mut vm: VM = VM::new(memory_page, storage.clone());
+        // We use Box here to heap-allocate the HostShim and pass it as a trait object (Box<dyn HostInterface>).
+        // This is necessary because `VM` stores the host as `Box<dyn HostInterface>`, which:
+        // - Allows us to erase the concrete type (HostShim) at compile time
+        // - Removes the need for lifetimes like &'a mut dyn HostInterface
+        // - Enables recursive call_contract logic, since the Box owns the host and doesn't borrow `self`
+        // Without Box, we would need to track lifetimes manually and would hit borrow checker issues.
+        let mut vm: VM = VM::new(memory_page, storage.clone(), Box::new(shim));
         vm.set_code(Config::PROGRAM_START_ADDR, &account.code);
 
         // add new context execution

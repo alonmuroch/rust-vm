@@ -1,5 +1,7 @@
 use vm::memory_page::MemoryPage;
 use std::{cell::RefCell, rc::Rc};
+
+#[derive(Debug)]
 pub struct MemoryPageManager {
     pub page_size: usize,
     max_pages: usize,

@@ -4,6 +4,7 @@ use crate::memory_page::MemoryPage;
 use storage::Storage;
 use std::rc::Rc;
 use core::cell::RefCell;
+use crate::host_interface::HostInterface;
 
 /// Represents the Central Processing Unit (CPU) of our RISC-V virtual machine.
 /// 
@@ -106,7 +107,12 @@ impl CPU {
     /// worker (instruction) performs a specific task. The conveyor belt (PC)
     /// moves to the next task automatically, unless a task specifically
     /// redirects the flow (like a branch or jump instruction).
-    pub fn step(&mut self, memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> bool {
+    pub fn step(
+        &mut self,
+        memory: Rc<RefCell<MemoryPage>>,
+        storage: Rc<RefCell<Storage>>,
+        host: &mut Box<dyn HostInterface>,
+    ) -> bool {
         // EDUCATIONAL: Step 1 - Fetch and decode the next instruction
         let instr = self.next_instruction(Rc::clone(&memory));
         
@@ -114,7 +120,7 @@ impl CPU {
         match instr {
             Some((instr, size)) => {
                 // Valid instruction found - execute it
-                self.run_instruction(instr, size, Rc::clone(&memory), storage)
+                self.run_instruction(instr, size, Rc::clone(&memory), storage, host)
             }
             None => {
                 // No valid instruction found - handle the error
@@ -137,7 +143,13 @@ impl CPU {
     /// - size: Size of the instruction in bytes (2 for compressed, 4 for full)
     /// - memory: Shared reference to memory for load/store operations
     /// - storage: Shared reference to persistent storage
-    fn run_instruction(&mut self, instr: Instruction, size: u8, memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> bool {
+    fn run_instruction(
+        &mut self, 
+        instr: Instruction, 
+        size: u8, 
+        memory: Rc<RefCell<MemoryPage>>, 
+        storage: Rc<RefCell<Storage>>,
+        host: &mut Box<dyn HostInterface>) -> bool {
         // EDUCATIONAL: Debug output to help understand what's happening
         if self.verbose {
             println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
@@ -147,7 +159,7 @@ impl CPU {
         let old_pc = self.pc;
         
         // EDUCATIONAL: Execute the instruction
-        let result = self.execute(instr, memory, storage);      
+        let result = self.execute(instr, memory, storage, host);      
 
         // EDUCATIONAL: Only increment PC if the instruction didn't change it
         // This handles branches, jumps, and calls correctly
@@ -249,7 +261,12 @@ impl CPU {
     /// - imm: Immediate value (constant)
     /// 
     /// RETURN VALUE: Returns true to continue execution, false to halt
-    pub fn execute(&mut self, instr: Instruction, memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> bool {
+    pub fn execute(
+        &mut self, 
+        instr: Instruction, 
+        memory: Rc<RefCell<MemoryPage>>, 
+        storage: Rc<RefCell<Storage>>,
+        host: &mut Box<dyn HostInterface>) -> bool {
         match instr {
             // EDUCATIONAL: Arithmetic instructions - perform mathematical operations
             Instruction::Add { rd, rs1, rs2 } => {
@@ -474,7 +491,7 @@ impl CPU {
             Instruction::Ecall => {
                 // EDUCATIONAL: ECALL - Environment Call - triggers a system call
                 // This is how user programs request services from the operating system
-                return self.handle_syscall(memory, storage);
+                return self.handle_syscall(memory, storage, host);
             }
             Instruction::Ebreak => {
                 // EDUCATIONAL: EBREAK - Environment Break - for debugging

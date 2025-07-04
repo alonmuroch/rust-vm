@@ -1,10 +1,10 @@
-use core::borrow;
 use std::rc::Rc;
 use core::cell::RefCell;
 use crate::cpu::CPU;
 use crate::registers::Register;
 use crate::memory_page::{MemoryPage};
 use storage::{Storage};
+use crate::host_interface::HostInterface;
 
 /// Represents a complete RISC-V virtual machine.
 /// 
@@ -26,11 +26,13 @@ pub struct VM {
     /// The CPU that executes RISC-V instructions
     pub cpu: CPU,
     
-    /// Shared reference to the VM's memory (RAM)
+    /// Shared reference to the VM's memo   ry (RAM)
     pub memory: Rc<RefCell<MemoryPage>>,
     
     /// Shared reference to persistent storage
     pub storage: Rc<RefCell<Storage>>,
+
+    pub host: Box<dyn HostInterface>,
 }
 
 impl VM {
@@ -48,7 +50,10 @@ impl VM {
     /// 
     /// STACK SETUP: The stack pointer (x2) is initialized to point to the
     /// top of the memory page, allowing programs to use the stack immediately.
-    pub fn new(memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> Self {
+    pub fn new(
+        memory: Rc<RefCell<MemoryPage>>,
+        storage: Rc<RefCell<Storage>>, 
+        host: Box<dyn HostInterface>) -> Self {
         // EDUCATIONAL: Initialize all registers to 0
         let mut regs = [0u32; 32];
         
@@ -63,7 +68,7 @@ impl VM {
             verbose: false,  // Disable debug output by default
         };
 
-        Self { cpu, memory, storage}
+        Self { cpu, memory, storage, host}
     }
 
     /// Loads program code into memory and sets the starting address.
@@ -277,6 +282,6 @@ impl VM {
     /// call this after setting up the initial state.
     pub fn raw_run(&mut self) {
         // EDUCATIONAL: Main execution loop - fetch, decode, execute
-        while self.cpu.step(Rc::clone(&self.memory), Rc::clone(&self.storage)) {}
+        while self.cpu.step(Rc::clone(&self.memory), Rc::clone(&self.storage), &mut self.host) {}
     }
 } 

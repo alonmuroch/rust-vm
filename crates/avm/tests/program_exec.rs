@@ -82,7 +82,10 @@ pub fn get_program_code<P: AsRef<Path>>(path: P) -> Vec<u8> {
     assert!(code.len() <= Config::CODE_SIZE_LIMIT, "code size exceeds limit");
     assert!(rodata.len() <= Config::RO_DATA_SIZE_LIMIT, "read only data size exceeds limit");
 
-    let total_len = rodata_start + rodata.len() as u64; // assumes rodata is after code
+    let mut total_len = code_start + code.len() as u64; // assumes rodata is after code
+    if rodata.len() > 0 {
+        total_len = rodata_start + rodata.len() as u64; // assumes rodata is after code
+    }
 
     // Initialize memory with 0x00
     let mut combined = vec![0u8; total_len as usize];
@@ -96,7 +99,7 @@ pub fn get_program_code<P: AsRef<Path>>(path: P) -> Vec<u8> {
     );
 
     // Copy rodata (if it exists)
-    if rodata_start > 0 {
+    if rodata.len() > 0 {
         combined[rodata_start as usize..rodata_start as usize + rodata.len()].copy_from_slice(&rodata);
         println!(
             "📦 Readonly data size: {} bytes, starting at 0x{:08x}",

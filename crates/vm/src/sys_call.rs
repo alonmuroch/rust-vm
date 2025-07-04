@@ -4,6 +4,7 @@ use storage::Storage;
 use crate::registers::Register;
 use std::rc::Rc;
 use core::cell::RefCell;
+use crate::host_interface::HostInterface;
 
 /// Example user data structure for demonstration purposes.
 /// 
@@ -24,6 +25,7 @@ pub const SYSCALL_STORAGE_GET: u32 = 1;
 pub const SYSCALL_STORAGE_SET: u32 = 2;
 pub const SYSCALL_PANIC: u32 = 3;
 pub const SYSCALL_LOG: u32 = 4;
+pub const SYSCALL_CALL_PROGRAM: u32 = 5;
 /// Represents different types of arguments that can be passed to system calls.
 /// 
 /// EDUCATIONAL: This enum demonstrates how to handle different data types
@@ -57,7 +59,11 @@ impl CPU {
     /// 
     /// SECURITY: System calls provide a controlled interface between user
     /// programs and system resources, preventing direct access to sensitive data.
-    pub fn handle_syscall(&mut self, memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> bool {
+    pub fn handle_syscall(
+        &mut self, 
+        memory: Rc<RefCell<MemoryPage>>, 
+        storage: Rc<RefCell<Storage>>,
+        host: &mut Box<dyn HostInterface>) -> bool {
         // EDUCATIONAL: Get the system call ID from register a7
         let syscall_id = self.regs[Register::A7 as usize]; // a7
 
@@ -78,6 +84,7 @@ impl CPU {
             SYSCALL_STORAGE_SET => self.sys_storage_set(args, memory, storage),
             SYSCALL_PANIC => self.sys_panic_with_message(memory),
             SYSCALL_LOG => self.sys_log(args, memory),
+            SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, host),
             _ => {
                 // EDUCATIONAL: Unknown system calls should panic
                 panic!("Unknown syscall: {}", syscall_id);
@@ -88,6 +95,46 @@ impl CPU {
         self.regs[Register::T6 as usize] = result;
 
         true // continue execution
+    }
+
+    pub fn sys_call_program(
+        &mut self,
+        args: [u32; 6],
+        memory: Rc<RefCell<MemoryPage>>,
+        host: &mut Box<dyn HostInterface>,
+    ) -> u32 {
+        let to_ptr = args[0] as usize;
+        let from_ptr = args[1] as usize;
+        let input_ptr = args[2] as usize;
+        let input_len = args[3] as usize;
+
+        let borrowed_memory = memory.borrow();
+
+        // === Read guest memory ===
+        let to_slice = match borrowed_memory.mem_slice(to_ptr, 20) {
+            Some(r) => r,
+            None => return 0, // Error: invalid to_ptr
+        };
+        let from_slice = match borrowed_memory.mem_slice(from_ptr, 20) {
+            Some(r) => r,
+            None => return 0, // Error: invalid from_ptr
+        };
+        let input_slice = match borrowed_memory.mem_slice(input_ptr, input_len) {
+            Some(r) => r,
+            None => return 0, // Error: invalid input_ptr
+        };
+
+        // === Copy slices into fixed and owned types ===
+        let mut to_bytes = [0u8; 20];
+        let mut from_bytes = [0u8; 20];
+        to_bytes.copy_from_slice(&to_slice);
+        from_bytes.copy_from_slice(&from_slice);
+        let input_vec = input_slice.to_vec();
+
+        // === Call the host ===
+        let result = host.call_contract(from_bytes, to_bytes, input_vec);
+
+        result
     }
 
     /// System call to retrieve data from persistent storage.
