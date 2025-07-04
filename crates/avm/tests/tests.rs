@@ -2,6 +2,10 @@ use avm::transaction::{TransactionType, TransactionBundle, Transaction};
 use avm::router::{encode_router_calls,HostFuncCall};
 use types::address::Address;
 use once_cell::sync::Lazy;
+use std::fs;
+use std::path::Path;
+use compiler::elf::parse_elf_from_bytes;
+use avm::global::Config;
 
 #[derive(Debug)]
 pub struct TestCase<'a> {
@@ -22,9 +26,17 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
-                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: vec![],
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: get_program_code("../examples/bin/call_program.elf"),
+                    value: 0,
+                    nonce: 0,
+                },
+                 Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
+                    data: get_program_code("../examples/bin/simple.elf"),
                     value: 0,
                     nonce: 0,
                 },
@@ -32,10 +44,11 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::ProgramCall,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: vec![
-                        100, 0, 0, 0,   // first u64 = 100
-                        42, 0, 0, 0,      // second u64 = 42
-                    ], 
+                    data: (|| {
+                        let mut data = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1").0.to_vec();
+                        data.extend(vec![100, 0, 0, 0, 42, 0, 0, 0]);
+                        data
+                    })(),
                     value: 0,
                     nonce: 0,
                 },
@@ -85,10 +98,10 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
         //             tx_type: TransactionType::ProgramCall,
         //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
         //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-        //             data: vec![
-        //                 100, 0, 0, 0,   // first u64 = 100
-        //                 42, 0, 0, 0,      // second u64 = 42
-        //             ], 
+                    // data: vec![
+                    //     100, 0, 0, 0,   // first u64 = 100
+                    //     42, 0, 0, 0,      // second u64 = 42
+                    // ], 
         //             value: 0,
         //             nonce: 0,
         //         },
@@ -151,4 +164,44 @@ pub fn to_address(hex: &str) -> Address {
     }
 
     Address::new(bytes)
+}
+
+pub fn get_program_code<P: AsRef<Path>>(path: P) -> Vec<u8> {
+    let path_str = path.as_ref().display();
+    let bytes = fs::read(&path)
+        .unwrap_or_else(|_| panic!("❌ Failed to read ELF file from {}", path_str));
+
+    let elf = parse_elf_from_bytes(&bytes)
+        .unwrap_or_else(|_| panic!("❌ Failed to parse ELF from {}", path_str));
+
+    let (code, code_start) = elf
+    .get_flat_code()
+    .unwrap_or_else(|| panic!("❌ No code sections found in ELF {}", path_str));
+
+    let (rodata, rodata_start) = elf
+        .get_flat_rodata()
+        .unwrap_or_else(|| {
+            (vec![], usize::MAX as u64)
+        });
+
+    // assert sizes
+    assert!(code.len() <= Config::CODE_SIZE_LIMIT, "code size exceeds limit");
+    assert!(rodata.len() <= Config::RO_DATA_SIZE_LIMIT, "read only data size exceeds limit");
+
+    let mut total_len = code_start + code.len() as u64; // assumes rodata is after code
+    if rodata.len() > 0 {
+        total_len = rodata_start + rodata.len() as u64; // assumes rodata is after code
+    }
+
+    // Initialize memory with 0x00
+    let mut combined = vec![0u8; total_len as usize];
+
+    // Copy code
+    combined[code_start as usize..code_start as usize + code.len()].copy_from_slice(&code);
+
+    // Copy rodata (if it exists)
+    if rodata.len() > 0 {
+        combined[rodata_start as usize..rodata_start as usize + rodata.len()].copy_from_slice(&rodata);
+    }
+    combined
 }

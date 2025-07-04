@@ -32,26 +32,43 @@ impl MemoryPageManager {
     }
 
     /// Pretty-prints all memory pages linearly, indicating page boundaries
-   pub fn dump_all_pages_linear(&self) {
+    pub fn dump_all_pages_linear(&self) {
         println!("Dumping memory ({} pages):", self.pages.len());
         for (i, page_rc) in self.pages.iter().enumerate() {
             println!("\n=== Page {} ===", i);
 
-            // Borrow the MemoryPage from Rc<RefCell<MemoryPage>>
             let page = page_rc.borrow();
-
-            // Assume this returns &[u8]
             let mem = page.mem();
 
             for (j, chunk) in mem.chunks(16).enumerate() {
                 print!("0x{:04x}: ", j * 16);
+
+                // Print hex representation
                 for byte in chunk {
                     print!("{:02x} ", byte);
                 }
-                println!();
+
+                // Pad spacing if chunk is less than 16 bytes
+                for _ in chunk.len()..16 {
+                    print!("   ");
+                }
+
+                // Print ASCII representation
+                print!(" |");
+                for byte in chunk {
+                    let ch = *byte;
+                    let display_char = if ch.is_ascii_graphic() || ch == b' ' {
+                        ch as char
+                    } else {
+                        '.'
+                    };
+                    print!("{}", display_char);
+                }
+                println!("|");
             }
         }
-    }
+}
+
 
 
     pub fn get_page(&self, index: usize) -> Option<Rc<RefCell<MemoryPage>>> {

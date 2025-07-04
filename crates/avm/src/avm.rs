@@ -143,17 +143,15 @@ impl AVM {
             }
 
             TransactionType::CreateAccount => {
-                // EDUCATIONAL: Deploy a new smart contract
-                // This creates a new account with the provided code
                 let result = catch_unwind(AssertUnwindSafe(|| {
                     self.create_account(tx.from, tx.to, tx.data);
                 }));
-                
+
                 // EDUCATIONAL: Handle deployment failures gracefully
                 if let Err(e) = result {
-                    return Result{error_code: 0, success: false};
+                    return Result { error_code: 0, success: false };
                 } else {
-                    return Result{error_code: 1, success: true};
+                    return Result { error_code: 1, success: true };
                 }
             }
 
@@ -225,6 +223,18 @@ impl AVM {
     /// - nonce: 0 (no transactions yet)
     /// - is_contract: true (marks this as a contract account)
    pub fn create_account(&mut self, _from: Address, to: Address, data: Vec<u8>) {
+        // EDUCATIONAL: Deploy a new smart contract
+        // This creates a new account with the provided code
+        let is_contract = !data.is_empty();
+        let code_size = data.len();
+
+        println!(
+            "Tx creating account at address {}. Is contract: {}. Code size: {} bytes.",
+            to,
+            is_contract,
+            code_size
+        );
+    
         // EDUCATIONAL: Check that the target address is not already in use
         // This prevents overwriting existing accounts
         if self.state.accounts.contains_key(&to) {
@@ -277,6 +287,12 @@ impl AVM {
     /// - a3: Input data length
     /// - a4: Result pointer (where to write the result)
     pub fn call_contract(&mut self, from: Address, to: Address, input_data: Vec<u8>) -> u32 {
+        println!(
+            "Tx calling program at address {} with data 0x{}",
+            to,
+            hex::encode(&input_data)
+        );
+
         // SAFETY NOTE:
         // This line creates a HostShim containing a raw pointer (*mut AVM) to self.
         // Even though raw pointers don't participate in Rust's borrow checker,

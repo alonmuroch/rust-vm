@@ -1,3 +1,7 @@
+// external
+pub extern crate hex;
+
+// exports
 pub mod avm;
 pub mod transaction;
 pub mod memory_page_manager;

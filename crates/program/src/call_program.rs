@@ -9,7 +9,7 @@ use types::address::Address;
 ///   t3: input data length
 /// Output:
 ///   t6: result code (u32)
-pub fn call(to: &Address, from: &Address, input_data: &[u8]) -> u32 {
+pub fn call(from: &Address, to: &Address, input_data: &[u8]) -> u32 {
     let result: u32;
     unsafe {
         asm!(
@@ -24,3 +24,4 @@ pub fn call(to: &Address, from: &Address, input_data: &[u8]) -> u32 {
     }
     result
 }
+

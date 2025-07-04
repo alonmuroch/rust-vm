@@ -19,7 +19,7 @@ pub use result::Result;
 pub mod log;
 
 // Contract call func
-pub mod call_contract;
+pub mod call_program;
 
 // Entrypoint macro
 #[macro_use]
