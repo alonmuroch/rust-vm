@@ -2,7 +2,7 @@
 #![no_main]
 
 extern crate program;
-use program::{entrypoint, Result, logf, require};
+use program::{entrypoint, types::result::Result, logf, require};
 use program::types::address::Address;    
 
 /// Simple smart contract that compares two 32-bit integers.

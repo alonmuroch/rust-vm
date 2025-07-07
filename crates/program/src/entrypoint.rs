@@ -39,7 +39,7 @@ macro_rules! entrypoint {
             pubkey_ptr: *const u8,       // Pointer to caller address (20 bytes)
             input_ptr: *const u8,        // Pointer to input data
             input_len: usize,            // Length of input data
-            result_ptr: *mut $crate::result::Result,  // Pointer to write result
+            result_ptr: *mut $crate::types::result::Result,  // Pointer to write result
         ) {
             // EDUCATIONAL: Convert raw pointer to contract address
             // This demonstrates safe pointer handling in unsafe code

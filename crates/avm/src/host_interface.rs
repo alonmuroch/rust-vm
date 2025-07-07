@@ -35,8 +35,7 @@ impl HostShim {
 impl<'a> HostInterface for HostShim {
     fn call_contract(&mut self, from: [u8; 20], to: [u8; 20], input_data: Vec<u8>) -> u32 {
         unsafe {
-            (*self.avm_ptr).call_contract(Address(from), Address(to), input_data);
+            return (*self.avm_ptr).call_contract(Address(from), Address(to), input_data);
         }
-        0
     }
 }

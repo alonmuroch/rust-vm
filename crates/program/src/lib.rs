@@ -11,10 +11,6 @@ pub extern crate types;
 
 /* --------------------------------- Modules --------------------------------- */
 
-// Result module
-pub mod result;
-pub use result::Result;
-
 // Logging macros
 pub mod log;
 

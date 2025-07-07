@@ -1,3 +1,5 @@
+use types::result::Result;
+
 /// Represents a function call with a selector (function ID) and arguments.
 /// This is the core data structure for routing function calls in our VM.
 /// 
@@ -29,7 +31,7 @@ pub struct FuncCall<'a> {
     pub args: &'a [u8],
 }
 
-use crate::{Result, vm_panic};
+use crate::{vm_panic};
 
 /// Decodes a sequence of function calls from a binary input buffer.
 /// 

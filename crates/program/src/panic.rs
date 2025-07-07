@@ -1,4 +1,3 @@
-// use core::fmt::Write;
 
 #[cfg(target_arch = "riscv32")]
 pub fn vm_panic(msg: &[u8]) -> ! {

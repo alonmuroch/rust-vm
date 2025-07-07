@@ -200,10 +200,10 @@ impl AVM {
         }
 
         // EDUCATIONAL: Extract the result fields from memory
-        let error_code = u32::from_le_bytes(mem[start..start + 4].try_into().unwrap());
-        let success = mem[start + 4] != 0;
+        let error_code = u32::from_le_bytes(mem[start+1..start + 5].try_into().unwrap());
+        let success = mem[start] != 0;
 
-        Result { error_code, success }
+        return Result { error_code, success };
     }
 
     /// Creates a new account (smart contract) with the provided code.

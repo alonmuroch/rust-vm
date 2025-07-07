@@ -3,7 +3,7 @@
 
 extern crate program;
 
-use program::{entrypoint, Result, vm_panic, require};
+use program::{entrypoint, types::result::Result, vm_panic, require};
 use program::types::address::Address;
 use program::router::{route, FuncCall};
 

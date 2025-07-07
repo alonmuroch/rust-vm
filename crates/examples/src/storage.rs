@@ -2,7 +2,7 @@
 #![no_main]
 
 extern crate program;
-use program::{entrypoint, Result, require};
+use program::{entrypoint, types::result::Result, require};
 use program::types::address::Address; 
 use program::persist_struct;
 

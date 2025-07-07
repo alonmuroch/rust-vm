@@ -23,9 +23,11 @@ fn test_entrypoint_function() {
             );
 
             let res = avm.run_tx(tx);
+            let success = res.success;
+            let error_code = res.error_code;
             // avm.state.pretty_print();
             // avm.memory_manager.dump_all_pages_linear();
-            println!("Success: {}, Error code: {}\n", res.success, res.error_code);
+            println!("Success: {}, Error code: {}\n", success, error_code);
         }
     }
 }
