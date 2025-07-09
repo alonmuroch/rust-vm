@@ -1,4 +1,3 @@
-
 #[cfg(target_arch = "riscv32")]
 pub fn vm_panic(msg: &[u8]) -> ! {
     unsafe {
@@ -15,8 +14,12 @@ pub fn vm_panic(msg: &[u8]) -> ! {
 
 #[cfg(target_arch = "riscv32")]
 #[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    vm_panic(b"unhandled error");
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    if let Some(s) = info.message().as_str() {
+        vm_panic(s.as_bytes());
+    } else {
+        vm_panic(b"panic occurred (non-str message)");
+    }
 }
 
 #[cfg(not(target_arch = "riscv32"))]
