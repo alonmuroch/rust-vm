@@ -108,33 +108,47 @@ impl CPU {
         let input_ptr = args[2] as usize;
         let input_len = args[3] as usize;
 
-        let borrowed_memory = memory.borrow();
+        let result_ptr: u32;
+        let page_index: usize;
+        {
+            let borrowed_memory = memory.borrow();
 
-        // === Read guest memory ===
-        let to_slice = match borrowed_memory.mem_slice(to_ptr, to_ptr + 20) {
-            Some(r) => r,
-            None => return 0, // Error: invalid to_ptr
-        };
-        let from_slice = match borrowed_memory.mem_slice(from_ptr, from_ptr + 20) {
-            Some(r) => r,
-            None => return 0, // Error: invalid from_ptr
-        };
-        let input_slice = match borrowed_memory.mem_slice(input_ptr, input_ptr + input_len) {
-            Some(r) => r,
-            None => return 0, // Error: invalid input_ptr
-        };
+            // === Read guest memory ===
+            let to_slice = match borrowed_memory.mem_slice(to_ptr, to_ptr + 20) {
+                Some(r) => r,
+                None => return 0, // Error: invalid to_ptr
+            };
+            let from_slice = match borrowed_memory.mem_slice(from_ptr, from_ptr + 20) {
+                Some(r) => r,
+                None => return 0, // Error: invalid from_ptr
+            };
+            let input_slice = match borrowed_memory.mem_slice(input_ptr, input_ptr + input_len) {
+                Some(r) => r,
+                None => return 0, // Error: invalid input_ptr
+            };
 
-        // === Copy slices into fixed and owned types ===
-        let mut to_bytes = [0u8; 20];
-        let mut from_bytes = [0u8; 20];
-        to_bytes.copy_from_slice(&to_slice);
-        from_bytes.copy_from_slice(&from_slice);
-        let input_vec = input_slice.to_vec();
+            // === Copy slices into fixed and owned types ===
+            let mut to_bytes = [0u8; 20];
+            let mut from_bytes = [0u8; 20];
+            to_bytes.copy_from_slice(&to_slice);
+            from_bytes.copy_from_slice(&from_slice);
+            let input_vec = input_slice.to_vec();
 
-        // === Call the host ===
-        let result = host.call_contract(from_bytes, to_bytes, input_vec);
+            // === Call the host ===
+            (result_ptr, page_index) = host.call_program(from_bytes, to_bytes, input_vec);
+        }
+        
+        {
+            let borrowed_memory = memory.borrow_mut();
+            // === Read result from callee’s memory via host ===
+            let result_bytes = match host.read_memory_page(page_index, result_ptr, 5) {
+                Some(b) => b,
+                None => return 0, // Failed to read result
+            };
 
-        result
+            // === Allocate heap memory in caller's memory page ===
+            borrowed_memory.alloc_on_heap(&result_bytes)
+        }
     }
 
     /// System call to retrieve data from persistent storage.

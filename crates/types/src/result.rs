@@ -8,17 +8,23 @@ pub struct Result {
 impl Result {
     /// # Safety
     /// Caller must ensure `ptr` points to at least 5 valid bytes in memory.
-    pub unsafe fn from_ptr(ptr: u32) -> Self {
-        let error_code = {
-            let raw = unsafe { core::slice::from_raw_parts(ptr as *const u8, 4) };
-            u32::from_le_bytes(raw.try_into().unwrap())
-        };
+    pub unsafe fn from_ptr(result_ptr: u32) -> Option<Self> {
+        // SAFETY: We assume the memory starting at `result_ptr` is valid and readable.
+        let ptr = result_ptr as *const u8;
 
-        let success = unsafe {
-            let ptr = ptr as *const u32;
-            *ptr.add(4) != 0
-        };
+        if ptr.is_null() {
+            return None;
+        }
 
-        Self { success: success, error_code }
+        unsafe {
+            // Read the `success` byte
+            let success = *ptr != 0;
+
+            // Read the next 4 bytes as the error code
+            let raw = core::slice::from_raw_parts(ptr.add(1), 4);
+            let error_code = u32::from_le_bytes(raw.try_into().unwrap());
+
+            Some(Result { success, error_code })        
+        }
     }
 }

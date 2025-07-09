@@ -98,10 +98,10 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
         //             tx_type: TransactionType::ProgramCall,
         //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
         //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    // data: vec![
-                    //     100, 0, 0, 0,   // first u64 = 100
-                    //     42, 0, 0, 0,      // second u64 = 42
-                    // ], 
+        //             data: vec![
+        //                 100, 0, 0, 0,   // first u64 = 100
+        //                 42, 0, 0, 0,      // second u64 = 42
+        //             ], 
         //             value: 0,
         //             nonce: 0,
         //         },

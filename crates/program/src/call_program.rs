@@ -1,5 +1,7 @@
-use core::arch::asm;
 use types::address::Address;
+use types::result::Result;
+use crate::logf;
+// use core::convert::TryInto;
 
 /// Syscall #5: Inter-program call
 /// Inputs:
@@ -10,18 +12,29 @@ use types::address::Address;
 /// Output:
 ///   t6: result code (u32)
 pub fn call(from: &Address, to: &Address, input_data: &[u8]) -> u32 {
-    let result: u32;
     unsafe {
-        asm!(
-            "li a7, 5",        // syscall ID for call_program
-            "ecall",           // trigger syscall
+        let mut result_ptr: u32 = 0;
+        core::arch::asm!(
+            "li a7, 5",        // syscall ID for call_contract
+            "ecall",
             in("t0") to.0.as_ptr(),
             in("t1") from.0.as_ptr(),
             in("t2") input_data.as_ptr(),
             in("t3") input_data.len(),
-            out("t6") result,  // syscall return value in t6
+            out("t6") result_ptr,
         );
+
+        // logf!(b"ptrrr %d", result_ptr);
+
+        // if result_ptr == 0 {
+        //     return None;
+        // }
+
+        // logf!(b"ptrrr2 %d", result_ptr);
+
+        // return Some(Result::from_ptr(result_ptr));
+        result_ptr
     }
-    result
 }
+
 

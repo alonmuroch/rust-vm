@@ -105,7 +105,7 @@ fn my_vm_entry(_self_address: Address, _caller: Address, _data: &[u8]) -> Result
 
     Result {
         success: true,
-        error_code:0,//error_code,
+        error_code:0,
     }
 }
 

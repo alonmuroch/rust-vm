@@ -33,9 +33,32 @@ impl HostShim {
 }
 
 impl<'a> HostInterface for HostShim {
-    fn call_contract(&mut self, from: [u8; 20], to: [u8; 20], input_data: Vec<u8>) -> u32 {
+    fn call_program(&mut self, from: [u8; 20], to: [u8; 20], input_data: Vec<u8>) -> (u32, usize) {
         unsafe {
             return (*self.avm_ptr).call_contract(Address(from), Address(to), input_data);
+        }
+    }
+
+    fn read_memory_page(&mut self, page_index: usize, guest_ptr: u32, len: usize) -> Option<Vec<u8>> {
+        unsafe {
+            // SAFETY: self.avm_ptr must point to a valid AVM that has access to the callee's memory
+            let avm = &*self.avm_ptr;
+
+            let ee = avm.context_stack.get(page_index).expect("missing execution context");
+            let vm = ee.vm.borrow();
+            let page_ref = vm.memory.borrow();
+
+            // Assume the callee's memory manager is accessible here
+            let mem = page_ref.mem();
+
+            let start = guest_ptr as usize;
+            let end = start.checked_add(len)?;
+
+            if end > mem.len() {
+                return None; // Out of bounds
+            }
+
+            Some(mem[start..end].to_vec())
         }
     }
 }

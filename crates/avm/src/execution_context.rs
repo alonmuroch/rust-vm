@@ -17,6 +17,9 @@ pub struct ExecutionContext {
 
     // Memory page
     pub vm: Rc<RefCell<VM>>,
+
+    // is exe_done marks context as executed
+    pub exe_done: bool,
 }
 
 impl ExecutionContext {
@@ -26,7 +29,7 @@ impl ExecutionContext {
          input_data: Vec<u8>,
          vm: VM,
     ) -> Self {
-        Self { from, to, input_data: Rc::new(input_data), vm: Rc::new(RefCell::new(vm)) }
+        Self { from, to, input_data: Rc::new(input_data), vm: Rc::new(RefCell::new(vm)), exe_done: false }
     }
 }
 
@@ -43,8 +46,11 @@ impl ContextStack {
     }
 
     /// Push a new context onto the stack (e.g., when a contract calls another).
-    pub fn push(&mut self, from: Address, to: Address, input_data: Vec<u8>, vm: VM) {
-        self.stack.push(ExecutionContext { from, to, input_data:Rc::new(input_data), vm:Rc::new(RefCell::new(vm)) });
+    /// returns index of the new execution context
+    pub fn push(&mut self, from: Address, to: Address, input_data: Vec<u8>, vm: VM) -> usize {
+        let index = self.stack.len();
+        self.stack.push(ExecutionContext { from, to, input_data:Rc::new(input_data), vm:Rc::new(RefCell::new(vm)), exe_done: false });
+        index
     }
 
     /// Pop the most recent context off the stack (e.g., when returning from a call).
@@ -52,9 +58,27 @@ impl ContextStack {
         self.stack.pop()
     }
 
+    /// Peek execution context index without modifying the stack.
+    pub fn get(&self, i: usize) -> Option<&ExecutionContext> {
+        self.stack.get(i)
+    }
+
+    pub fn get_mut(&mut self, i: usize) -> Option<&mut ExecutionContext> {
+        self.stack.get_mut(i)
+    }
+
     /// Peek at the current execution context without modifying the stack.
     pub fn current(&self) -> Option<&ExecutionContext> {
         self.stack.last()
+    }
+
+    pub fn current_mut(&mut self) -> Option<&mut ExecutionContext> {
+        self.stack.last_mut()
+    }
+
+
+    pub fn iter(&self) -> impl Iterator<Item = &ExecutionContext> {
+        self.stack.iter()
     }
 
     pub fn is_empty(&self) -> bool {

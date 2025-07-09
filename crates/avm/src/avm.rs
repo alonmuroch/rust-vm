@@ -161,14 +161,17 @@ impl AVM {
                 assert!(self.state.is_contract(tx.to), "destination address is not a contract");
 
                 // EDUCATIONAL: Call the contract and extract the result
-                let result_ptr = self.call_contract(tx.from, tx.to, tx.data);
+                let (result_ptr, context_index) = self.call_contract(tx.from, tx.to, tx.data);
 
                 // verify context stack is empty
                 if !self.context_stack.is_empty() {
-                    panic!("context stack is not empty after tx execution");
+                    if self.context_stack.iter().any(|ctx| !ctx.exe_done) {
+                        panic!("context stack has unfinished contexts after tx execution");
+                    }
                 }
 
-                self.extract_result(result_ptr)
+                // extract result 
+                self.extract_result(result_ptr, context_index)
             }
         }
     }
@@ -185,12 +188,15 @@ impl AVM {
     /// 
     /// MEMORY SAFETY: Validates that the result pointer is within bounds
     /// to prevent reading invalid memory.
-    fn extract_result(&self, result_ptr: u32) -> Result {
+    fn extract_result(&self, result_ptr: u32, context_index: usize) -> Result {
         // EDUCATIONAL: Get the memory page where the result was stored
-        let page_rc = self.memory_manager.first_page().expect("No memory page allocated");
+        let ee = self.context_stack.get(context_index).expect("missing execution context");
+        let vm = ee.vm.borrow();
+        let page = vm.memory.borrow();
+        // let page_rc = self.memory_manager.first_page().expect("No memory page allocated");
 
         // EDUCATIONAL: Borrow the memory page to read from it
-        let page = page_rc.borrow();
+        // let page = page_rc.borrow();
         let mem = page.mem();
         let start = result_ptr as usize;
 
@@ -286,7 +292,7 @@ impl AVM {
     /// - a2: Input data pointer
     /// - a3: Input data length
     /// - a4: Result pointer (where to write the result)
-    pub fn call_contract(&mut self, from: Address, to: Address, input_data: Vec<u8>) -> u32 {
+    pub fn call_contract(&mut self, from: Address, to: Address, input_data: Vec<u8>) -> (u32, usize) {
         println!(
             "Tx calling program at address {} with data 0x{}",
             to,
@@ -323,8 +329,8 @@ impl AVM {
         vm.set_code(Config::PROGRAM_START_ADDR, &account.code);
 
         // add new context execution
-        self.context_stack.push(from, to, input_data, vm);
-        let context = self.context_stack.current().expect("missing execution context");
+        let context_index = self.context_stack.push(from, to, input_data, vm);
+        let context = self.context_stack.current_mut().expect("missing execution context");
 
         // EDUCATIONAL: Set up function parameters in registers
         // This follows the RISC-V calling convention
@@ -362,10 +368,10 @@ impl AVM {
         let updated_map = storage.borrow().map.borrow().clone();
         account.storage = updated_map;
 
-        // EDUCATIONAL: Pop context if using a stack
-        self.context_stack.pop();
+        // EDUCATIONAL: set context execution done
+        context.exe_done = true;
 
-        result_ptr
+        (result_ptr, context_index)
     }
 
     /// Peek the current active execution context.

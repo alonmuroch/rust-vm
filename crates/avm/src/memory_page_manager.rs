@@ -31,6 +31,10 @@ impl MemoryPageManager {
         return page;
     }
 
+    pub fn pop_page(&mut self) {
+        self.pages.pop();
+    }
+
     /// Pretty-prints all memory pages linearly, indicating page boundaries
     pub fn dump_all_pages_linear(&self) {
         println!("Dumping memory ({} pages):", self.pages.len());
@@ -77,6 +81,10 @@ impl MemoryPageManager {
 
     pub fn first_page(&self) -> Option<Rc<RefCell<MemoryPage>>> {
         self.pages.first().cloned() // ✅ clone the Rc (increases refcount)
+    }
+
+    pub fn top_page(&self) -> Option<Rc<RefCell<MemoryPage>>> {
+        self.pages.last().cloned() // ✅ clone the Rc (increases refcount)
     }   
 
 }
