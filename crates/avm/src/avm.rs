@@ -6,7 +6,6 @@ use state::{State, Account};
 use crate::transaction::{TransactionType, Transaction};
 use crate::global::Config;
 use crate::execution_context::{ExecutionContext, ContextStack};
-use vm::host_interface::HostInterface;
 use crate::host_interface::HostShim;
 use types::address::Address;
 use types::result::Result;
@@ -148,7 +147,7 @@ impl AVM {
                 }));
 
                 // EDUCATIONAL: Handle deployment failures gracefully
-                if let Err(e) = result {
+                if let Err(_e) = result {
                     return Result { error_code: 0, success: false };
                 } else {
                     return Result { error_code: 1, success: true };

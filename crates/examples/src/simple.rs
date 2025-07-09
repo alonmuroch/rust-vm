@@ -2,7 +2,7 @@
 #![no_main]
 
 extern crate program;
-use program::{entrypoint, types::result::Result, logf, require};
+use program::{entrypoint, types::result::Result, require};
 use program::types::address::Address;    
 
 /// Simple smart contract that compares two 32-bit integers.
@@ -54,7 +54,7 @@ fn my_vm_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result 
 
     // EDUCATIONAL: Perform the comparison and return appropriate result
     // This demonstrates conditional logic in smart contracts
-    let error_code = if first > second { 
+    if first > second { 
         return Result { success: true, error_code:first as u32}
     } else {
         return Result { success: false, error_code: second as u32}

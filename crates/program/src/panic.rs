@@ -15,7 +15,7 @@ pub fn vm_panic(msg: &[u8]) -> ! {
 
 #[cfg(target_arch = "riscv32")]
 #[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
+fn panic(_info: &core::panic::PanicInfo) -> ! {
     vm_panic(b"unhandled error");
 }
 

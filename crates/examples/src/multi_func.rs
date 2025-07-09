@@ -5,7 +5,7 @@ extern crate program;
 
 use program::{entrypoint, types::result::Result, vm_panic, require};
 use program::types::address::Address;
-use program::router::{route, FuncCall};
+use program::router::{route};
 
 /// Maximum number of function calls that can be routed in a single transaction.
 /// 
@@ -99,9 +99,4 @@ fn other(_data: &[u8]) -> Result {
     vm_panic(b"Intentional failure");
 }
 
-/// Macro that sets up the contract entry point.
-/// 
-/// EDUCATIONAL: This macro generates the necessary code to make this
-/// function the main entry point for the smart contract. It handles
-/// the interface between the VM and the contract code.
 entrypoint!(my_vm_entry);

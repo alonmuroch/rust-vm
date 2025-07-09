@@ -179,7 +179,7 @@ impl CPU {
     /// went wrong, including the hex dump of the invalid bytes.
     /// 
     /// RETURN VALUE: Returns false to halt execution on invalid instructions
-    fn unknown_instruction(&mut self, memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> bool {
+    fn unknown_instruction(&mut self, memory: Rc<RefCell<MemoryPage>>, _storage: Rc<RefCell<Storage>>) -> bool {
         // EDUCATIONAL: Try to read the invalid instruction bytes for debugging
         if let Some(slice_ref) = memory.borrow().mem_slice(self.pc as usize, self.pc as usize + 4) {
             // EDUCATIONAL: Convert bytes to hex for human-readable debugging

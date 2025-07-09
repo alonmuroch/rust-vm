@@ -559,12 +559,6 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
                 offset,
             })
         }
-
-
-        _ => {
-            println!("Unimplemented compressed instruction: {:?}", op);
-            todo!("implement: {:?}", op);
-        }
     }
 }
 
