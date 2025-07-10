@@ -1,5 +1,4 @@
 use avm::transaction::{TransactionType, TransactionBundle, Transaction};
-use avm::router::{encode_router_calls,HostFuncCall};
 use types::address::Address;
 use once_cell::sync::Lazy;
 use std::fs;

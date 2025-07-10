@@ -326,6 +326,7 @@ impl AVM {
         // Without Box, we would need to track lifetimes manually and would hit borrow checker issues.
         let mut vm: VM = VM::new(memory_page, storage.clone(), Box::new(shim));
         vm.set_code(Config::PROGRAM_START_ADDR, &account.code);
+        // vm.cpu.verbose = true;
 
         // add new context execution
         let context_index = self.context_stack.push(from, to, input_data, vm);

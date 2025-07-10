@@ -15,7 +15,7 @@ pub extern crate types;
 pub mod log;
 
 // Contract call func
-pub mod call_program;
+pub mod call;
 
 // Entrypoint macro
 #[macro_use]
