@@ -13,7 +13,7 @@ macro_rules! persist_struct {
     ($name:ident, $key_ident:ident, {
         $($field:ident : $type:ty),* $(,)?
     }) => {
-        #[repr(C, packed)]
+        #[repr(C)]
         #[derive(Copy, Clone, Debug)]
         pub struct $name {
             $(pub $field: $type),*

@@ -1,4 +1,5 @@
 use core::fmt;
+use crate::O;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
@@ -7,6 +8,16 @@ pub struct Address(pub [u8; 20]);
 impl Address {
     pub fn to_bytes(&self) -> [u8; 20] {
         self.0
+    }
+
+    pub fn from_ptr(data: &[u8]) -> O<Self> {
+        if data.len() != 20 {
+            return O::None;
+        }
+        
+        let mut bytes = [0u8; 20];
+        bytes.copy_from_slice(data);
+        O::Some(Address(bytes))
     }
 }
 

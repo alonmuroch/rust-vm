@@ -114,7 +114,7 @@ impl MemoryPage {
         // Align to 4 bytes (or 8 if you're storing u64s)
         let align = 8;
         addr = (addr + (align - 1)) & !(align - 1);
-
+        
         let end = addr + data.len() as u32;
         assert!(end as usize <= self.size());
 
