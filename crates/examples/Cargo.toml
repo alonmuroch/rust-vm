@@ -19,3 +19,15 @@ path = "src/simple.rs"
 [[bin]]
 name = "storage"
 path = "src/storage.rs"
+
+[[bin]]
+name = "call_program"
+path = "src/call_program.rs"
+
+[[bin]]
+name = "multi_func"
+path = "src/multi_func.rs"
+
+[[bin]]
+name = "erc20"
+path = "src/erc20.rs"

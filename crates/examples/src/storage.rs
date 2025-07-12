@@ -6,16 +6,16 @@ use program::{entrypoint, types::result::Result, require};
 use program::types::address::Address; 
 use program::persist_struct;
 
-#[link_section = ".rodata"]
-#[no_mangle]
+// #[link_section = ".rodata"]
+// #[used]
 pub static PERSIST_USER: [u8; 5] = *b"user\0";
 
-#[link_section = ".rodata"]
-#[no_mangle]
+// #[link_section = ".rodata"]
+// #[used]
 pub static PERSIST_CONFIG: [u8; 7] = *b"config\0";
 
-#[link_section = ".rodata"]
-#[no_mangle]
+// #[link_section = ".rodata"]
+// #[used]
 pub static PERSIST_SESSION: [u8; 8] = *b"session\0";
 
 // Struct 1: User profile
