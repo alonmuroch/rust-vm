@@ -66,22 +66,21 @@ pub struct AVM {
     /// operating systems - one process can't access another's memory.
     pub memory_manager: MemoryPageManager,
 
-    /// Global persistent storage shared across all contracts.
-    /// 
-    /// EDUCATIONAL: This is like a global database that persists between
-    /// transactions. Contracts can read and write to this storage, and
-    /// changes survive across multiple contract calls.
-    pub storage: Storage,
-
     /// Global state of the AVM including all accounts and their data.
     /// 
     /// EDUCATIONAL: This represents the entire blockchain state - all
     /// accounts, their balances, code, and storage. Every transaction
     /// can potentially modify this state.
     pub state: State,
+
+    pub verbose: bool, // Enable verbose logging for debugging
 }
 
 impl AVM {
+    pub fn set_verbosity(&mut self, value: bool) {
+        self.verbose = value;
+    }
+
     /// Creates a new Application Virtual Machine with specified memory constraints.
     /// 
     /// EDUCATIONAL PURPOSE: This demonstrates VM initialization with resource limits.
@@ -98,8 +97,8 @@ impl AVM {
         Self {
             context_stack: ContextStack::new(),
             memory_manager: MemoryPageManager::new(max_pages, page_size),
-            storage: Storage::new(),
             state: State::new(),
+            verbose: false, // Default to no verbose logging
         }
     }
 
@@ -148,9 +147,9 @@ impl AVM {
 
                 // EDUCATIONAL: Handle deployment failures gracefully
                 if let Err(_e) = result {
-                    return Result { error_code: 0, success: false };
+                    return Result { error_code: 1, success: false };
                 } else {
-                    return Result { error_code: 1, success: true };
+                    return Result { error_code: 0, success: true };
                 }
             }
 
@@ -326,7 +325,7 @@ impl AVM {
         // Without Box, we would need to track lifetimes manually and would hit borrow checker issues.
         let mut vm: VM = VM::new(memory_page, storage.clone(), Box::new(shim));
         vm.set_code(Config::PROGRAM_START_ADDR, &account.code);
-        // vm.cpu.verbose = true;
+        vm.cpu.verbose = self.verbose;
 
         // add new context execution
         let context_index = self.context_stack.push(from, to, input_data, vm);
@@ -367,6 +366,7 @@ impl AVM {
         // This persists any changes the contract made to storage
         let updated_map = storage.borrow().map.borrow().clone();
         account.storage = updated_map;
+
 
         // EDUCATIONAL: set context execution done
         context.exe_done = true;

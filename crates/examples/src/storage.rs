@@ -6,16 +6,8 @@ use program::{entrypoint, types::result::Result, require};
 use program::types::address::Address; 
 use program::persist_struct;
 
-// #[link_section = ".rodata"]
-// #[used]
 pub static PERSIST_USER: [u8; 5] = *b"user\0";
-
-// #[link_section = ".rodata"]
-// #[used]
 pub static PERSIST_CONFIG: [u8; 7] = *b"config\0";
-
-// #[link_section = ".rodata"]
-// #[used]
 pub static PERSIST_SESSION: [u8; 8] = *b"session\0";
 
 // Struct 1: User profile
@@ -40,11 +32,7 @@ persist_struct!(Session, PERSIST_SESSION, {
 
 fn my_vm_entry(_self_address: Address, _caller: Address, _data: &[u8]) -> Result {
     // --- User ---
-    let mut user = match User::load() {
-        Some(u) => u,
-        None => User { id: 1001, active: true, level: 3 },
-    };
-
+    let mut user = User::load().expect("user not found");
     user.level = 4;
     user.id = 40000;
     user.store();
@@ -55,19 +43,12 @@ fn my_vm_entry(_self_address: Address, _caller: Address, _data: &[u8]) -> Result
 
     // ... later ...
 
-    let reloaded_user = match User::load() {
-        Some(u) => u,
-        None => User { id: 0, active: false, level: 0 },
-    };
+    let reloaded_user =  User::load().expect("user not found");
     require(reloaded_user.level == 4, b"user level must be 4");
     require(reloaded_user.id == 40000, b"user id must be 40000");
 
     // --- Config ---
-    let mut config = match Config::load() {
-        Some(c) => c,
-        None => Config { retries: 2, timeout_ms: 3000 },
-    };
-
+    let mut config =  Config::load().expect("config not found");
     config.retries = 13;
     config.timeout_ms = 100000;
     config.store();
@@ -78,10 +59,7 @@ fn my_vm_entry(_self_address: Address, _caller: Address, _data: &[u8]) -> Result
 
     // ... later ...
 
-    let reloaded_config = match Config::load() {
-        Some(c) => c,
-        None => Config { retries: 2, timeout_ms: 3000 },
-    };
+    let reloaded_config =  Config::load().expect("config not found");
     require(reloaded_config.retries == 13, b"config retries must be 13");
     require(reloaded_config.timeout_ms == 100000, b"config timeout_ms must be 100000");
 

@@ -124,4 +124,25 @@ impl Storage {
     pub fn set(&self, key: &str, value: Vec<u8>) {
         self.map.borrow_mut().insert(key.to_string(), value);
     }
+
+    /// Dumps the contents of persistent storage for debugging.
+    /// 
+    /// EDUCATIONAL PURPOSE: This demonstrates how to inspect persistent storage,
+    /// which is crucial for understanding how programs store data between runs.
+    /// 
+    /// STORAGE vs MEMORY: Storage persists between program runs, while memory
+    /// is cleared each time. This is like the difference between a hard drive
+    /// and RAM in a real computer.
+    /// 
+    /// OUTPUT FORMAT: Shows each key-value pair in storage, with the value
+    /// displayed in hexadecimal format.
+    pub fn dump(&self) {
+        println!("--- Storage Dump ---");
+        for (key, value) in self.map.borrow().iter() {
+            let key_str = key;
+            let value_hex: Vec<String> = value.iter().map(|b| format!("{:02x}", b)).collect();
+            println!("Key: {:<20} | Value ({} bytes): {}", key_str, value.len(), value_hex.join(" "));
+        }
+        println!("--------------------");
+    }
 }

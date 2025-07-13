@@ -242,20 +242,20 @@ impl CPU {
         // EDUCATIONAL: Safely get the key slice from memory
         let key_slice_ref = match borrowed_memory.mem_slice(key_ptr, key_ptr + key_len) {
             Some(r) => r,
-            None => return 0,  // Invalid memory access
+            None => panic!("invalid key memory access"),  // Invalid memory access
         };
         let key_slice = key_slice_ref.as_ref();
 
         // EDUCATIONAL: Convert the key slice to a string
         let key: &str = match core::str::from_utf8(key_slice) {
             Ok(s) => s,
-            Err(_) => return 0,  // Invalid UTF-8
+            Err(_) => panic!("invalid UTF-8 key"),  // Invalid UTF-8
         };
 
         // EDUCATIONAL: Safely get the value slice from memory
         let value_slice_ref = match borrowed_memory.mem_slice(val_ptr, val_ptr + val_len) {
             Some(r) => r,
-            None => return 0,  // Invalid memory access
+            None => panic!("invalid value memory access"),  // Invalid memory access
         };
         let value_slice = value_slice_ref.as_ref();
         
