@@ -1,4 +1,5 @@
 use types::result::Result;
+use types::{O};
 
 /// Represents a function call with a selector (function ID) and arguments.
 /// This is the core data structure for routing function calls in our VM.
@@ -166,7 +167,7 @@ pub fn route<'a>(
 ) -> Result {
     // EDUCATIONAL: Fixed-size array for storing decoded calls
     // This avoids heap allocations and provides predictable memory usage
-    let mut buf: [Option<FuncCall<'a>>; 8] = [None, None, None, None, None, None, None, None];
+    let mut buf: [O<FuncCall<'a>>; 8] = [O::None, O::None, O::None, O::None, O::None, O::None, O::None, O::None];
     let mut input = input;
     let mut count = 0;
 
@@ -187,7 +188,7 @@ pub fn route<'a>(
         let args = &input[2..2 + arg_len];
 
         // Store the decoded call in our buffer
-        buf[count] = Some(FuncCall { selector, args });
+        buf[count] = O::Some(FuncCall { selector, args });
         count += 1;
         input = &input[2 + arg_len..];
     }
@@ -201,7 +202,7 @@ pub fn route<'a>(
 
     // Second pass: execute each function call using the provided handler
     for i in 0..count {
-        if let Some(call) = &buf[i] {
+        if let O::Some(call) = &buf[i] {
             // EDUCATIONAL: Each call can succeed or fail, but we continue processing
             // This is important for batch operations where you want to process all calls
             last_result = handler(call);

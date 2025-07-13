@@ -1,6 +1,7 @@
+use types::O;
 /// Trait for persistent structs
 pub trait Persistent {
-    fn load() -> Option<Self>
+    fn load() -> O<Self>
     where
         Self: Sized;
 
@@ -33,9 +34,9 @@ macro_rules! persist_struct {
                 unsafe { core::slice::from_raw_parts(ptr, len) }
             }
 
-            pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+            pub fn from_bytes(bytes: &[u8]) -> $crate::types::O<Self> {
                 if bytes.len() != core::mem::size_of::<Self>() {
-                    return None;
+                    return $crate::types::O::None;
                 }
 
                 let mut val = core::mem::MaybeUninit::<Self>::uninit();
@@ -45,11 +46,11 @@ macro_rules! persist_struct {
                         val.as_mut_ptr() as *mut u8,
                         bytes.len(),
                     );
-                    Some(val.assume_init())
+                    $crate::types::O::Some(val.assume_init())
                 }
             }
 
-            pub fn load() -> Option<Self> {
+            pub fn load() -> $crate::types::O<Self> {
                 <$name as $crate::Persistent>::load()
             }
 
@@ -59,7 +60,7 @@ macro_rules! persist_struct {
         }
 
         impl $crate::Persistent for $name {
-            fn load() -> Option<Self> {
+            fn load() -> $crate::types::O<Self> {
                 unsafe {
                     let key_ptr = $name::key_ptr();
                     let key_len = $name::key_len();
@@ -80,7 +81,7 @@ macro_rules! persist_struct {
                     );
 
                     if value_ptr == 0 {
-                        return None;
+                        return $crate::types::O::None;
                     }
 
                     let len_bytes = core::slice::from_raw_parts(value_ptr as *const u8, 4);
@@ -94,7 +95,7 @@ macro_rules! persist_struct {
                         
                     if value_len == 0 {
                         $crate::require(value_len > 0, b"Decoded value len is 0 for bytes");
-                        return None;
+                        return $crate::types::O::None;
                     }    
 
                     let data_ptr = (value_ptr + 4) as *const u8;

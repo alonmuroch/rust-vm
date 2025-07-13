@@ -11,6 +11,15 @@ pub extern crate types;
 
 /* --------------------------------- Modules --------------------------------- */
 
+// Integers func
+pub mod integers;
+pub use integers::*;
+
+// StorageMap
+pub mod storage_map;
+pub use storage_map::StorageMap;
+pub use storage_map::StorageKey;
+
 // Logging macros
 pub mod log;
 
