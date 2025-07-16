@@ -5,10 +5,10 @@ macro_rules! logf_syscall {
             core::arch::asm!(
                 "li a7, 4",  // syscall_log
                 "ecall",
-                in("t0") $fmt_ptr,
-                in("t1") $fmt_len,
-                in("t2") $args_ptr,
-                in("t3") $args_len,
+                in("a1") $fmt_ptr,
+                in("a2") $fmt_len,
+                in("a3") $args_ptr,
+                in("a4") $args_len,
             );
         }
     }};
@@ -28,12 +28,12 @@ macro_rules! logf {
     }};
 
     ($fmt:expr, $($arg:expr),+ $(,)?) => {{
+        let mut i = 0;
         const MAX_ARGS: usize = 32;
         let args_buf: [u32; MAX_ARGS] = {
             let temp_args = [$($arg as u32),+];
             let mut buffer = [0u32; MAX_ARGS];
             let count = temp_args.len();
-            let mut i = 0;
             while i < count {
                 buffer[i] = temp_args[i];
                 i += 1;
@@ -42,30 +42,30 @@ macro_rules! logf {
         };
 
         let fmt_bytes: &[u8] = $fmt;
-        let mut j = 0;
-        let mut i = 0;
+        // let mut j = 0;
+        // let mut i = 0;
 
-        while i < fmt_bytes.len() {
-            if fmt_bytes[i] == b'%' {
-                i += 1;
-                if i >= fmt_bytes.len() {
-                    $crate::vm_panic(b"logf: format string ends with bare '%'");
-                }
-                match fmt_bytes[i] {
-                    b'd' | b'u' | b'x' => {
-                        j += 1;
-                    }
-                    b'%' => {} // escape
-                    _ => continue, // ignore unsupported for now
-                }
-            }
-            i += 1;
-        }
+        // while i < fmt_bytes.len() {
+        //     if fmt_bytes[i] == b'%' {
+        //         i += 1;
+        //         if i >= fmt_bytes.len() {
+        //             $crate::vm_panic(b"logf: format string ends with bare '%'");
+        //         }
+        //         match fmt_bytes[i] {
+        //             b'd' | b'u' | b'x' => {
+        //                 j += 1;
+        //             }
+        //             b'%' => {} // escape
+        //             _ => continue, // ignore unsupported for now
+        //         }
+        //     }
+        //     i += 1;
+        // }
 
         let fmt_ptr = fmt_bytes.as_ptr();
         let fmt_len = fmt_bytes.len();
         let args_ptr = args_buf.as_ptr();
-        let args_len = j * core::mem::size_of::<u32>();
+        let args_len = i * core::mem::size_of::<u32>();
 
         $crate::logf_syscall!(fmt_ptr, fmt_len, args_ptr, args_len);
     }};

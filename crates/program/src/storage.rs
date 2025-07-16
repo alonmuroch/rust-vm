@@ -75,9 +75,9 @@ macro_rules! persist_struct {
                     core::arch::asm!(
                         "li a7, 1",  // syscall_storage_read
                         "ecall",
-                        in("t0") key_ptr,
-                        in("t1") key_len,
-                        out("t6") value_ptr,
+                        in("a1") key_ptr,
+                        in("a2") key_len,
+                        out("a0") value_ptr,
                     );
 
                     if value_ptr == 0 {
@@ -129,10 +129,10 @@ macro_rules! persist_struct {
                     core::arch::asm!(
                         "li a7, 2", // syscall_storage_write
                         "ecall",
-                        in("t0") key_ptr,
-                        in("t1") key_len,
-                        in("t2") val_ptr,
-                        in("t3") val_len,
+                        in("a1") key_ptr,
+                        in("a2") key_len,
+                        in("a3") val_ptr,
+                        in("a4") val_len,
                         options(readonly, nostack, preserves_flags)
                     );
                 }

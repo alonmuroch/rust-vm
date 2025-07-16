@@ -7,11 +7,11 @@ pub fn call(from: &Address, to: &Address, input_data: &[u8]) -> Option<Result> {
         core::arch::asm!(
             "li a7, 5",        // syscall ID for call_contract
             "ecall",
-            in("t0") to.0.as_ptr(),
-            in("t1") from.0.as_ptr(),
-            in("t2") input_data.as_ptr(),
-            in("t3") input_data.len(),
-            out("t6") result_ptr,
+            in("a1") to.0.as_ptr(),
+            in("a2") from.0.as_ptr(),
+            in("a3") input_data.as_ptr(),
+            in("a4") input_data.len(),
+            out("a0") result_ptr,
         );
 
         if result_ptr == 0 {

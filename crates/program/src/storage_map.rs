@@ -4,7 +4,8 @@ use crate::logf;
 
 /// Trait for types that can be used as storage keys in `StorageMap`.
 pub trait StorageKey {
-    /// Returns the raw byte representation of the key.
+    /// Fills the provided buffer with the hex-encoded key.
+    /// Returns the length of the encoded key.
     fn as_storage_key(&self) -> &[u8];
 }
 
@@ -13,6 +14,7 @@ impl StorageKey for Address {
         &self.0
     }
 }
+
 
 pub struct StorageMap;
 
@@ -31,9 +33,9 @@ impl StorageMap {
             core::arch::asm!(
                 "li a7, 1", // syscall_storage_read
                 "ecall",
-                in("t0") full_key.as_ptr(),
-                in("t1") key.len(),
-                out("t6") value_ptr,
+                in("a1") full_key.as_ptr(),
+                in("a2") key.len(),
+                out("a0") value_ptr,
             );
 
             if value_ptr == 0 {
@@ -67,16 +69,15 @@ impl StorageMap {
 
         let val_bytes = unsafe {
             core::slice::from_raw_parts((&val as *const V) as *const u8, size_of::<V>())
-        };
-
+        };        
         unsafe {
             core::arch::asm!(
                 "li a7, 2", // syscall_storage_write
                 "ecall",
-                in("t0") full_key.as_ptr(),
-                in("t1") key.len(),
-                in("t2") val_bytes.as_ptr(),
-                in("t3") val_bytes.len(),
+                in("a1") full_key.as_ptr(),
+                in("a2") key.len(),
+                in("a3") val_bytes.as_ptr(),
+                in("a4") val_bytes.len(),
                 options(readonly, nostack, preserves_flags)
             );
         }
@@ -90,46 +91,55 @@ macro_rules! Map {
         pub struct $name;
 
         impl $name {
-            pub fn get<K, V>(key: &K) -> $crate::types::O<V>
+            const PREFIX: &'static [u8] = concat!("-",stringify!($name),"").as_bytes();
+            const MAX_KEY_LEN: usize = 64;
+
+            fn build_key<K: $crate::StorageKey>(key: K, out: &mut [u8]) -> usize {
+                let prefix_len = Self::PREFIX.len();
+                let key_bytes = key.as_storage_key();
+                let key_len = key_bytes.len();
+
+                // 🛡 Copy key bytes into separate buffer to prevent aliasing
+                let mut tmp = [0u8; 64];
+                tmp[..key_len].copy_from_slice(key_bytes);
+
+                // ✅ Write key first, then prefix
+                out[..key_len].copy_from_slice(&tmp[..key_len]);
+                out[key_len..key_len+prefix_len].copy_from_slice(Self::PREFIX);
+
+                let total_len = key_len + prefix_len;
+                $crate::require(total_len <= Self::MAX_KEY_LEN, b"key too long");
+
+                total_len
+            }
+
+
+
+
+            pub fn get<K, V>(key: K) -> $crate::types::O<V>
             where
                 K: $crate::StorageKey,
                 V: Copy + Default,
             {
-                const PREFIX: &[u8] = concat!(stringify!($name), "/").as_bytes();
-                const MAX_KEY_LEN: usize = 64;
-
-                let key_bytes = key.as_storage_key();
-                let total_len = PREFIX.len() + key_bytes.len();
-                $crate::require(total_len <= MAX_KEY_LEN, b"key too long");
-
-                let mut buf = [0u8; MAX_KEY_LEN];
-                buf[..PREFIX.len()].copy_from_slice(PREFIX);
-                buf[PREFIX.len()..total_len].copy_from_slice(key_bytes);
-
+                let mut buf = [0u8; Self::MAX_KEY_LEN];
+                let total_len = Self::build_key(key, &mut buf);
                 $crate::StorageMap::get::<V>(&buf[..total_len])
             }
 
-            pub fn set<K, V>(key: &K, val: V)
+            pub fn set<K, V>(key: K, val: V)
             where
                 K: $crate::StorageKey,
                 V: Copy,
             {
-                const PREFIX: &[u8] = concat!(stringify!($name), "/").as_bytes();
-                const MAX_KEY_LEN: usize = 64;
-                
-                let key_bytes = key.as_storage_key();
-                let total_len = PREFIX.len() + key_bytes.len();
-                $crate::require(total_len <= MAX_KEY_LEN, b"key too long");
-
-                let mut buf = [0u8; MAX_KEY_LEN];
-                buf[..PREFIX.len()].copy_from_slice(PREFIX);
-                buf[PREFIX.len()..total_len].copy_from_slice(key_bytes);
-
+                let mut buf = [0u8; Self::MAX_KEY_LEN];
+                let total_len = Self::build_key(key, &mut buf);
                 $crate::StorageMap::set::<V>(&buf[..total_len], val);
             }
         }
     };
 }
+
+
 
 
 

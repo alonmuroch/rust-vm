@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 state = { path = "../state" }  # adjust path as needed
 storage = { path = "../storage" }  # adjust path as needed
+hex = "0.4"

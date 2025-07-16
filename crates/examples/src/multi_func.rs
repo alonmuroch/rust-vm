@@ -7,13 +7,6 @@ use program::{entrypoint, types::result::Result, vm_panic, require};
 use program::types::address::Address;
 use program::router::{route};
 
-/// Maximum number of function calls that can be routed in a single transaction.
-/// 
-/// EDUCATIONAL: This is a safety limit to prevent resource exhaustion attacks.
-/// In real smart contracts, you need to limit the amount of work that can be
-/// done in a single transaction to prevent denial-of-service attacks.
-pub const MAX_ROUTING_CALLS: usize = 4;
-
 /// Main entry point for the smart contract.
 /// 
 /// EDUCATIONAL PURPOSE: This demonstrates a multi-function smart contract
@@ -33,7 +26,7 @@ pub const MAX_ROUTING_CALLS: usize = 4;
 fn my_vm_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
     // EDUCATIONAL: Use the router to handle multiple function calls
     // The router decodes the input data and calls the appropriate function
-    route(data, MAX_ROUTING_CALLS, |call| match call.selector {
+    route(data, _self_address, _caller, |to, from,call| match call.selector {
         0x01 => compare(call.args),    // Function selector 0x01 = compare function
         0x02 => other(call.args),      // Function selector 0x02 = other function
         _ => vm_panic(b"unknown selector"),  // Unknown selector = panic

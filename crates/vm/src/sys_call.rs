@@ -5,6 +5,7 @@ use crate::registers::Register;
 use std::rc::Rc;
 use core::cell::RefCell;
 use crate::host_interface::HostInterface;
+use hex;
 
 /// Example user data structure for demonstration purposes.
 /// 
@@ -47,9 +48,9 @@ impl CPU {
     /// request services from the VM (like storage access, logging, etc.).
     /// 
     /// RISC-V SYSTEM CALL CONVENTION:
-    /// - System call ID is passed in register a7
-    /// - Arguments are passed in registers t0-t5
-    /// - Return value is placed in register t6
+    /// - System call ID is passed in register A7
+    /// - Arguments are passed in registers A1-A6
+    /// - Return value is placed in register A0
     /// 
     /// SYSTEM CALL TYPES:
     /// - 1: Storage GET - retrieve data from persistent storage
@@ -70,12 +71,12 @@ impl CPU {
         // EDUCATIONAL: Extract arguments from registers t0-t5
         // This follows the RISC-V calling convention for system calls
         let args = [
-            self.regs[Register::T0 as usize],
-            self.regs[Register::T1 as usize],
-            self.regs[Register::T2 as usize],
-            self.regs[Register::T3 as usize],
-            self.regs[Register::T4 as usize],
-            self.regs[Register::T5 as usize],
+            self.regs[Register::A1 as usize],
+            self.regs[Register::A2 as usize],
+            self.regs[Register::A3 as usize],
+            self.regs[Register::A4 as usize],
+            self.regs[Register::A5 as usize],
+            self.regs[Register::A6 as usize],
         ];
 
         // EDUCATIONAL: Dispatch to the appropriate system call handler
@@ -92,7 +93,7 @@ impl CPU {
         };
 
         // EDUCATIONAL: Store the result in register t6 for the user program
-        self.regs[Register::T6 as usize] = result;
+        self.regs[Register::A0 as usize] = result;
 
         true // continue execution
     }
@@ -185,15 +186,21 @@ impl CPU {
         };
 
         // EDUCATIONAL: Convert bytes to string, handling invalid UTF-8
-        let key = match core::str::from_utf8(&key_slice) {
-            Ok(s) => s,
-            Err(_) => return 0,  // Invalid UTF-8
-        };
+        let key: String = key_slice
+            .iter()
+            .map(|&b| {
+                if b.is_ascii_graphic() {
+                    (b as char).to_string()
+                } else {
+                    format!("{:02x}", b)
+                }
+            })
+            .collect();
 
         println!("🔑 Storage GET key: \"{}\" @ 0x{:08x} (len = {})", key, key_ptr, key_len);
 
         // EDUCATIONAL: Look up the value in storage
-        if let Some(value) = storage.borrow().get(key) {
+        if let Some(value) = storage.borrow().get(&key) {
             // EDUCATIONAL: Create result buffer with format [length][data]
             let mut buf = (value.len() as u32).to_le_bytes().to_vec();
             buf.extend_from_slice(value.as_slice());
@@ -242,15 +249,24 @@ impl CPU {
         // EDUCATIONAL: Safely get the key slice from memory
         let key_slice_ref = match borrowed_memory.mem_slice(key_ptr, key_ptr + key_len) {
             Some(r) => r,
-            None => panic!("invalid key memory access"),  // Invalid memory access
+            None => panic!(
+                "invalid key memory access: key_ptr=0x{:08x}, key_len={}",
+                key_ptr, key_len
+            ),  // Invalid memory access
         };
         let key_slice = key_slice_ref.as_ref();
 
         // EDUCATIONAL: Convert the key slice to a string
-        let key: &str = match core::str::from_utf8(key_slice) {
-            Ok(s) => s,
-            Err(_) => panic!("invalid UTF-8 key"),  // Invalid UTF-8
-        };
+        let key: String = key_slice
+            .iter()
+            .map(|&b| {
+                if b.is_ascii_graphic() {
+                    (b as char).to_string()
+                } else {
+                    format!("{:02x}", b)
+                }
+            })
+            .collect();
 
         // EDUCATIONAL: Safely get the value slice from memory
         let value_slice_ref = match borrowed_memory.mem_slice(val_ptr, val_ptr + val_len) {
@@ -268,7 +284,7 @@ impl CPU {
         );
 
         // EDUCATIONAL: Store the key-value pair in persistent storage
-        storage.borrow_mut().set(key, value_slice.to_vec());
+        storage.borrow_mut().set(&key, value_slice.to_vec());
         0  // Success
     }
 
