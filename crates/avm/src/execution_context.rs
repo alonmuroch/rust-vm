@@ -18,6 +18,8 @@ pub struct ExecutionContext {
     // Memory page
     pub vm: Rc<RefCell<VM>>,
 
+    pub events: Vec<Vec<u8>>, 
+
     // is exe_done marks context as executed
     pub exe_done: bool,
 }
@@ -29,7 +31,14 @@ impl ExecutionContext {
          input_data: Vec<u8>,
          vm: VM,
     ) -> Self {
-        Self { from, to, input_data: Rc::new(input_data), vm: Rc::new(RefCell::new(vm)), exe_done: false }
+        Self { 
+            from,
+            to,
+            input_data: Rc::new(input_data), 
+            vm: Rc::new(RefCell::new(vm)), 
+            events: Vec::new(),
+            exe_done: false,
+         }
     }
 }
 
@@ -49,7 +58,15 @@ impl ContextStack {
     /// returns index of the new execution context
     pub fn push(&mut self, from: Address, to: Address, input_data: Vec<u8>, vm: VM) -> usize {
         let index = self.stack.len();
-        self.stack.push(ExecutionContext { from, to, input_data:Rc::new(input_data), vm:Rc::new(RefCell::new(vm)), exe_done: false });
+        self.stack.push(
+            ExecutionContext { 
+                from, 
+                to, 
+                input_data:Rc::new(input_data), 
+                vm:Rc::new(RefCell::new(vm)), 
+                events: Vec::new(),
+                exe_done: false,
+            });
         index
     }
 

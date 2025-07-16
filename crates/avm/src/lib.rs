@@ -9,3 +9,4 @@ pub mod global;
 pub mod execution_context;
 pub mod router;
 pub mod host_interface;
+pub mod receipt;

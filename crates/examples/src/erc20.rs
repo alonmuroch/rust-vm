@@ -4,13 +4,18 @@
 extern crate program;
 use program::{entrypoint, require, vm_panic, read_u32, logf,
      types::result::Result, types::address::Address, router::route, 
-     persist_struct, types::o::O, Map};
+     persist_struct, types::o::O, Map, event, fire_event};
 
 // Persistent structs
 static PERSIST_METADATA: [u8; 9] = *b"metadata\0";
 persist_struct!(Metadata, PERSIST_METADATA, {
     total_supply: u32,
     decimals: u8,
+});
+
+event!(Minted {
+    caller: Address,
+    amount: u32,
 });
 
 Map!(Balances);
@@ -71,6 +76,7 @@ fn init(caller: Address, args: &[u8]) {
 fn mint(caller: Address, val: u32) {
     logf!(b"mint ptr = %d", (&caller.0 as *const u8) as u32);
     logf!(b"minting: %d tokens", val);
+    fire_event!(Minted::new(caller, val));
     Balances::set(caller, val);
 }
 

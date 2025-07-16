@@ -68,8 +68,6 @@ macro_rules! entrypoint {
                 core::slice::from_raw_parts(input_ptr, input_len)
             };
 
-            $crate::logf!(b"entrypoint ptr = %d", (&from.0 as *const u8) as u32);
-
             // EDUCATIONAL: Call the user's contract function with safe types
             let result = $func(to, from, input);
             
