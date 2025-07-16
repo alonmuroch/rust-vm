@@ -1,5 +1,7 @@
 use types::result::Result;
+use types::address::Address;
 use types::{O};
+use crate::logf;
 
 /// Represents a function call with a selector (function ID) and arguments.
 /// This is the core data structure for routing function calls in our VM.
@@ -160,20 +162,21 @@ pub fn decode_calls<'a>(mut input: &'a [u8], buffer: &mut [FuncCall<'a>]) -> usi
 /// - handler: Closure that processes each individual function call
 /// 
 /// RETURNS: Result of the last processed function call
+/// Routes function calls from an encoded input buffer to the given handler closure.
+/// Passes in the `to` (contract address) and `from` (caller address) to each call.
 pub fn route<'a>(
     input: &'a [u8],
-    max_calls: usize,
-    mut handler: impl FnMut(&FuncCall<'a>) -> Result,
+    to: Address,
+    from: Address,
+    mut handler: impl FnMut(Address, Address, &FuncCall<'a>) -> Result,
 ) -> Result {
-    // EDUCATIONAL: Fixed-size array for storing decoded calls
-    // This avoids heap allocations and provides predictable memory usage
+    // Fixed-size buffer: max 8 calls
     let mut buf: [O<FuncCall<'a>>; 8] = [O::None, O::None, O::None, O::None, O::None, O::None, O::None, O::None];
     let mut input = input;
     let mut count = 0;
 
-    // First pass: decode all function calls into our buffer
-    while !input.is_empty() && count < max_calls {
-        // EDUCATIONAL: Same safety checks as in decode_calls
+    // Phase 1: Decode calls into buffer
+    while !input.is_empty() && count < buf.len() {
         if input.len() < 2 {
             vm_panic(b"router: bad header");
         }
@@ -186,26 +189,20 @@ pub fn route<'a>(
         }
 
         let args = &input[2..2 + arg_len];
-
-        // Store the decoded call in our buffer
         buf[count] = O::Some(FuncCall { selector, args });
         count += 1;
         input = &input[2 + arg_len..];
     }
 
-    // EDUCATIONAL: Initialize with a default success result
-    // This ensures we always return a valid Result even if no calls are processed
+    // Phase 2: Execute calls
     let mut last_result = Result {
         success: true,
         error_code: 0,
     };
 
-    // Second pass: execute each function call using the provided handler
     for i in 0..count {
         if let O::Some(call) = &buf[i] {
-            // EDUCATIONAL: Each call can succeed or fail, but we continue processing
-            // This is important for batch operations where you want to process all calls
-            last_result = handler(call);
+            last_result = handler(to, from, call);
         }
     }
 

@@ -23,16 +23,10 @@ persist_struct!(Config, PERSIST_CONFIG, {
     timeout_ms: u64,
 });
 
-// Struct 3: Session stats
-persist_struct!(Session, PERSIST_SESSION, {
-    tx_count: u64,
-    last_error: u64,
-    completed: bool,
-});
-
 fn my_vm_entry(_self_address: Address, _caller: Address, _data: &[u8]) -> Result {
     // --- User ---
-    let mut user = User::load().expect("user not found");
+    require(User::load().is_none() == true, b"user already exists");
+    let mut user = User{id: 1000, active: false, level: 3};
     user.level = 4;
     user.id = 40000;
     user.store();
@@ -48,7 +42,8 @@ fn my_vm_entry(_self_address: Address, _caller: Address, _data: &[u8]) -> Result
     require(reloaded_user.id == 40000, b"user id must be 40000");
 
     // --- Config ---
-    let mut config =  Config::load().expect("config not found");
+    require(Config::load().is_none() == true, b"config already exists");
+    let mut config =  Config{retries: 10, timeout_ms: 10};
     config.retries = 13;
     config.timeout_ms = 100000;
     config.store();
@@ -62,24 +57,6 @@ fn my_vm_entry(_self_address: Address, _caller: Address, _data: &[u8]) -> Result
     let reloaded_config =  Config::load().expect("config not found");
     require(reloaded_config.retries == 13, b"config retries must be 13");
     require(reloaded_config.timeout_ms == 100000, b"config timeout_ms must be 100000");
-
-    // // --- Session ---
-    // let mut session = match Session::load() {
-    //     Some(s) => s,
-    //     None => Session { tx_count: 0, last_error: 0, completed: false },
-    // };
-
-    // // ... later ...
-
-    // let reloaded_session = match Session::load() {
-    //     Some(s) => s,
-    //     None => Session { tx_count: 0, last_error: 0, completed: false },
-    // };
-
-    // // Compute error code
-    // let error_code = (reloaded_user.level as u32)
-    //                + (reloaded_config.timeout_ms as u32)
-    //                + (reloaded_session.tx_count as u32);
 
     Result {
         success: true,

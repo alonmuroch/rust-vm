@@ -35,8 +35,8 @@ macro_rules! entrypoint {
         /// prevents the compiler from changing the function name.
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn entrypoint(
-            address_ptr: *const u8,      // Pointer to contract address (20 bytes)
-            pubkey_ptr: *const u8,       // Pointer to caller address (20 bytes)
+            to_ptr: *const u8,      // Pointer to contract address (20 bytes)
+            from_ptr: *const u8,       // Pointer to caller address (20 bytes)
             input_ptr: *const u8,        // Pointer to input data
             input_len: usize,            // Length of input data
             result_ptr: *mut $crate::types::result::Result,  // Pointer to write result
@@ -45,7 +45,7 @@ macro_rules! entrypoint {
             // This demonstrates safe pointer handling in unsafe code
             let to = {
                 // EDUCATIONAL: Create a slice from the raw pointer (20 bytes for address)
-                let slice = core::slice::from_raw_parts(address_ptr, 20);
+                let slice = core::slice::from_raw_parts(to_ptr, 20);
                 let mut array = [0u8; 20];
                 // EDUCATIONAL: Copy bytes to avoid aliasing issues
                 array.copy_from_slice(slice);
@@ -55,7 +55,7 @@ macro_rules! entrypoint {
             // EDUCATIONAL: Convert raw pointer to caller address
             let from = {
                 // EDUCATIONAL: Create a slice from the raw pointer (20 bytes for address)
-                let slice = core::slice::from_raw_parts(pubkey_ptr, 20);
+                let slice = core::slice::from_raw_parts(from_ptr, 20);
                 let mut array = [0u8; 20];
                 // EDUCATIONAL: Copy bytes to avoid aliasing issues
                 array.copy_from_slice(slice);
@@ -67,6 +67,8 @@ macro_rules! entrypoint {
                 // EDUCATIONAL: Create a slice from the raw pointer with specified length
                 core::slice::from_raw_parts(input_ptr, input_len)
             };
+
+            $crate::logf!(b"entrypoint ptr = %d", (&from.0 as *const u8) as u32);
 
             // EDUCATIONAL: Call the user's contract function with safe types
             let result = $func(to, from, input);
