@@ -1,4 +1,5 @@
 use crate::memory_page_manager::MemoryPageManager;
+use crate::receipt::TransactionReceipt;
 use storage::Storage;
 use vm::vm::VM;
 use vm::registers::Register;
@@ -132,7 +133,7 @@ impl AVM {
     /// doesn't include gas accounting.
     /// 
     /// RETURN VALUE: Returns a Result indicating success/failure and any error codes
-    pub fn run_tx(&mut self, tx: Transaction) -> Result {
+    pub fn run_tx(&mut self, tx: Transaction) -> TransactionReceipt {
         match tx.tx_type {
             TransactionType::Transfer => {
                 // EDUCATIONAL: Value transfers between accounts
@@ -142,14 +143,14 @@ impl AVM {
 
             TransactionType::CreateAccount => {
                 let result = catch_unwind(AssertUnwindSafe(|| {
-                    self.create_account(tx.from, tx.to, tx.data);
+                    self.create_account(tx.from, tx.to, tx.data.clone());
                 }));
 
                 // EDUCATIONAL: Handle deployment failures gracefully
                 if let Err(_e) = result {
-                    return Result { error_code: 1, success: false };
-                } else {
-                    return Result { error_code: 0, success: true };
+                    return TransactionReceipt::new(tx, Result { error_code: 1, success: false }) ;
+                } else { 
+                    return TransactionReceipt::new(tx, Result { error_code: 0, success: true });
                 }
             }
 
@@ -159,7 +160,7 @@ impl AVM {
                 assert!(self.state.is_contract(tx.to), "destination address is not a contract");
 
                 // EDUCATIONAL: Call the contract and extract the result
-                let (result_ptr, context_index) = self.call_contract(tx.from, tx.to, tx.data);
+                let (result_ptr, context_index) = self.call_contract(tx.from, tx.to, tx.data.clone());
 
                 // verify context stack is empty
                 if !self.context_stack.is_empty() {
@@ -169,7 +170,9 @@ impl AVM {
                 }
 
                 // extract result 
-                self.extract_result(result_ptr, context_index)
+                let res = self.extract_result(result_ptr, context_index);
+                TransactionReceipt::new(tx, res)
+                    .set_events(self.context_stack.get(context_index).expect("missing execution context").events.clone())
             }
         }
     }

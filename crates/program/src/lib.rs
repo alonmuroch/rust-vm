@@ -20,6 +20,10 @@ pub mod storage_map;
 pub use storage_map::StorageMap;
 pub use storage_map::StorageKey;
 
+// Events
+pub mod event;
+pub use event::*; 
+
 // Logging macros
 pub mod log;
 

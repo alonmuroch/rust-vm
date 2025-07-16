@@ -39,6 +39,22 @@ impl<'a> HostInterface for HostShim {
         }
     }
 
+    fn fire_event(&mut self, event: Vec<u8>) {
+        unsafe {
+            // SAFETY: self.avm_ptr must point to a valid AVM that has access to the callee's memory
+            let avm = &mut *self.avm_ptr;
+            avm.context_stack.current_mut().expect("must have current context").events.push(event.clone());
+
+            let hex_string: String = event
+                .iter()
+                .map(|byte| format!("{:02x}", byte))
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            println!("[sys_fire_event] Event bytes (hex): {}", hex_string);
+        }
+    }
+
     fn read_memory_page(&mut self, page_index: usize, guest_ptr: u32, len: usize) -> Option<Vec<u8>> {
         unsafe {
             // SAFETY: self.avm_ptr must point to a valid AVM that has access to the callee's memory

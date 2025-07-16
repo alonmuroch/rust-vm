@@ -13,7 +13,7 @@ pub const SYSCALL_STORAGE_SET: u32 = 2;
 pub const SYSCALL_PANIC: u32 = 3;
 pub const SYSCALL_LOG: u32 = 4;
 pub const SYSCALL_CALL_PROGRAM: u32 = 5;
-
+pub const SYSCALL_FIRE_EVENT: u32 = 6;
 /// Represents different types of arguments that can be passed to system calls.
 /// 
 /// EDUCATIONAL: This enum demonstrates how to handle different data types
@@ -44,6 +44,25 @@ pub trait SyscallHandler: std::fmt::Debug {
 pub struct DefaultSyscallHandler;
 
 impl DefaultSyscallHandler {
+
+	pub fn sys_fire_event(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>,) -> u32 {
+        // EDUCATIONAL: Extract key pointer and length from arguments
+        let ptr = args[0] as usize;
+        let len = args[1] as usize;
+
+        let borrowed_memory = memory.borrow();
+
+        // EDUCATIONAL: Safely read the key from memory
+        // EDUCATIONAL: Create a limited scope to avoid borrow checker issues
+        let event_bytes = match borrowed_memory.mem_slice(ptr, ptr + len) {
+            Some(r) => r,
+            None => panic!("invalid memory access"),  // Invalid memory access
+        };
+
+        host.fire_event(event_bytes.to_vec());
+        0
+    }
+
     fn sys_storage_get(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
         let key_ptr = args[0] as usize;
         let key_len = args[1] as usize;

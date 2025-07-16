@@ -4,7 +4,7 @@
 extern crate program;
 use core::ops::Add;
 
-use program::{entrypoint, types::result::Result, require, logf, types::O};
+use program::{entrypoint, types::result::Result, require, logf, types::O, vm_panic};
 use program::call::call;
 use program::types::address::Address;
 
@@ -19,7 +19,7 @@ fn my_vm_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result 
     let input = &data[20..];
     let ret = match call(&_caller, &target, input) {
         Some(result) => result,
-        None => Result { success: false, error_code: 0}, // Or another error-handling path
+        None => vm_panic(b"program call failed"), // Error code 2: call failed
     };
     ret
 }
