@@ -6,6 +6,7 @@ use std::fs;
 use std::path::Path;
 use compiler::elf::parse_elf_from_bytes;
 use avm::global::Config;
+use compiler::{EventParam, EventAbi, ParamType};
 
 #[derive(Debug)]
 pub struct TestCase<'a> {
@@ -13,6 +14,7 @@ pub struct TestCase<'a> {
     pub expected_success: bool,
     pub expected_error_code: u32,
     pub bundle: TransactionBundle,
+    pub abi: Option<Vec<EventAbi>>
 }
 
 pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
@@ -21,6 +23,23 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             name: "erc20",
             expected_success: true,
             expected_error_code: 100,
+            abi: Some(vec!(
+                EventAbi {
+                    name: "Minted".to_string(),
+                    inputs: vec![
+                        EventParam {
+                            name: "caller".to_string(),
+                            kind: ParamType::Address,
+                            indexed: false,
+                        },
+                        EventParam {
+                            name: "amount".to_string(),
+                            kind: ParamType::Uint(32),
+                            indexed: false,
+                        },
+                    ],
+                }
+            )),
             bundle: TransactionBundle::new(vec![
                  Transaction {
                     tx_type: TransactionType::CreateAccount,

@@ -21,7 +21,6 @@ event!(Minted {
 Map!(Balances);
 
 unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {   
-    logf!(b"main ptr = %d", (&caller.0 as *const u8) as u32);
     route(data, program, caller, 
          |to, from, call| match call.selector {
         0x01 => {
@@ -32,7 +31,6 @@ unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
             // for (i, b) in from.0.iter().enumerate() {
             //     logf!(b"2 addr[%d] = %d", i as u32, *b as u32);
             // }
-            logf!(b"handler ptr = %d", (&from.0 as *const u8) as u32);
             init(caller, call.args);
             Result { success: true, error_code: 0 }
         },
@@ -50,7 +48,6 @@ unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
 }
 
 fn init(caller: Address, args: &[u8]) {
-    logf!(b"init ptr = %d", (&caller.0 as *const u8) as u32);
     logf!(b"init called");
     let mut meta = match Metadata::load() {
         O::Some(m) => vm_panic(b"already initialized"),
@@ -74,7 +71,6 @@ fn init(caller: Address, args: &[u8]) {
 }
 
 fn mint(caller: Address, val: u32) {
-    logf!(b"mint ptr = %d", (&caller.0 as *const u8) as u32);
     logf!(b"minting: %d tokens", val);
     fire_event!(Minted::new(caller, val));
     Balances::set(caller, val);
