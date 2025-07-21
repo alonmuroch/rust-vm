@@ -33,9 +33,9 @@ impl StorageMap {
             core::arch::asm!(
                 "li a7, 1", // syscall_storage_read
                 "ecall",
-                in("a1") full_key.as_ptr(),
-                in("a2") key.len(),
-                out("a0") value_ptr,
+                in("x11") full_key.as_ptr(), // a1
+                in("x12") key.len(), // a2
+                out("x10") value_ptr, // a0
             );
 
             if value_ptr == 0 {
@@ -74,10 +74,10 @@ impl StorageMap {
             core::arch::asm!(
                 "li a7, 2", // syscall_storage_write
                 "ecall",
-                in("a1") full_key.as_ptr(),
-                in("a2") key.len(),
-                in("a3") val_bytes.as_ptr(),
-                in("a4") val_bytes.len(),
+                in("x11") full_key.as_ptr(), // a1
+                in("x12") key.len(), // a2
+                in("x13") val_bytes.as_ptr(), // a3
+                in("x14") val_bytes.len(), // a4
                 options(readonly, nostack, preserves_flags)
             );
         }

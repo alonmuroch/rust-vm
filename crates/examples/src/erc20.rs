@@ -2,9 +2,11 @@
 #![no_main]
 
 extern crate program;
-use program::{entrypoint, require, vm_panic, read_u32, logf,
-     types::result::Result, types::address::Address, router::route, 
-     persist_struct, types::o::O, Map, event, fire_event};
+use program::{entrypoint, event, 
+    fire_event, log, logf, persist_struct, 
+    read_u32, require, router::route, 
+    types::{address::Address, o::O, result::Result}, vm_panic, Map};
+
 
 // Persistent structs
 static PERSIST_METADATA: [u8; 9] = *b"metadata\0";
@@ -14,11 +16,11 @@ persist_struct!(Metadata, PERSIST_METADATA, {
 });
 
 event!(Minted {
-    caller: Address,
-    amount: u32,
+    caller => Address,
+    amount => u32,
 });
 
-Map!(Balances);
+// Map!(Balances);
 
 unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {   
     route(data, program, caller, 
@@ -72,8 +74,14 @@ fn init(caller: Address, args: &[u8]) {
 
 fn mint(caller: Address, val: u32) {
     logf!(b"minting: %d tokens", val);
-    fire_event!(Minted::new(caller, val));
-    Balances::set(caller, val);
+    let e = Minted::new(caller, val);//);12, val, val + 1, *b"hello00000",*b"hello11111");
+    // fire_event!();
+
+    // logf!(b"id byte[3]=%x", e.id[3]);
+    // logf!(b"caller byte[3]=%x", e.caller.0[3]);
+    // logf!(b"caller byte[15]=%x", e.caller.0[15]);
+    fire_event!(e);
+    // Balances::set(caller, val);
 }
 
 // fn transfer(caller: Address, args: &[u8]) {

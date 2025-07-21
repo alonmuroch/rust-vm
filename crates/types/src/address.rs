@@ -1,5 +1,6 @@
 use core::fmt;
 use crate::O;
+use crate::SerializeField;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C)]
@@ -42,5 +43,17 @@ impl fmt::Display for Address {
 impl AsRef<[u8]> for Address {
     fn as_ref(&self) -> &[u8] {
         &self.0
+    }
+}
+
+impl SerializeField for Address {
+    fn serialize_field(&self, buf: &mut [u8], offset: &mut usize) {
+        let bytes = &self.0;
+        if *offset + 20 <= buf.len() {
+            buf[*offset..*offset + 20].copy_from_slice(bytes);
+            *offset += 20;
+        } else {
+            panic!("Buffer overflow in Address serialization");
+        }
     }
 }
