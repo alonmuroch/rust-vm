@@ -34,7 +34,7 @@
 /// PERFORMANCE IMPLICATIONS: Different instruction types have different
 /// execution costs. Memory operations are typically slower than register
 /// operations, and branches can cause pipeline stalls in real CPUs.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Instruction {
     // ===== RV32I =====
 
@@ -195,7 +195,7 @@ pub enum Instruction {
     MiscAlu { rd: usize, rs2: usize, op: MiscAluOp },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum MiscAluOp {
     Sub,
     Xor,
