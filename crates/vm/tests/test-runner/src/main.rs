@@ -28,17 +28,20 @@ fn main() {
     let (rodata, rodata_start) = elf.get_flat_rodata().unwrap_or((vec![], usize::MAX as u64));
 
     // Set up VM memory (allocate enough to cover 0x80000000+)
-    let memory = Rc::new(RefCell::new(MemoryPage::new(0x10000000))); // 256MB
-    memory.borrow_mut().write_code(code_start as usize, &code);
-    if !rodata.is_empty() {
-        memory.borrow_mut().write_code(rodata_start as usize, &rodata);
-    }
+    let memory = Rc::new(RefCell::new(MemoryPage::new_with_base(0x400000, 0x80000000))); // 4MB at 0x80000000
+    // Only use vm.set_code to load code
+    println!("Loading code into VM: addr=0x{:x}, size=0x{:x}", code_start, code.len());
 
     // Set up VM
     let storage = Rc::new(RefCell::new(Storage::default()));
     let host: Box<dyn vm::host_interface::HostInterface> = Box::new(NoopHost {});
     let mut vm = VM::new(Rc::clone(&memory), Rc::clone(&storage), host);
-    vm.set_code(code_start as u32, &code);
+    vm.set_code(code_start as u32,code_start as u32, &code);
+
+    if !rodata.is_empty() {
+        println!("Writing rodata to memory: addr=0x{:x}, size=0x{:x}", rodata_start, rodata.len());
+        memory.borrow_mut().write_code(rodata_start as usize, &rodata);
+    }
 
     // Run the VM
     println!("Running test...");

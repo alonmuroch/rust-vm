@@ -78,14 +78,15 @@ impl VM {
     /// executable formats, and setting up memory protection.
     /// 
     /// PARAMETERS:
-    /// - start_addr: Where the program should start executing
+    /// - alloc_add: The address where the code should be allocated in memory
+    /// - start_addr: Where the program should start executing from
     /// - code: The binary program code to load
     /// 
     /// MEMORY LAYOUT: Programs are typically loaded at specific addresses
     /// to ensure proper alignment and to avoid conflicts with system memory.
-    pub fn set_code(&mut self, start_addr: u32, code: &[u8]) {
+    pub fn set_code(&mut self, alloc_add: u32, start_addr: u32, code: &[u8]) {
         // EDUCATIONAL: Write the program code to memory starting at address 0
-        self.memory.borrow_mut().write_code(0, code);
+        self.memory.borrow_mut().write_code(alloc_add as usize, code);
         
         // EDUCATIONAL: Set the program counter to the starting address
         self.cpu.pc = start_addr;

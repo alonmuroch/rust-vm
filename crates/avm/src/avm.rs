@@ -325,7 +325,7 @@ impl AVM {
         // - Enables recursive call_contract logic, since the Box owns the host and doesn't borrow `self`
         // Without Box, we would need to track lifetimes manually and would hit borrow checker issues.
         let mut vm: VM = VM::new(memory_page, storage.clone(), Box::new(shim));
-        vm.set_code(Config::PROGRAM_START_ADDR, &account.code);
+        vm.set_code(0, Config::PROGRAM_START_ADDR, &account.code);
         // vm.cpu.verbose = true;
 
         // add new context execution

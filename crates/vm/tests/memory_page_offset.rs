@@ -46,4 +46,12 @@ fn test_store_and_load_high_base() {
     assert_eq!(mem.load_halfword(base + 20), 0xCDEF);
     mem.store_u32(base + 30, 0x12345678);
     assert_eq!(mem.load_u32(base + 30), 0x12345678);
+}
+
+#[test]
+fn test_store_and_load_at_offset_zero() {
+    let base = 0x80000000;
+    let mem = MemoryPage::new_with_base(1024, base);
+    mem.store_u8(base, 0xAA);
+    assert_eq!(mem.load_byte(base), 0xAA);
 } 
