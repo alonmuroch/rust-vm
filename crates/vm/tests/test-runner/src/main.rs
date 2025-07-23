@@ -1,0 +1,49 @@
+//! Standalone test runner for rv32ui-p-* ELF files from riscv-tests
+//! Loads an ELF file, loads it into the VM, and runs it to completion.
+
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use vm::vm::VM;
+use vm::memory_page::MemoryPage;
+use storage::Storage;
+use std::rc::Rc;
+use std::cell::RefCell;
+use vm::host_interface::NoopHost;
+use compiler::elf::parse_elf_from_bytes;
+
+fn main() {
+    // Path to a single rv32ui ELF file (change as needed)
+    let elf_path = "crates/vm/tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-add";
+    println!("Loading test: {}", elf_path);
+
+    // Read ELF file
+    let mut file = File::open(elf_path).expect("Failed to open ELF file");
+    let mut elf_bytes = Vec::new();
+    file.read_to_end(&mut elf_bytes).expect("Failed to read ELF file");
+
+    // Parse ELF
+    let elf = parse_elf_from_bytes(&elf_bytes).expect("Failed to parse ELF");
+    let (code, code_start) = elf.get_flat_code().expect("No code section in ELF");
+    let (rodata, rodata_start) = elf.get_flat_rodata().unwrap_or((vec![], usize::MAX as u64));
+
+    // Set up VM memory (allocate enough to cover 0x80000000+)
+    let memory = Rc::new(RefCell::new(MemoryPage::new(0x10000000))); // 256MB
+    memory.borrow_mut().write_code(code_start as usize, &code);
+    if !rodata.is_empty() {
+        memory.borrow_mut().write_code(rodata_start as usize, &rodata);
+    }
+
+    // Set up VM
+    let storage = Rc::new(RefCell::new(Storage::default()));
+    let host: Box<dyn vm::host_interface::HostInterface> = Box::new(NoopHost {});
+    let mut vm = VM::new(Rc::clone(&memory), Rc::clone(&storage), host);
+    vm.set_code(code_start as u32, &code);
+
+    // Run the VM
+    println!("Running test...");
+    vm.raw_run();
+    println!("Test completed.");
+
+    // TODO: Check result (registers, memory, etc.)
+}

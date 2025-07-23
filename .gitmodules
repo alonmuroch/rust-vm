@@ -1,0 +1,3 @@
+[submodule "crates/vm/tests/riscv-tests"]
+	path = crates/vm/tests/riscv-tests
+	url = https://github.com/riscv/riscv-tests.git

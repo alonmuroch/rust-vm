@@ -1,11 +1,14 @@
 [workspace]
 members = [
-  "crates/vm",
-  "crates/state", 
-  "crates/program", 
-  "crates/compiler",
-  "crates/examples", 
-  "crates/storage", "crates/avm", "crates/types",
+    "crates/avm",
+    "crates/compiler",
+    "crates/examples",
+    "crates/program",
+    "crates/state",
+    "crates/storage",
+    "crates/types",
+    "crates/vm",
+    "crates/vm/tests/test-runner"
 ]
 
 [profile.release]
