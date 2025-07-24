@@ -20,12 +20,15 @@ pub struct User {
 }
 
 
-
+#[cfg(any(test, debug_assertions, feature = "spec-tests"))]
+pub const SYSCALL_SPEC_TEST: u32 = 0;
+/// System call IDs for the VM.
 pub const SYSCALL_STORAGE_GET: u32 = 1;
 pub const SYSCALL_STORAGE_SET: u32 = 2;
 pub const SYSCALL_PANIC: u32 = 3;
 pub const SYSCALL_LOG: u32 = 4;
 pub const SYSCALL_CALL_PROGRAM: u32 = 5;
+
 /// Represents different types of arguments that can be passed to system calls.
 /// 
 /// EDUCATIONAL: This enum demonstrates how to handle different data types
@@ -66,6 +69,18 @@ impl CPU {
         host: &mut Box<dyn HostInterface>) -> bool {
         // EDUCATIONAL: Get the system call ID from register a7
         let syscall_id = self.regs[Register::A7 as usize]; // a7
+
+        #[cfg(any(test, debug_assertions, feature = "spec-tests"))]
+        if syscall_id == SYSCALL_SPEC_TEST {
+            let result = self.regs[Register::A0 as usize];
+            if result == 0 {
+                println!("[spec-test] PASS: SYSCALL_SPEC_TEST called: a0 (result) = 0");
+            } else {
+                println!("[spec-test] FAIL: SYSCALL_SPEC_TEST called: a0 (result) = {}", result);
+            }
+            // Halt execution after reporting result
+            return true;
+        }
 
         // EDUCATIONAL: Extract arguments from registers t0-t5
         // This follows the RISC-V calling convention for system calls

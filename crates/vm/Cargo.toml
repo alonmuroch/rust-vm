@@ -2,10 +2,16 @@
 name = "vm"
 version = "0.1.0"
 authors = ["Alon Muroch <alonmuroch@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 state = { path = "../state" }  # adjust path as needed
 storage = { path = "../storage" }  # adjust path as needed
+
+[features]
+spec-tests = []
+
+[dev-dependencies]
+compiler = { path = "../compiler" }

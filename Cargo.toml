@@ -8,7 +8,6 @@ members = [
     "crates/storage",
     "crates/types",
     "crates/vm",
-    "crates/vm/tests/test-runner"
 ]
 
 [profile.release]
