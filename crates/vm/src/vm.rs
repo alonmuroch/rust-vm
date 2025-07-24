@@ -5,6 +5,7 @@ use crate::registers::Register;
 use crate::memory_page::{MemoryPage};
 use storage::{Storage};
 use crate::host_interface::HostInterface;
+use crate::sys_call::{SyscallHandler, DefaultSyscallHandler};
 
 /// Represents a complete RISC-V virtual machine.
 /// 
@@ -36,39 +37,32 @@ pub struct VM {
 }
 
 impl VM {
-    /// Creates a new virtual machine with the specified memory and storage.
-    /// 
-    /// EDUCATIONAL PURPOSE: This demonstrates VM initialization. A real VM
-    /// would need to set up all its components in a known state before
-    /// running any programs.
-    /// 
-    /// INITIALIZATION PROCESS:
-    /// 1. Create CPU with default register values
-    /// 2. Set up stack pointer to point to the top of available memory
-    /// 3. Initialize program counter to 0
-    /// 4. Link memory and storage components
-    /// 
-    /// STACK SETUP: The stack pointer (x2) is initialized to point to the
-    /// top of the memory page, allowing programs to use the stack immediately.
+    /// Creates a new virtual machine with the specified memory, storage, and host, using the default syscall handler.
     pub fn new(
         memory: Rc<RefCell<MemoryPage>>,
         storage: Rc<RefCell<Storage>>, 
-        host: Box<dyn HostInterface>) -> Self {
-        // EDUCATIONAL: Initialize all registers to 0
+        host: Box<dyn HostInterface>,
+    ) -> Self {
+        Self::new_with_syscall_handler(memory, storage, host, Box::new(DefaultSyscallHandler))
+    }
+
+    /// Creates a new virtual machine with a custom syscall handler.
+    /// This is useful for testing or custom environments.
+    pub fn new_with_syscall_handler(
+        memory: Rc<RefCell<MemoryPage>>,
+        storage: Rc<RefCell<Storage>>, 
+        host: Box<dyn HostInterface>,
+        syscall_handler: Box<dyn SyscallHandler>,
+    ) -> Self {
         let mut regs = [0u32; 32];
-        
-        // EDUCATIONAL: Set stack pointer to top of memory
-        // This allows programs to use the stack immediately
         regs[Register::Sp as usize] = memory.borrow().stack_top();
-
-        // EDUCATIONAL: Create CPU with initial state
         let cpu = CPU {
-            pc: 0,  // Start at address 0
-            regs,   // Use our initialized registers
-            verbose: false,  // Disable debug output by default
+            pc: 0,
+            regs,
+            verbose: false,
+            syscall_handler,
         };
-
-        Self { cpu, memory, storage, host}
+        Self { cpu, memory, storage, host }
     }
 
     /// Loads program code into memory and sets the starting address.

@@ -2,6 +2,9 @@
 //! Loads an ELF file, loads it into the VM, and runs it to completion.
 
 use std::io::Read;
+use vm::vm::VM;
+mod test_syscall_handler;
+use test_syscall_handler::TestSyscallHandler;
 
 #[test]
 fn test_riscv_spec() {
@@ -32,7 +35,13 @@ fn test_riscv_spec() {
     // Set up VM
     let storage = std::rc::Rc::new(std::cell::RefCell::new(storage::Storage::default()));
     let host: Box<dyn vm::host_interface::HostInterface> = Box::new(vm::host_interface::NoopHost {});
-    let mut vm = vm::vm::VM::new(std::rc::Rc::clone(&memory), std::rc::Rc::clone(&storage), host);
+    // When constructing the VM, use the test syscall handler:
+    let mut vm = VM::new_with_syscall_handler(
+        memory.clone(),
+        storage,
+        host,
+        Box::new(TestSyscallHandler),
+    );
     vm.cpu.verbose = true;
     vm.set_code(code_start as u32, code_start as u32, &code);
 

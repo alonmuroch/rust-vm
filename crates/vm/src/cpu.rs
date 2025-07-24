@@ -5,6 +5,8 @@ use storage::Storage;
 use std::rc::Rc;
 use core::cell::RefCell;
 use crate::host_interface::HostInterface;
+use crate::sys_call::SyscallHandler;
+use crate::registers::Register;
 
 /// Represents the Central Processing Unit (CPU) of our RISC-V virtual machine.
 /// 
@@ -58,6 +60,7 @@ pub struct CPU {
     /// EDUCATIONAL: This helps students understand what the CPU is doing
     /// by printing each instruction as it executes
     pub verbose: bool,
+    pub syscall_handler: Box<dyn SyscallHandler>,
 }
 
 impl CPU {
@@ -70,11 +73,12 @@ impl CPU {
     /// - PC starts at 0 (first instruction)
     /// - All registers start at 0 (except x0 which is always 0)
     /// - Verbose logging is disabled by default
-    pub fn new() -> Self {
+    pub fn new(syscall_handler: Box<dyn SyscallHandler>) -> Self {
         Self {
             pc: 0,
             regs: [0; 32],
             verbose: false,
+            syscall_handler,
         }
     }
 
@@ -489,9 +493,18 @@ impl CPU {
             
             // EDUCATIONAL: System instructions - for OS interaction and debugging
             Instruction::Ecall => {
-                // EDUCATIONAL: ECALL - Environment Call - triggers a system call
-                // This is how user programs request services from the operating system
-                return self.handle_syscall(memory, storage, host);
+                // Prepare syscall args from registers
+                let args = [
+                    self.regs[Register::T0 as usize],
+                    self.regs[Register::T1 as usize],
+                    self.regs[Register::T2 as usize],
+                    self.regs[Register::T3 as usize],
+                    self.regs[Register::T4 as usize],
+                    self.regs[Register::T5 as usize],
+                ];
+                let (result, cont) = self.syscall_handler.handle_syscall(args, memory, storage, host, &mut self.regs);
+                self.regs[Register::T6 as usize] = result;
+                return cont;
             }
             Instruction::Ebreak => {
                 // EDUCATIONAL: EBREAK - Environment Break - for debugging
