@@ -6,8 +6,6 @@ use std::rc::Rc;
 use core::cell::RefCell;
 use crate::host_interface::HostInterface;
 
-#[cfg(any(test, debug_assertions, feature = "spec-tests"))]
-pub const SYSCALL_SPEC_TEST: u32 = 0;
 /// System call IDs for the VM.
 pub const SYSCALL_STORAGE_GET: u32 = 1;
 pub const SYSCALL_STORAGE_SET: u32 = 2;

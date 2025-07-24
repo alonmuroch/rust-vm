@@ -40,7 +40,7 @@ fn test_riscv_spec() {
         memory.clone(),
         storage,
         host,
-        Box::new(TestSyscallHandler),
+        Box::new(TestSyscallHandler::new()),
     );
     vm.cpu.verbose = true;
     vm.set_code(code_start as u32, code_start as u32, &code);
