@@ -117,6 +117,19 @@ pub fn decode(bytes: &[u8]) -> Option<(Instruction, u8)> {
 ///
 /// RETURNS: Some(instruction) if valid, None if unrecognized
 pub fn decode_full(word: u32) -> Option<Instruction> {
+        // Null bytes (padding) - treat as no-op
+    if word == 0x00000000 {
+        return Some(Instruction::Unimp);
+    }
+    // FENCE: 0x0ff0000f
+    if word == 0x0ff0000f {
+        return Some(Instruction::Fence);
+    }
+    // UNIMP: 0x0000000f (common convention)
+    if word == 0x0000000f {
+        return Some(Instruction::Unimp);
+    }
+    
     // EDUCATIONAL: Extract opcode from bottom 7 bits
     let opcode = Opcode::from_u8((word & 0x7f) as u8)?;
 

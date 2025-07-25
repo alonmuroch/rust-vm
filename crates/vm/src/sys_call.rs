@@ -5,6 +5,7 @@ use crate::registers::Register;
 use std::rc::Rc;
 use core::cell::RefCell;
 use crate::host_interface::HostInterface;
+use std::any::Any;
 
 /// System call IDs for the VM.
 pub const SYSCALL_STORAGE_GET: u32 = 1;
@@ -35,6 +36,7 @@ pub trait SyscallHandler: std::fmt::Debug {
         host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
     ) -> (u32, bool);
+    fn as_any(&self) -> &dyn Any;
 }
 
 #[derive(Debug)]
@@ -278,5 +280,8 @@ impl SyscallHandler for DefaultSyscallHandler {
             }
         };
         (result, true)
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }

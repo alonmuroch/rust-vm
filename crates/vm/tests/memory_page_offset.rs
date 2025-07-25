@@ -1,6 +1,6 @@
 use vm::memory_page::MemoryPage;
-use crate::vm::VM;
-use crate::sys_call::DefaultSyscallHandler;
+use vm::vm::VM;
+use vm::sys_call::DefaultSyscallHandler;
 
 #[test]
 fn test_offset_zero_base() {

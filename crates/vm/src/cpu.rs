@@ -192,13 +192,13 @@ impl CPU {
                 .collect::<Vec<_>>()
                 .join(" ");
 
-            eprintln!(
+            panic!(
                 "🚨 Unknown or invalid instruction at PC = 0x{:08x} (bytes: [{}])",
                 self.pc,
                 hex_dump
             );
         } else {
-            eprintln!(
+            panic!(
                 "🚨 Unknown or invalid instruction at PC = 0x{:08x} (could not read memory)",
                 self.pc
             );
@@ -582,6 +582,12 @@ impl CPU {
                         self.regs[rd] = self.regs[rd] & self.regs[rs2];
                     }
                 }
+            }
+            Instruction::Fence => {
+                // FENCE is a memory barrier in hardware, but is a no-op in this VM
+            }
+            Instruction::Unimp => {
+                // UNIMP is an unimplemented instruction, treat as a no-op for compatibility
             }
             _ => todo!("unhandled instruction"),
         }

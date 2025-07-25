@@ -193,6 +193,11 @@ pub enum Instruction {
 
     /// Compressed Miscellaneous ALU (C.SUB, C.XOR, C.OR, C.AND)
     MiscAlu { rd: usize, rs2: usize, op: MiscAluOp },
+
+    /// FENCE: Memory barrier (no-op in this VM)
+    Fence,
+    /// UNIMP: Unimplemented instruction (no-op in this VM)
+    Unimp,
 }
 
 #[derive(Debug, PartialEq)]
@@ -291,6 +296,10 @@ impl Instruction {
 
             Instruction::Ecall =>
                 "ecall".to_string(),
+            Instruction::Fence =>
+                "fence".to_string(),
+            Instruction::Unimp =>
+                "unimp".to_string(),
 
             Instruction::Mul { rd, rs1, rs2 } =>
                 format!("mul  {}, {}, {}", reg(*rd), reg(*rs1), reg(*rs2)),

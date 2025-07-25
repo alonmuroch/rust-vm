@@ -62,6 +62,12 @@ impl<'a> ElfInfo<'a> {
 
         Some((flat_rodata, min_addr))
     }
+
+    /// Returns a reference to a section by its name, if it exists.
+    /// Only the first section with the given name is returned, or None if not found.
+    pub fn get_section_by_name(&self, name: &str) -> Option<&ElfSection<'a>> {
+        self.sections.iter().find(|s| s.name == name)
+    }
 }
 
 
