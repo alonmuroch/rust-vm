@@ -64,6 +64,9 @@ impl SyscallHandler for TestSyscallHandler {
             },
             SYSCALL_TERMINATE => {
                 let exit_code = regs[Register::A0 as usize];
+                if exit_code != 0 {
+                    panic!("[spec-test] FAIL: Test failed with exit code {}", exit_code);
+                }
                 return (exit_code, false); // halt VM
             },
             _ => {
