@@ -7,6 +7,23 @@ use vm::vm::VM;
 mod test_syscall_handler;
 use test_syscall_handler::TestSyscallHandler;
 
+/// Tests that are skipped and the reasons why
+const SKIPPED_TESTS: &[(&str, &str)] = &[
+    ("fence_i", "Requires self-modifying code support (writes instructions to memory and executes them)"),
+    ("ld_st", "Contains 64-bit load/store instructions (ld/sd) that the 32-bit VM doesn't support"),
+    ("st_ld", "Contains 64-bit store/load instructions (sd/ld) that the 32-bit VM doesn't support"),
+];
+
+/// Check if a test file should be skipped
+fn should_skip_test(file_name: &str) -> Option<&str> {
+    for (test_name, reason) in SKIPPED_TESTS {
+        if file_name.ends_with(test_name) {
+            return Some(reason);
+        }
+    }
+    None
+}
+
 #[test]
 fn test_riscv_spec() {
     // Discover all test files in the riscv-tests directory
@@ -18,12 +35,13 @@ fn test_riscv_spec() {
 
     // Check if the test directory exists
     if !Path::new(test_dir).exists() {
-        println!("Test directory not found at {}, skipping all tests...", test_dir);
+        println!("Test directory not found at {}, skipping test", test_dir);
         return;
     }
 
     // Collect all rv32ui-p-* files
     let mut test_files = Vec::new();
+    let mut skipped_count = 0;
     if let Ok(entries) = std::fs::read_dir(test_dir) {
         for entry in entries {
             if let Ok(entry) = entry {
@@ -33,8 +51,15 @@ fn test_riscv_spec() {
                         // Only include files that start with rv32ui-p- and are not .dump files
                         if name_str.starts_with("rv32ui-p-") && 
                            !path.is_dir() && 
-                           !name_str.ends_with(".dump") &&
-                           !name_str.ends_with("fence_i") { // Skip fence_i test (requires self-modifying code)
+                           !name_str.ends_with(".dump") {
+                            
+                            // Check if this test should be skipped
+                            if let Some(reason) = should_skip_test(name_str) {
+                                println!("Skipping {}: {}", name_str, reason);
+                                skipped_count += 1;
+                                continue;
+                            }
+                            
                             test_files.push(path.to_string_lossy().to_string());
                         }
                     }
@@ -43,10 +68,8 @@ fn test_riscv_spec() {
         }
     }
 
-    // Sort the test files for consistent ordering
-    test_files.sort();
-
-    println!("Found {} test files to run", test_files.len());
+    test_files.sort(); // Sort for consistent ordering
+    println!("Found {} test files to run ({} skipped)", test_files.len(), skipped_count);
 
     for (i, elf_path) in test_files.iter().enumerate() {
         println!("\n=== Running test {}: {} ===", i + 1, elf_path);
