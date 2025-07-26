@@ -352,6 +352,13 @@ impl CPU {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
                 self.write_reg(rd, memory.borrow().load_u32(addr));
             }
+            Instruction::Lb { rd, rs1, offset } => {
+                // EDUCATIONAL: Load byte (8-bit, sign-extended)
+                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
+                let byte = memory.borrow().load_byte(addr);
+                let value = (byte as i8) as i32 as u32; // sign-extend to 32-bit
+                self.write_reg(rd, value);
+            }
             Instruction::Lbu { rd, rs1, offset } => {
                 // EDUCATIONAL: Load byte unsigned (8-bit, zero-extended)
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;

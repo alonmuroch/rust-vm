@@ -2,33 +2,56 @@
 //! Loads an ELF file, loads it into the VM, and runs it to completion.
 
 use std::io::Read;
+use std::path::Path;
 use vm::vm::VM;
 mod test_syscall_handler;
 use test_syscall_handler::TestSyscallHandler;
 
 #[test]
 fn test_riscv_spec() {
-    // Array of test files to run
-    let test_files = [
-        "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-addi",
-        "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-add",
-        "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-and",
-        "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-or",
-        "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-xor",
-        "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-slt",
-        "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-sltu",
-        "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-sll",
-        "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-srl",
-        "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-sra",
-    ];
-
+    // Discover all test files in the riscv-tests directory
+    let test_dir = "tests/riscv-tests/isa";
+    
     // Print current working directory for debugging
     println!("Current dir: {:?}", std::env::current_dir().unwrap());
+    println!("Looking for tests in: {}", test_dir);
+
+    // Check if the test directory exists
+    if !Path::new(test_dir).exists() {
+        println!("Test directory not found at {}, skipping all tests...", test_dir);
+        return;
+    }
+
+    // Collect all rv32ui-p-* files
+    let mut test_files = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(test_dir) {
+        for entry in entries {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if let Some(file_name) = path.file_name() {
+                    if let Some(name_str) = file_name.to_str() {
+                        // Only include files that start with rv32ui-p- and are not .dump files
+                        if name_str.starts_with("rv32ui-p-") && 
+                           !path.is_dir() && 
+                           !name_str.ends_with(".dump") &&
+                           !name_str.ends_with("fence_i") { // Skip fence_i test (requires self-modifying code)
+                            test_files.push(path.to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort the test files for consistent ordering
+    test_files.sort();
+
+    println!("Found {} test files to run", test_files.len());
 
     for (i, elf_path) in test_files.iter().enumerate() {
         println!("\n=== Running test {}: {} ===", i + 1, elf_path);
         
-        if !std::path::Path::new(elf_path).exists() {
+        if !Path::new(elf_path).exists() {
             println!("ELF file not found at {}, skipping...", elf_path);
             continue;
         }
@@ -42,6 +65,13 @@ fn test_riscv_spec() {
         let elf = compiler::elf::parse_elf_from_bytes(&elf_bytes).expect("Failed to parse ELF");
         let (code, code_start) = elf.get_flat_code().expect("No code section in ELF");
         let (rodata, rodata_start) = elf.get_flat_rodata().unwrap_or((vec![], usize::MAX as u64));
+        
+        // Get .data section if it exists
+        let (data, data_start) = if let Some(data_section) = elf.get_section_by_name(".data") {
+            (data_section.data.to_vec(), data_section.addr as usize)
+        } else {
+            (vec![], usize::MAX)
+        };
 
         // Find .tohost section
         if let Some(tohost_section) = elf.get_section_by_name(".tohost") {
@@ -80,6 +110,11 @@ fn test_riscv_spec() {
         if !rodata.is_empty() {
             println!("Writing rodata to memory: addr=0x{:x}, size=0x{:x}", rodata_start, rodata.len());
             memory.borrow_mut().write_code(rodata_start as usize, &rodata);
+        }
+
+        if !data.is_empty() {
+            println!("Writing data to memory: addr=0x{:x}, size=0x{:x}", data_start, data.len());
+            memory.borrow_mut().write_code(data_start as usize, &data);
         }
 
         // Run the VM

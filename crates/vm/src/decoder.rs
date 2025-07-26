@@ -125,6 +125,10 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
     if word == 0x0ff0000f {
         return Some(Instruction::Fence);
     }
+    // FENCE.I: 0x100f
+    if word == 0x100f {
+        return Some(Instruction::Fence);
+    }
     // UNIMP: 0x0000000f (common convention)
     if word == 0x0000000f {
         return Some(Instruction::Unimp);
@@ -221,6 +225,11 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             // EDUCATIONAL: Sign-extend 12-bit immediate for address offset
             let imm = (word as i32) >> 20;
             match funct3 {
+                0x0 => Some(Instruction::Lb {  // Load byte (8-bit, sign-extended)
+                    rd,
+                    rs1,
+                    offset: imm,
+                }),
                 0x1 => Some(Instruction::Lh {  // Load halfword (16-bit)
                     rd,
                     rs1,
