@@ -156,7 +156,13 @@ impl CPU {
         host: &mut Box<dyn HostInterface>) -> bool {
         // EDUCATIONAL: Debug output to help understand what's happening
         if self.verbose {
-            println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
+            // Get the actual instruction bytes for debugging
+            if let Some(bytes) = memory.borrow().mem_slice(self.pc as usize, self.pc as usize + size as usize) {
+                let hex_bytes = bytes.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ");
+                println!("PC = 0x{:08x}, Bytes = [{}], Instr = {}", self.pc, hex_bytes, instr.pretty_print());
+            } else {
+                println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
+            }
         }
         
         // EDUCATIONAL: Remember the old PC to detect if the instruction changed it
@@ -246,6 +252,14 @@ impl CPU {
         }
     }
 
+    /// Safely write to a register, ignoring writes to x0 (which should always be 0)
+    fn write_reg(&mut self, rd: usize, value: u32) {
+        if rd != 0 {
+            self.regs[rd] = value;
+        }
+        // Writes to x0 are ignored (RISC-V specification)
+    }
+
     /// Executes a decoded instruction.
     /// 
     /// EDUCATIONAL PURPOSE: This is the execute phase of the instruction cycle.
@@ -276,61 +290,64 @@ impl CPU {
             Instruction::Add { rd, rs1, rs2 } => {
                 // EDUCATIONAL: Use wrapping_add to handle overflow correctly
                 // In real CPUs, overflow might set flags or cause exceptions
-                self.regs[rd] = self.regs[rs1].wrapping_add(self.regs[rs2])
+                self.write_reg(rd, self.regs[rs1].wrapping_add(self.regs[rs2]))
             }
             Instruction::Sub { rd, rs1, rs2 } => {
-                self.regs[rd] = self.regs[rs1].wrapping_sub(self.regs[rs2])
+                self.write_reg(rd, self.regs[rs1].wrapping_sub(self.regs[rs2]))
             }
             Instruction::Addi { rd, rs1, imm } => {
                 // EDUCATIONAL: Add immediate - adds a constant to a register
                 // This is very common in real programs
-                self.regs[rd] = self.regs[rs1].wrapping_add(imm as u32)
+                if self.verbose && rd == 17 { // a7 register
+                    println!("DEBUG: addi rd={}, rs1={}, imm={}, rs1_val={}", rd, rs1, imm, self.regs[rs1]);
+                }
+                self.write_reg(rd, self.regs[rs1].wrapping_add(imm as u32))
             }
             
             // EDUCATIONAL: Logical instructions - perform bitwise operations
-            Instruction::And { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] & self.regs[rs2],
-            Instruction::Or { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] | self.regs[rs2],
-            Instruction::Xor { rd, rs1, rs2 } => self.regs[rd] = self.regs[rs1] ^ self.regs[rs2],
-            Instruction::Andi { rd, rs1, imm } => self.regs[rd] = self.regs[rs1] & (imm as u32),
-            Instruction::Ori { rd, rs1, imm } => self.regs[rd] = self.regs[rs1] | (imm as u32),
-            Instruction::Xori { rd, rs1, imm } => self.regs[rd] = self.regs[rs1] ^ (imm as u32),
+            Instruction::And { rd, rs1, rs2 } => self.write_reg(rd, self.regs[rs1] & self.regs[rs2]),
+            Instruction::Or { rd, rs1, rs2 } => self.write_reg(rd, self.regs[rs1] | self.regs[rs2]),
+            Instruction::Xor { rd, rs1, rs2 } => self.write_reg(rd, self.regs[rs1] ^ self.regs[rs2]),
+            Instruction::Andi { rd, rs1, imm } => self.write_reg(rd, self.regs[rs1] & (imm as u32)),
+            Instruction::Ori { rd, rs1, imm } => self.write_reg(rd, self.regs[rs1] | (imm as u32)),
+            Instruction::Xori { rd, rs1, imm } => self.write_reg(rd, self.regs[rs1] ^ (imm as u32)),
             
             // EDUCATIONAL: Comparison instructions - set result to 0 or 1
             Instruction::Slt { rd, rs1, rs2 } => {
                 // EDUCATIONAL: Set if less than (signed comparison)
-                self.regs[rd] = (self.regs[rs1] as i32).lt(&(self.regs[rs2] as i32)) as u32
+                self.write_reg(rd, (self.regs[rs1] as i32).lt(&(self.regs[rs2] as i32)) as u32)
             }
             Instruction::Sltu { rd, rs1, rs2 } => {
                 // EDUCATIONAL: Set if less than (unsigned comparison)
-                self.regs[rd] = (self.regs[rs1].lt(&self.regs[rs2])) as u32
+                self.write_reg(rd, (self.regs[rs1].lt(&self.regs[rs2])) as u32)
             }
             Instruction::Slti { rd, rs1, imm } => {
-                self.regs[rd] = (self.regs[rs1] as i32).lt(&imm) as u32
+                self.write_reg(rd, (self.regs[rs1] as i32).lt(&imm) as u32)
             }
             Instruction::Sltiu { rd, rs1, imm } => {
                 let lhs = self.regs[rs1];
                 let rhs = imm as u32;
-                self.regs[rd] = if lhs < rhs { 1 } else { 0 };
+                self.write_reg(rd, if lhs < rhs { 1 } else { 0 });
             }
             
             // EDUCATIONAL: Shift instructions - move bits left or right
             Instruction::Sll { rd, rs1, rs2 } => {
                 // EDUCATIONAL: Logical left shift - multiply by 2^shift_amount
                 // The & 0x1F ensures shift amount is 0-31 (5 bits)
-                self.regs[rd] = self.regs[rs1] << (self.regs[rs2] & 0x1F)
+                self.write_reg(rd, self.regs[rs1] << (self.regs[rs2] & 0x1F))
             }
             Instruction::Srl { rd, rs1, rs2 } => {
                 // EDUCATIONAL: Logical right shift - divide by 2^shift_amount
-                self.regs[rd] = self.regs[rs1] >> (self.regs[rs2] & 0x1F)
+                self.write_reg(rd, self.regs[rs1] >> (self.regs[rs2] & 0x1F))
             }
             Instruction::Sra { rd, rs1, rs2 } => {
                 // EDUCATIONAL: Arithmetic right shift - preserves sign bit
-                self.regs[rd] = ((self.regs[rs1] as i32) >> (self.regs[rs2] & 0x1F)) as u32
+                self.write_reg(rd, ((self.regs[rs1] as i32) >> (self.regs[rs2] & 0x1F)) as u32)
             }
-            Instruction::Slli { rd, rs1, shamt } => self.regs[rd] = self.regs[rs1] << shamt,
-            Instruction::Srli { rd, rs1, shamt } => self.regs[rd] = self.regs[rs1] >> shamt,
+            Instruction::Slli { rd, rs1, shamt } => self.write_reg(rd, self.regs[rs1] << shamt),
+            Instruction::Srli { rd, rs1, shamt } => self.write_reg(rd, self.regs[rs1] >> shamt),
             Instruction::Srai { rd, rs1, shamt } => {
-                self.regs[rd] = ((self.regs[rs1] as i32) >> shamt) as u32
+                self.write_reg(rd, ((self.regs[rs1] as i32) >> shamt) as u32)
             }
             
             // EDUCATIONAL: Load instructions - read data from memory into registers
@@ -338,20 +355,20 @@ impl CPU {
                 // EDUCATIONAL: Load word (32-bit) from memory
                 // Address = base register + offset
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                self.regs[rd] = memory.borrow().load_u32(addr);
+                self.write_reg(rd, memory.borrow().load_u32(addr));
             }
             Instruction::Lbu { rd, rs1, offset } => {
                 // EDUCATIONAL: Load byte unsigned (8-bit, zero-extended)
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
                 let byte = memory.borrow().load_byte(addr);
-                self.regs[rd] = byte as u32;
+                self.write_reg(rd, byte as u32);
             }
             Instruction::Lh { rd, rs1, offset } => {
                 // EDUCATIONAL: Load halfword (16-bit, sign-extended)
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
                 let halfword = memory.borrow().load_halfword(addr); // returns u16
                 let value = (halfword as i16) as i32 as u32; // sign-extend to 32-bit
-                self.regs[rd] = value;
+                self.write_reg(rd, value);
             }
 
             // EDUCATIONAL: Store instructions - write data from registers to memory
@@ -418,12 +435,11 @@ impl CPU {
             }
             // EDUCATIONAL: Jump and Link instructions - for function calls
             Instruction::Jal { rd, offset } => {
-                // EDUCATIONAL: JAL (Jump and Link) - used for function calls
-                // Saves the return address (PC + 4) in rd, then jumps to PC + offset
-                // Note: rd = 0 is special (x0 is always zero), so we don't write to it
-                if rd != 0 {
-                    self.regs[rd] = self.pc + 4;
-                }
+                // EDUCATIONAL: JAL (Jump and Link) - unconditional jump with return address
+                // Used for function calls and long-distance jumps
+                // The return address is stored in rd (usually x1/ra)
+                let return_address = self.pc + 4;
+                self.write_reg(rd, return_address);
                 self.pc = self.pc.wrapping_add(offset as u32);
                 return true;
             }
@@ -435,9 +451,7 @@ impl CPU {
                 let target = base.wrapping_add(offset as u32) & !1;
                 let return_address = self.pc + 4;
 
-                if rd != 0 {
-                    self.regs[rd] = return_address;
-                } 
+                self.write_reg(rd, return_address);
 
                 self.pc = target;
                 return true;
@@ -447,48 +461,48 @@ impl CPU {
             Instruction::Lui { rd, imm } => {
                 // EDUCATIONAL: LUI loads a 20-bit immediate into bits 31-12 of rd
                 // This is used to load large constants (like addresses) into registers
-                self.regs[rd] = (imm << 12) as u32
+                self.write_reg(rd, (imm << 12) as u32)
             }
             Instruction::Auipc { rd, imm } => {
                 // EDUCATIONAL: AUIPC (Add Upper Immediate to PC) - PC-relative addressing
                 // Used for position-independent code and loading addresses relative to PC
-                self.regs[rd] = self.pc.wrapping_add((imm << 12) as u32);
+                self.write_reg(rd, self.pc.wrapping_add((imm << 12) as u32));
             }
             
             // EDUCATIONAL: Multiplication instructions - extended arithmetic
             Instruction::Mul { rd, rs1, rs2 } => {
                 // EDUCATIONAL: MUL - multiply two registers, store lower 32 bits
-                self.regs[rd] = self.regs[rs1].wrapping_mul(self.regs[rs2])
+                self.write_reg(rd, self.regs[rs1].wrapping_mul(self.regs[rs2]))
             }
             Instruction::Mulh { rd, rs1, rs2 } => {
                 // EDUCATIONAL: MULH - multiply signed, store upper 32 bits
-                self.regs[rd] = (((self.regs[rs1] as i64) * (self.regs[rs2] as i64)) >> 32) as u32
+                self.write_reg(rd, (((self.regs[rs1] as i64) * (self.regs[rs2] as i64)) >> 32) as u32)
             }
             Instruction::Mulhu { rd, rs1, rs2 } => {
                 // EDUCATIONAL: MULHU - multiply unsigned, store upper 32 bits
-                self.regs[rd] = (((self.regs[rs1] as u64) * (self.regs[rs2] as u64)) >> 32) as u32
+                self.write_reg(rd, (((self.regs[rs1] as u64) * (self.regs[rs2] as u64)) >> 32) as u32)
             }
             Instruction::Mulhsu { rd, rs1, rs2 } => {
                 // EDUCATIONAL: MULHSU - multiply signed by unsigned, store upper 32 bits
-                self.regs[rd] =
-                    (((self.regs[rs1] as i64) * (self.regs[rs2] as u64 as i64)) >> 32) as u32
+                self.write_reg(rd,
+                    (((self.regs[rs1] as i64) * (self.regs[rs2] as u64 as i64)) >> 32) as u32)
             }
             // EDUCATIONAL: Division and remainder instructions
             Instruction::Div { rd, rs1, rs2 } => {
                 // EDUCATIONAL: DIV - signed division with wrapping behavior
-                self.regs[rd] = (self.regs[rs1] as i32).wrapping_div(self.regs[rs2] as i32) as u32
+                self.write_reg(rd, (self.regs[rs1] as i32).wrapping_div(self.regs[rs2] as i32) as u32)
             }
             Instruction::Divu { rd, rs1, rs2 } => {
                 // EDUCATIONAL: DIVU - unsigned division
-                self.regs[rd] = self.regs[rs1] / self.regs[rs2]
+                self.write_reg(rd, self.regs[rs1] / self.regs[rs2])
             }
             Instruction::Rem { rd, rs1, rs2 } => {
                 // EDUCATIONAL: REM - signed remainder with wrapping behavior
-                self.regs[rd] = (self.regs[rs1] as i32).wrapping_rem(self.regs[rs2] as i32) as u32
+                self.write_reg(rd, (self.regs[rs1] as i32).wrapping_rem(self.regs[rs2] as i32) as u32)
             }
             Instruction::Remu { rd, rs1, rs2 } => {
                 // EDUCATIONAL: REMU - unsigned remainder
-                self.regs[rd] = self.regs[rs1] % self.regs[rs2]
+                self.write_reg(rd, self.regs[rs1] % self.regs[rs2])
             }
             
             // EDUCATIONAL: System instructions - for OS interaction and debugging
@@ -502,7 +516,8 @@ impl CPU {
                     self.regs[Register::T4 as usize],
                     self.regs[Register::T5 as usize],
                 ];
-                let (result, cont) = self.syscall_handler.handle_syscall(args, memory, storage, host, &mut self.regs);
+                let call_id = self.regs[Register::A7 as usize];
+                let (result, cont) = self.syscall_handler.handle_syscall(call_id, args, memory, storage, host, &mut self.regs);
                 self.regs[Register::T6 as usize] = result;
                 return cont;
             }
@@ -531,17 +546,17 @@ impl CPU {
             }
             Instruction::Mv { rd, rs2 } => {
                 // EDUCATIONAL: MV (Move) - compressed register copy
-                self.regs[rd] = self.regs[rs2]
+                self.write_reg(rd, self.regs[rs2])
             }
             Instruction::Addi16sp { imm } => {
                 // EDUCATIONAL: ADDI16SP - add immediate to stack pointer
                 // x2 is the stack pointer (SP)
-                self.regs[2] = self.regs[2].wrapping_add(imm as u32)
+                self.write_reg(2, self.regs[2].wrapping_add(imm as u32))
             }
             Instruction::Addi4spn { rd, imm } => {
                 // EDUCATIONAL: ADDI4SPN - add immediate to SP, store in rd
                 // Used for stack frame setup in function prologues
-                self.regs[rd] = self.regs[2].wrapping_add(imm);
+                self.write_reg(rd, self.regs[2].wrapping_add(imm));
             }
             Instruction::Nop => {
                 // EDUCATIONAL: NOP - No Operation - does nothing
@@ -567,19 +582,19 @@ impl CPU {
                 match op {
                     crate::instruction::MiscAluOp::Sub => {
                         // EDUCATIONAL: C.SUB - compressed subtract
-                        self.regs[rd] = self.regs[rd].wrapping_sub(self.regs[rs2]);
+                        self.write_reg(rd, self.regs[rd].wrapping_sub(self.regs[rs2]));
                     }
                     crate::instruction::MiscAluOp::Xor => {
                         // EDUCATIONAL: C.XOR - compressed XOR
-                        self.regs[rd] = self.regs[rd] ^ self.regs[rs2];
+                        self.write_reg(rd, self.regs[rd] ^ self.regs[rs2]);
                     }
                     crate::instruction::MiscAluOp::Or => {
                         // EDUCATIONAL: C.OR - compressed OR
-                        self.regs[rd] = self.regs[rd] | self.regs[rs2];
+                        self.write_reg(rd, self.regs[rd] | self.regs[rs2]);
                     }
                     crate::instruction::MiscAluOp::And => {
                         // EDUCATIONAL: C.AND - compressed AND
-                        self.regs[rd] = self.regs[rd] & self.regs[rs2];
+                        self.write_reg(rd, self.regs[rd] & self.regs[rs2]);
                     }
                 }
             }

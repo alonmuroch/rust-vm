@@ -9,7 +9,7 @@ use test_syscall_handler::TestSyscallHandler;
 #[test]
 fn test_riscv_spec() {
     // Path to a single rv32ui ELF file (change as needed)
-    let elf_path = "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-add";
+    let elf_path = "tests/riscv-tests-install/share/riscv-tests/isa/rv32ui-p-addi";
     println!("Loading test: {}", elf_path);
 
     // Print current working directory for debugging

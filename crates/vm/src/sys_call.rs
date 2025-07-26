@@ -30,6 +30,7 @@ enum Arg {
 pub trait SyscallHandler: std::fmt::Debug {
     fn handle_syscall(
         &mut self,
+        call_id: u32,
         args: [u32; 6],
         memory: Rc<RefCell<MemoryPage>>,
         storage: Rc<RefCell<Storage>>,
@@ -262,21 +263,21 @@ impl DefaultSyscallHandler {
 impl SyscallHandler for DefaultSyscallHandler {
     fn handle_syscall(
         &mut self,
+        call_id: u32,
         args: [u32; 6],
         memory: Rc<RefCell<MemoryPage>>,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
     ) -> (u32, bool) {
-        let syscall_id = regs[Register::A7 as usize];
-        let result = match syscall_id {
+        let result = match call_id {
             SYSCALL_STORAGE_GET => self.sys_storage_get(args, memory, storage),
             SYSCALL_STORAGE_SET => self.sys_storage_set(args, memory, storage),
             SYSCALL_PANIC => self.sys_panic_with_message(regs, memory),
             SYSCALL_LOG => self.sys_log(args, memory),
             SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, host),
             _ => {
-                panic!("Unknown syscall: {}", syscall_id);
+                panic!("Unknown syscall: {}", call_id);
             }
         };
         (result, true)
