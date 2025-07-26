@@ -490,7 +490,11 @@ impl CPU {
             }
             Instruction::Mulh { rd, rs1, rs2 } => {
                 // EDUCATIONAL: MULH - multiply signed, store upper 32 bits
-                self.write_reg(rd, (((self.regs[rs1] as i64) * (self.regs[rs2] as i64)) >> 32) as u32)
+                // Properly sign-extend 32-bit values to 64-bit for signed multiplication
+                let val1 = (self.regs[rs1] as i32) as i64;
+                let val2 = (self.regs[rs2] as i32) as i64;
+                let result = val1 * val2;
+                self.write_reg(rd, (result >> 32) as u32)
             }
             Instruction::Mulhu { rd, rs1, rs2 } => {
                 // EDUCATIONAL: MULHU - multiply unsigned, store upper 32 bits
@@ -498,25 +502,64 @@ impl CPU {
             }
             Instruction::Mulhsu { rd, rs1, rs2 } => {
                 // EDUCATIONAL: MULHSU - multiply signed by unsigned, store upper 32 bits
-                self.write_reg(rd,
-                    (((self.regs[rs1] as i64) * (self.regs[rs2] as u64 as i64)) >> 32) as u32)
+                // Properly sign-extend first operand to signed 64-bit, keep second as unsigned 64-bit
+                let val1 = (self.regs[rs1] as i32) as i64;
+                let val2 = self.regs[rs2] as u64;
+                let result = val1 * (val2 as i64);
+                self.write_reg(rd, (result >> 32) as u32)
             }
             // EDUCATIONAL: Division and remainder instructions
             Instruction::Div { rd, rs1, rs2 } => {
-                // EDUCATIONAL: DIV - signed division with wrapping behavior
-                self.write_reg(rd, (self.regs[rs1] as i32).wrapping_div(self.regs[rs2] as i32) as u32)
+                // EDUCATIONAL: DIV - signed division
+                // RISC-V spec: division by zero returns -1, overflow returns dividend
+                if self.regs[rs2] == 0 {
+                    self.write_reg(rd, 0xFFFFFFFF); // -1 in two's complement
+                } else {
+                    let dividend = self.regs[rs1] as i32;
+                    let divisor = self.regs[rs2] as i32;
+                    
+                    // Check for overflow: -2^31 / -1 = 2^31 (overflow)
+                    if dividend == i32::MIN && divisor == -1 {
+                        self.write_reg(rd, self.regs[rs1]); // Return dividend on overflow
+                    } else {
+                        self.write_reg(rd, (dividend / divisor) as u32)
+                    }
+                }
             }
             Instruction::Divu { rd, rs1, rs2 } => {
                 // EDUCATIONAL: DIVU - unsigned division
-                self.write_reg(rd, self.regs[rs1] / self.regs[rs2])
+                // RISC-V spec: division by zero returns 2^XLEN - 1
+                if self.regs[rs2] == 0 {
+                    self.write_reg(rd, 0xFFFFFFFF); // 2^32 - 1
+                } else {
+                    self.write_reg(rd, self.regs[rs1] / self.regs[rs2])
+                }
             }
             Instruction::Rem { rd, rs1, rs2 } => {
-                // EDUCATIONAL: REM - signed remainder with wrapping behavior
-                self.write_reg(rd, (self.regs[rs1] as i32).wrapping_rem(self.regs[rs2] as i32) as u32)
+                // EDUCATIONAL: REM - signed remainder
+                // RISC-V spec: remainder by zero returns dividend, overflow returns dividend
+                if self.regs[rs2] == 0 {
+                    self.write_reg(rd, self.regs[rs1])
+                } else {
+                    let dividend = self.regs[rs1] as i32;
+                    let divisor = self.regs[rs2] as i32;
+                    
+                    // Check for overflow: -2^31 % -1 = 0 (no overflow, but -2^31 % -1 = 0)
+                    if dividend == i32::MIN && divisor == -1 {
+                        self.write_reg(rd, 0) // Remainder of -2^31 % -1 is 0
+                    } else {
+                        self.write_reg(rd, (dividend % divisor) as u32)
+                    }
+                }
             }
             Instruction::Remu { rd, rs1, rs2 } => {
                 // EDUCATIONAL: REMU - unsigned remainder
-                self.write_reg(rd, self.regs[rs1] % self.regs[rs2])
+                // RISC-V spec: remainder by zero returns dividend
+                if self.regs[rs2] == 0 {
+                    self.write_reg(rd, self.regs[rs1])
+                } else {
+                    self.write_reg(rd, self.regs[rs1] % self.regs[rs2])
+                }
             }
             
             // EDUCATIONAL: System instructions - for OS interaction and debugging

@@ -39,7 +39,7 @@ fn test_riscv_spec() {
         return;
     }
 
-    // Collect all rv32ui-p-* files
+    // Collect all rv32ui-p-* and rv32um-p-* files
     let mut test_files = Vec::new();
     let mut skipped_count = 0;
     if let Ok(entries) = std::fs::read_dir(test_dir) {
@@ -48,8 +48,8 @@ fn test_riscv_spec() {
                 let path = entry.path();
                 if let Some(file_name) = path.file_name() {
                     if let Some(name_str) = file_name.to_str() {
-                        // Only include files that start with rv32ui-p- and are not .dump files
-                        if name_str.starts_with("rv32ui-p-") && 
+                        // Include files that start with rv32ui-p- or rv32um-p- and are not .dump files
+                        if (name_str.starts_with("rv32ui-p-") || name_str.starts_with("rv32um-p-")) && 
                            !path.is_dir() && 
                            !name_str.ends_with(".dump") {
                             
