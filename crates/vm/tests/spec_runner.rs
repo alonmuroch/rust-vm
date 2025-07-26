@@ -69,11 +69,5 @@ fn test_riscv_spec() {
     // Run the VM
     println!("Running test...");
     vm.raw_run();
-    println!("Test completed.");
-    
-    // Extract the syscall handler and print results
-    if let Some(test_handler) = vm.cpu.syscall_handler.as_any().downcast_ref::<TestSyscallHandler>() {
-        test_handler.print_results();
-    }
-    // TODO: Check result (registers, memory, etc.)
+    println!("Test completed.");    
 }

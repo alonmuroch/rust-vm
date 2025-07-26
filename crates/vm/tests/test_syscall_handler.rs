@@ -9,14 +9,13 @@ use std::any::Any;
 
 #[derive(Debug)]
 pub struct TestSyscallHandler {
-    pub calls: Rc<RefCell<Vec<(u32, u32)>>>, // (syscall_id, result)
     tohost_addr: u64,
     memory: Option<Rc<RefCell<MemoryPage>>>,
 }
 
 impl TestSyscallHandler {
     pub fn new() -> Self {
-        Self { calls: Rc::new(RefCell::new(Vec::new())), tohost_addr: 0, memory: None }
+        Self { tohost_addr: 0, memory: None }
     }
 
     /// Set the address of the .tohost section
@@ -27,26 +26,6 @@ impl TestSyscallHandler {
     /// Set the memory reference (needed to read .tohost)
     pub fn set_memory(&mut self, memory: Rc<RefCell<MemoryPage>>) {
         self.memory = Some(memory);
-    }
-
-    /// Print the test results
-    pub fn print_results(&self) {
-        let calls = self.calls.borrow();
-        let mut failed = false;
-        println!("[TestSyscallHandler] Syscall results:");
-        for (i, (_syscall_id, result)) in calls.iter().enumerate() {
-             if *result != 0 {
-                failed = true;
-                println!("  Test {} Failed! with result = {}", i, result);
-             } else {
-                println!("  Test {} Successful!", i);
-             }
-        }
-        if failed {
-            println!("###### One or more syscalls returned non-zero result! ######");
-        } else {
-            println!("###### All syscalls returned result = 0 ######");
-        }
     }
 }
 
@@ -64,9 +43,6 @@ impl SyscallHandler for TestSyscallHandler {
         regs: &mut [u32; 32],
     ) -> (u32, bool) {
         let mut result = 0;
-
-        print!("[TestSyscallHandler] handle_syscall called (id = {}) ", call_id);
-
         match call_id {
             SYSCALL_TEST_DONE => {
                 // Read .tohost value
@@ -76,24 +52,18 @@ impl SyscallHandler for TestSyscallHandler {
                 let mem = mem_guard.mem();
                 if offset + 8 <= mem.len() {
                     let tohost_val = u64::from_le_bytes(mem[offset..offset+8].try_into().unwrap());
-                    println!("[TestSyscallHandler] .tohost value: 0x{:x}", tohost_val);
                     // Use .tohost value as the test result
                     result = tohost_val as u32;
                 } else {
-                    println!("[TestSyscallHandler] .tohost address out of bounds");
+                    panic!("[TestSyscallHandler] .tohost address out of bounds");
                 }
                 if result == 0 {
-                    println!("[spec-test] PASS: .tohost value = 0");
-                } else {
-                    println!("[spec-test] FAIL: .tohost value = 0x{:x}", result);
-                }
-                self.calls.borrow_mut().push((call_id, result));
-                (result, true)
+                    return (result, true);
+                } 
+                panic!("[spec-test] FAIL: .tohost value = 0x{:x}", result);
             },
             SYSCALL_TERMINATE => {
                 let exit_code = regs[Register::A0 as usize];
-                println!("[TestSyscallHandler] exit syscall called with code {} (syscall {})", exit_code, call_id);
-                self.calls.borrow_mut().push((call_id, exit_code));
                 return (exit_code, false); // halt VM
             },
             _ => {

@@ -296,11 +296,6 @@ impl CPU {
                 self.write_reg(rd, self.regs[rs1].wrapping_sub(self.regs[rs2]))
             }
             Instruction::Addi { rd, rs1, imm } => {
-                // EDUCATIONAL: Add immediate - adds a constant to a register
-                // This is very common in real programs
-                if self.verbose && rd == 17 { // a7 register
-                    println!("DEBUG: addi rd={}, rs1={}, imm={}, rs1_val={}", rd, rs1, imm, self.regs[rs1]);
-                }
                 self.write_reg(rd, self.regs[rs1].wrapping_add(imm as u32))
             }
             
