@@ -133,16 +133,17 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
     if word == 0x0000000f {
         return Some(Instruction::Unimp);
     }
-    
-    // EDUCATIONAL: Extract opcode from bottom 7 bits
-    let opcode = Opcode::from_u8((word & 0x7f) as u8)?;
 
-    // EDUCATIONAL: Extract register fields and function codes
-    let rd = ((word >> 7) & 0x1f) as usize;      // Destination register
-    let funct3 = ((word >> 12) & 0x07) as u8;    // Function code for immediate ops
-    let rs1 = ((word >> 15) & 0x1f) as usize;    // First source register
-    let rs2 = ((word >> 20) & 0x1f) as usize;    // Second source register
-    let funct7 = ((word >> 25) & 0x7f) as u8;    // Function code for register-register ops
+    // EDUCATIONAL: Extract instruction fields
+    let opcode_raw = word & 0x7f; // bits 0-6
+    let rd = ((word >> 7) & 0x1f) as usize; // bits 7-11
+    let funct3 = ((word >> 12) & 0x7) as u8; // bits 12-14
+    let rs1 = ((word >> 15) & 0x1f) as usize; // bits 15-19
+    let rs2 = ((word >> 20) & 0x1f) as usize; // bits 20-24
+    let funct7 = ((word >> 25) & 0x7f) as u8; // bits 25-31
+
+    // EDUCATIONAL: Extract opcode from bottom 7 bits
+    let opcode = Opcode::from_u8(opcode_raw as u8)?;
 
     match opcode {
         // EDUCATIONAL: Register-register operations (R-type)
@@ -240,7 +241,13 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                     rs1, 
                     offset: imm, 
                 }),
+                0x3 => Some(Instruction::Ld {  // Load doubleword (64-bit)
+                    rd,
+                    rs1,
+                    offset: imm,
+                }),
                 0x4 => Some(Instruction::Lbu { rd, rs1, offset: imm }), // Load byte unsigned
+                0x5 => Some(Instruction::Lhu { rd, rs1, offset: imm }), // Load halfword unsigned
                 _ => None,
             }
         },

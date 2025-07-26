@@ -352,6 +352,12 @@ impl CPU {
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
                 self.write_reg(rd, memory.borrow().load_u32(addr));
             }
+            Instruction::Ld { rd, rs1, offset } => {
+                // EDUCATIONAL: Load doubleword (64-bit) from memory, truncated to 32-bit
+                // Since this is a 32-bit VM, we only load the lower 32 bits
+                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
+                self.write_reg(rd, memory.borrow().load_u32(addr));
+            }
             Instruction::Lb { rd, rs1, offset } => {
                 // EDUCATIONAL: Load byte (8-bit, sign-extended)
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
@@ -368,9 +374,15 @@ impl CPU {
             Instruction::Lh { rd, rs1, offset } => {
                 // EDUCATIONAL: Load halfword (16-bit, sign-extended)
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
-                let halfword = memory.borrow().load_halfword(addr); // returns u16
+                let halfword = memory.borrow().load_halfword(addr);
                 let value = (halfword as i16) as i32 as u32; // sign-extend to 32-bit
                 self.write_reg(rd, value);
+            }
+            Instruction::Lhu { rd, rs1, offset } => {
+                // EDUCATIONAL: Load halfword unsigned (16-bit, zero-extended)
+                let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
+                let halfword = memory.borrow().load_halfword(addr);
+                self.write_reg(rd, halfword as u32); // zero-extend to 32-bit
             }
 
             // EDUCATIONAL: Store instructions - write data from registers to memory

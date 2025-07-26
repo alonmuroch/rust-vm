@@ -84,12 +84,16 @@ pub enum Instruction {
 
     /// Load word: rd = *(rs1 + offset)
     Lw { rd: usize, rs1: usize, offset: i32 },
+    /// Load doubleword (64-bit): rd = *(rs1 + offset)
+    Ld { rd: usize, rs1: usize, offset: i32 },
     /// Load byte: rd = sign_extend(*(rs1 + offset))
     Lb { rd: usize, rs1: usize, offset: i32 },
     /// Load Byte Unsigned: rd = zero_extend(memory[rs1 + offset])
     Lbu { rd: usize, rs1: usize, offset: i32 },
-    /// Load Halfword: rd = sign_extend(*(rs1 + offset) as i16)
+    /// Load halfword: rd = sign_extend(*(rs1 + offset))
     Lh { rd: usize, rs1: usize, offset: i32 },
+    /// Load halfword unsigned: rd = zero_extend(*(rs1 + offset))
+    Lhu { rd: usize, rs1: usize, offset: i32 },
     /// Store halfword: *(rs1 + offset) = rs2 & 0xFFFF
     Sh { rs1: usize, rs2: usize, offset: i32 },
     /// Store word: *(rs1 + offset) = rs2
@@ -262,12 +266,16 @@ impl Instruction {
 
             Instruction::Lw { rd, rs1, offset } =>
                 format!("lw   {}, {}({})", reg(*rd), offset, reg(*rs1)),
+            Instruction::Ld { rd, rs1, offset } =>
+                format!("ld   {}, {}({})", reg(*rd), offset, reg(*rs1)),
             Instruction::Lb { rd, rs1, offset } =>
                 format!("lb   {}, {}({})", reg(*rd), offset, reg(*rs1)),
             Instruction::Lbu { rd, rs1, offset } =>
                 format!("lbu   {}, {}({})", reg(*rd), offset, reg(*rs1)),
             Instruction::Lh { rd, rs1, offset } =>
                 format!("lh   {}, {}({})", reg(*rd), offset, reg(*rs1)),
+            Instruction::Lhu { rd, rs1, offset } =>
+                format!("lhu   {}, {}({})", reg(*rd), offset, reg(*rs1)),
             Instruction::Sh { rs1, rs2, offset } =>
                 format!("sh   {}, {}({})", reg(*rs2), offset, reg(*rs1)),
             Instruction::Sw { rs1, rs2, offset } =>
