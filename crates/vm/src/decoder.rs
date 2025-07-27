@@ -177,6 +177,41 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             _ => None,
         },
         
+        // EDUCATIONAL: Atomic Memory Operations (A extension)
+        // These instructions use rs1, rs2, and rd registers
+        Opcode::Amo => {
+            // Debug output for all AMO instructions to see patterns
+            println!("DEBUG: AMO decode - funct3=0x{:x}, funct7=0x{:x}, rd={}, rs1={}, rs2={}", funct3, funct7, rd, rs1, rs2);
+            
+            if funct3 == 0x2 {
+                match funct7 {
+                    // LR.W: funct7=0x02, rs2=0
+                    0x02 => Some(Instruction::LrW { rd, rs1 }),
+                    // SC.W: funct7=0x03, rs2≠0
+                    0x03 => Some(Instruction::ScW { rd, rs1, rs2 }),
+                    // AMO instructions
+                    0x01 => Some(Instruction::AmoswapW { rd, rs1, rs2 }),
+                    0x00 => Some(Instruction::AmoaddW { rd, rs1, rs2 }),
+                    0x04 => Some(Instruction::AmoswapW { rd, rs1, rs2 }),
+                    0x08 => Some(Instruction::AmoorW { rd, rs1, rs2 }),
+                    0x0C => Some(Instruction::ScW { rd, rs1, rs2 }), // Alternative SC encoding
+                    0x10 => Some(Instruction::AmoxorW { rd, rs1, rs2 }),
+                    0x14 => Some(Instruction::AmomaxW { rd, rs1, rs2 }),
+                    0x18 => Some(Instruction::AmominuW { rd, rs1, rs2 }),
+                    0x1C => Some(Instruction::AmomaxuW { rd, rs1, rs2 }),
+                    0x20 => Some(Instruction::AmoorW { rd, rs1, rs2 }),
+                    0x30 => Some(Instruction::AmoandW { rd, rs1, rs2 }),
+                    0x40 => Some(Instruction::AmominW { rd, rs1, rs2 }),
+                    0x50 => Some(Instruction::AmomaxW { rd, rs1, rs2 }),
+                    0x60 => Some(Instruction::AmominuW { rd, rs1, rs2 }),
+                    0x70 => Some(Instruction::AmomaxuW { rd, rs1, rs2 }),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        },
+        
         // EDUCATIONAL: Immediate operations (I-type)
         // These instructions use rs1, immediate, and rd
         Opcode::OpImm => {

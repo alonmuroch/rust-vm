@@ -54,14 +54,8 @@ impl VM {
         host: Box<dyn HostInterface>,
         syscall_handler: Box<dyn SyscallHandler>,
     ) -> Self {
-        let mut regs = [0u32; 32];
-        regs[Register::Sp as usize] = memory.borrow().stack_top();
-        let cpu = CPU {
-            pc: 0,
-            regs,
-            verbose: false,
-            syscall_handler,
-        };
+        let mut cpu = CPU::new(syscall_handler);
+        cpu.regs[Register::Sp as usize] = memory.borrow().stack_top();
         Self { cpu, memory, storage, host }
     }
 

@@ -30,6 +30,9 @@ pub enum Opcode {
 
     /// System instructions: ECALL, EBREAK, CSR operations
     System = 0x73,
+
+    /// Atomic Memory Operations: AMO instructions
+    Amo = 0x2f,
 }
 
 impl Opcode {
@@ -46,6 +49,7 @@ impl Opcode {
             0x37 => Lui,
             0x17 => Auipc,
             0x73 => System,
+            0x2f => Amo,
             _ => return None,
         })
     }

@@ -61,6 +61,11 @@ pub struct CPU {
     /// by printing each instruction as it executes
     pub verbose: bool,
     pub syscall_handler: Box<dyn SyscallHandler>,
+    
+    /// Reservation address for LR/SC instructions
+    /// EDUCATIONAL: In real hardware, this tracks which memory address has a reservation
+    /// for atomic operations. SC will only succeed if the reservation is still valid.
+    reservation_addr: Option<usize>,
 }
 
 impl CPU {
@@ -79,6 +84,7 @@ impl CPU {
             regs: [0; 32],
             verbose: false,
             syscall_handler,
+            reservation_addr: None,
         }
     }
 
@@ -259,6 +265,17 @@ impl CPU {
         }
         // Writes to x0 are ignored (RISC-V specification)
     }
+    
+    /// Clear memory reservation if writing to the reserved address
+    /// EDUCATIONAL: In real hardware, any write to a reserved address clears the reservation
+    fn clear_reservation_if_needed(&mut self, addr: usize) {
+        if self.reservation_addr == Some(addr) {
+            self.reservation_addr = None;
+            if self.verbose {
+                println!("Reservation cleared for addr 0x{:x} due to memory write", addr);
+            }
+        }
+    }
 
     /// Executes a decoded instruction.
     /// 
@@ -389,16 +406,19 @@ impl CPU {
             Instruction::Sh { rs1, rs2, offset } => {
                 // EDUCATIONAL: Store halfword (16-bit)
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
+                self.clear_reservation_if_needed(addr);
                 memory.borrow_mut().store_u16(addr, (self.regs[rs2] & 0xFFFF) as u16);
             }
             Instruction::Sw { rs1, rs2, offset } => {
                 // EDUCATIONAL: Store word (32-bit)
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
+                self.clear_reservation_if_needed(addr);
                 memory.borrow_mut().store_u32(addr, self.regs[rs2]);
             }
             Instruction::Sb { rs1, rs2, offset } => {
                 // EDUCATIONAL: Store byte (8-bit)
                 let addr = self.regs[rs1].wrapping_add(offset as u32) as usize;
+                self.clear_reservation_if_needed(addr);
                 memory.borrow_mut().store_u8(addr, (self.regs[rs2] & 0xFF) as u8);
             }
         
@@ -660,6 +680,111 @@ impl CPU {
             }
             Instruction::Unimp => {
                 // UNIMP is an unimplemented instruction, treat as a no-op for compatibility
+            }
+            // ===== RV32A (Atomics) =====
+            Instruction::AmoswapW { rd, rs1, rs2 } => {
+                let addr = self.regs[rs1] as usize;
+                let orig = memory.borrow().load_u32(addr);
+                self.clear_reservation_if_needed(addr);
+                memory.borrow_mut().store_u32(addr, self.regs[rs2]);
+                self.write_reg(rd, orig);
+            }
+            Instruction::AmoaddW { rd, rs1, rs2 } => {
+                let addr = self.regs[rs1] as usize;
+                let orig = memory.borrow().load_u32(addr);
+                let new_val = orig.wrapping_add(self.regs[rs2]);
+                self.clear_reservation_if_needed(addr);
+                memory.borrow_mut().store_u32(addr, new_val);
+                self.write_reg(rd, orig);
+            }
+            Instruction::AmoandW { rd, rs1, rs2 } => {
+                let addr = self.regs[rs1] as usize;
+                let orig = memory.borrow().load_u32(addr);
+                let new_val = orig & self.regs[rs2];
+                self.clear_reservation_if_needed(addr);
+                memory.borrow_mut().store_u32(addr, new_val);
+                self.write_reg(rd, orig);
+            }
+            Instruction::AmoorW { rd, rs1, rs2 } => {
+                let addr = self.regs[rs1] as usize;
+                let orig = memory.borrow().load_u32(addr);
+                let new_val = orig | self.regs[rs2];
+                self.clear_reservation_if_needed(addr);
+                memory.borrow_mut().store_u32(addr, new_val);
+                self.write_reg(rd, orig);
+            }
+            Instruction::AmoxorW { rd, rs1, rs2 } => {
+                let addr = self.regs[rs1] as usize;
+                let orig = memory.borrow().load_u32(addr);
+                let new_val = orig ^ self.regs[rs2];
+                self.clear_reservation_if_needed(addr);
+                memory.borrow_mut().store_u32(addr, new_val);
+                self.write_reg(rd, orig);
+            }
+            Instruction::AmomaxW { rd, rs1, rs2 } => {
+                let addr = self.regs[rs1] as usize;
+                let orig = memory.borrow().load_u32(addr);
+                let new_val = if (orig as i32) > (self.regs[rs2] as i32) { orig } else { self.regs[rs2] };
+                self.clear_reservation_if_needed(addr);
+                memory.borrow_mut().store_u32(addr, new_val);
+                self.write_reg(rd, orig);
+            }
+            Instruction::AmominW { rd, rs1, rs2 } => {
+                let addr = self.regs[rs1] as usize;
+                let orig = memory.borrow().load_u32(addr);
+                let new_val = if (orig as i32) < (self.regs[rs2] as i32) { orig } else { self.regs[rs2] };
+                self.clear_reservation_if_needed(addr);
+                memory.borrow_mut().store_u32(addr, new_val);
+                self.write_reg(rd, orig);
+            }
+            Instruction::AmomaxuW { rd, rs1, rs2 } => {
+                let addr = self.regs[rs1] as usize;
+                let orig = memory.borrow().load_u32(addr);
+                let new_val = if orig > self.regs[rs2] { orig } else { self.regs[rs2] };
+                self.clear_reservation_if_needed(addr);
+                memory.borrow_mut().store_u32(addr, new_val);
+                self.write_reg(rd, orig);
+            }
+            Instruction::AmominuW { rd, rs1, rs2 } => {
+                let addr = self.regs[rs1] as usize;
+                let orig = memory.borrow().load_u32(addr);
+                let new_val = if orig < self.regs[rs2] { orig } else { self.regs[rs2] };
+                self.clear_reservation_if_needed(addr);
+                memory.borrow_mut().store_u32(addr, new_val);
+                self.write_reg(rd, orig);
+            }
+            // ===== RV32A (LR/SC) =====
+            Instruction::LrW { rd, rs1 } => {
+                let addr = self.regs[rs1] as usize;
+                let value = memory.borrow().load_u32(addr);
+                self.write_reg(rd, value);
+                // Set reservation for this address
+                self.reservation_addr = Some(addr);
+                if self.verbose {
+                    println!("LR: Set reservation for addr 0x{:x}, loaded value 0x{:x}", addr, value);
+                }
+            }
+            Instruction::ScW { rd, rs1, rs2 } => {
+                let addr = self.regs[rs1] as usize;
+                let value_to_store = self.regs[rs2];
+                
+                // Check if we have a valid reservation for this address
+                if self.reservation_addr == Some(addr) {
+                    // Reservation is valid, perform the store
+                    memory.borrow_mut().store_u32(addr, value_to_store);
+                    self.write_reg(rd, 0); // 0 = success
+                    // Clear the reservation (it's consumed)
+                    self.reservation_addr = None;
+                    if self.verbose {
+                        println!("SC: Success - stored 0x{:x} at addr 0x{:x}, cleared reservation", value_to_store, addr);
+                    }
+                } else {
+                    // No valid reservation, fail
+                    self.write_reg(rd, 1); // 1 = failure
+                    if self.verbose {
+                        println!("SC: Failed - no reservation for addr 0x{:x}", addr);
+                    }
+                }
             }
             _ => todo!("unhandled instruction"),
         }

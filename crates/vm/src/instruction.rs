@@ -167,6 +167,8 @@ pub enum Instruction {
     AmomaxuW { rd: usize, rs1: usize, rs2: usize },
     /// Atomic min unsigned
     AmominuW { rd: usize, rs1: usize, rs2: usize },
+    LrW { rd: usize, rs1: usize },
+    ScW { rd: usize, rs1: usize, rs2: usize },
 
     // ===== RV32C (Compressed Instructions) =====
 
@@ -349,6 +351,10 @@ impl Instruction {
                 format!("amomaxu.w {}, ({}) maxu {}", reg(*rd), reg(*rs1), reg(*rs2)),
             Instruction::AmominuW { rd, rs1, rs2 } =>
                 format!("amominu.w {}, ({}) minu {}", reg(*rd), reg(*rs1), reg(*rs2)),
+            Instruction::LrW { rd, rs1 } =>
+                format!("lr.w   {}, ({})", reg(*rd), reg(*rs1)),
+            Instruction::ScW { rd, rs1, rs2 } =>
+                format!("sc.w   {}, ({}) <- {}", reg(*rd), reg(*rs1), reg(*rs2)),
 
             Instruction::Jr { rs1 } =>
                 format!("jr   {}", reg(*rs1)),
