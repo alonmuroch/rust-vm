@@ -246,6 +246,8 @@ fn test_riscv_spec() {
     println!("\n🎯 Test Coverage:");
     println!("  UI Tests: Base integer instructions (RV32I)");
     println!("  UM Tests: Integer multiplication and division (RV32M)");
+    println!("  UA Tests: Atomic memory operations (RV32A)");
+    println!("  UC Tests: Compressed instructions (RV32C)");
     
     // Skipped tests explanation
     if total_skipped > 0 {

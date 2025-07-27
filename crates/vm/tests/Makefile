@@ -16,15 +16,16 @@ autogen:
 
 # Configure the build
 configure:
-	cd $(RISCV_TESTS_DIR) && ./configure --prefix=$(INSTALL_PREFIX)
+	cd $(RISCV_TESTS_DIR) && ./configure --prefix=$(INSTALL_PREFIX) --with-xlen=32
 
-# Build the tests
+# Build the tests (ISA only)
 build:
-	cd $(RISCV_TESTS_DIR) && make
+	cd $(RISCV_TESTS_DIR)/isa && make rv32ui rv32um rv32ua rv32uc
 
-# Install the tests
+# Install the tests (ISA only)
 install:
-	cd $(RISCV_TESTS_DIR) && make install
+	mkdir -p $(INSTALL_PREFIX)/share/riscv-tests/isa
+	cp $(RISCV_TESTS_DIR)/isa/rv32* $(INSTALL_PREFIX)/share/riscv-tests/isa/ 2>/dev/null || true
 
 # Full flow: update submodules, autogen, configure, build, install
 all: update-submodules autogen configure build install
