@@ -7,6 +7,19 @@ use vm::sys_call::SyscallHandler;
 use vm::registers::Register;
 use std::any::Any;
 
+/// Map RISC-V test exit codes to test case numbers
+/// Formula: exit_code = (TESTNUM << 1) | 1
+/// So: TESTNUM = (exit_code - 1) >> 1
+fn exit_code_to_test_num(exit_code: u32) -> Option<u32> {
+    if exit_code == 0 {
+        None // 0 means test passed
+    } else if exit_code % 2 == 1 {
+        Some((exit_code - 1) >> 1)
+    } else {
+        None // Even exit codes are not from RVTEST_FAIL
+    }
+}
+
 #[derive(Debug)]
 pub struct TestSyscallHandler {
     tohost_addr: u64,
@@ -65,7 +78,12 @@ impl SyscallHandler for TestSyscallHandler {
             SYSCALL_TERMINATE => {
                 let exit_code = regs[Register::A0 as usize];
                 if exit_code != 0 {
-                    panic!("[spec-test] FAIL: Test failed with exit code {}", exit_code);
+                    // Try to map exit code to test case number
+                    if let Some(test_num) = exit_code_to_test_num(exit_code) {
+                        panic!("[spec-test] FAIL: Test case {} failed (exit code {})", test_num, exit_code);
+                    } else {
+                        panic!("[spec-test] FAIL: Test failed with exit code {}", exit_code);
+                    }
                 }
                 return (exit_code, false); // halt VM
             },

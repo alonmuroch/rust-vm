@@ -16,7 +16,7 @@ const SKIPPED_TESTS: &[(&str, &str)] = &[
 ];
 
 /// Testing categories to run
-const TESTING_CATEGORIES: &[&str] = &["ui", "um", "ua"];
+const TESTING_CATEGORIES: &[&str] = &["ui", "um", "ua", "uc"];
 
 /// Check if a test file should be skipped
 fn should_skip_test(file_name: &str) -> Option<&str> {
