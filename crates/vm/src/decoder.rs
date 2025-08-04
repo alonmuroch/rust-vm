@@ -606,7 +606,7 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 
         // ...other compressed cases...
         CompressedOpcode::MiscAlu => {
-            let funct2 = (hword >> 5) & 0b11;
+            let funct2 = (hword >> 10) & 0b11; // funct2 is in bits 11-10
             let rd = 8 + ((hword >> 7) & 0b111) as usize;
             let rs2 = 8 + ((hword >> 2) & 0b111) as usize;
             
@@ -615,10 +615,11 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             
             if is_immediate {
                 // CB format: C.SRLI, C.SRAI, C.ANDI
-                let shamt = ((hword >> 2) & 0x1f) as u8;
+                // shamt[5] from bit 12, shamt[4:0] from bits 6-2
+                let shamt = (((hword >> 12) & 0x1) << 5) | ((hword >> 2) & 0x1f);
                 match funct2 {
-                    0b00 => Some(Instruction::Srli { rd, rs1: rd, shamt }),
-                    0b01 => Some(Instruction::Srai { rd, rs1: rd, shamt }),
+                    0b00 => Some(Instruction::Srli { rd, rs1: rd, shamt: shamt as u8 }),
+                    0b01 => Some(Instruction::Srai { rd, rs1: rd, shamt: shamt as u8 }),
                     0b10 => Some(Instruction::Andi { rd, rs1: rd, imm: shamt as i32 }),
                     _ => return None,
                 }
