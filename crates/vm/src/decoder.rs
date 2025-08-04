@@ -605,36 +605,43 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         }
 
         // ...other compressed cases...
-        CompressedOpcode::MiscAlu => {
-            let funct2 = (hword >> 10) & 0b11; // funct2 is in bits 11-10
+        CompressedOpcode::MiscAlu => {        
+            let funct2 = (hword >> 10) & 0b11; // bits 11–10
+            let bit12 = (hword >> 12) & 0x1;
             let rd = 8 + ((hword >> 7) & 0b111) as usize;
             let rs2 = 8 + ((hword >> 2) & 0b111) as usize;
-            
-            // Check if this is an immediate operation (CB format) or register operation (CA format)
-            let is_immediate = (hword >> 12) & 0b1 == 0; // Bit 12 distinguishes CB vs CA format
-            
-            if is_immediate {
-                // CB format: C.SRLI, C.SRAI, C.ANDI
-                // shamt[5] from bit 12, shamt[4:0] from bits 6-2
-                let shamt = (((hword >> 12) & 0x1) << 5) | ((hword >> 2) & 0x1f);
-                match funct2 {
-                    0b00 => Some(Instruction::Srli { rd, rs1: rd, shamt: shamt as u8 }),
-                    0b01 => Some(Instruction::Srai { rd, rs1: rd, shamt: shamt as u8 }),
-                    0b10 => Some(Instruction::Andi { rd, rs1: rd, imm: shamt as i32 }),
-                    _ => return None,
+        
+            match funct2 {
+                0b00 => {
+                    // C.SRLI
+                    let shamt = ((bit12 << 5) | ((hword >> 2) & 0x1f)) as u8;
+                    Some(Instruction::Srli { rd, rs1: rd, shamt })
                 }
-            } else {
-                // CA format: C.SUB, C.XOR, C.OR, C.AND
-                let op = match funct2 {
-                    0b00 => MiscAluOp::Sub,
-                    0b01 => MiscAluOp::Xor,
-                    0b10 => MiscAluOp::Or,
-                    0b11 => MiscAluOp::And,
-                    _ => return None,
-                };
-                Some(Instruction::MiscAlu { rd, rs2, op })
+                0b01 => {
+                    // C.SRAI
+                    let shamt = ((bit12 << 5) | ((hword >> 2) & 0x1f)) as u8;
+                    Some(Instruction::Srai { rd, rs1: rd, shamt })
+                }
+                0b10 => {
+                    // ✅ C.ANDI (bit12 is imm[5], NOT format discriminator)
+                    let imm_raw = ((bit12 << 5) | ((hword >> 2) & 0x1f)) as i32;
+                    let imm = (imm_raw << 26) >> 26; // sign-extend 6-bit
+                    Some(Instruction::Andi { rd, rs1: rd, imm })
+                }
+                0b11 => {
+                    // CA-format — check bits [6:5] (rs2′)
+                    let op = match (hword >> 5) & 0b11 {
+                        0b00 => MiscAluOp::Sub,
+                        0b01 => MiscAluOp::Xor,
+                        0b10 => MiscAluOp::Or,
+                        0b11 => MiscAluOp::And,
+                        _ => return None,
+                    };
+                    Some(Instruction::MiscAlu { rd, rs2, op })
+                }
+                _ => None,
             }
-        }
+        }        
 
         CompressedOpcode::Swsp => {
             let rs2 = ((hword >> 2) & 0x1F) as usize;
