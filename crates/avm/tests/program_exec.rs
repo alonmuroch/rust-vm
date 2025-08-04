@@ -26,7 +26,7 @@ fn test_entrypoint_function() {
             let receipt = avm.run_tx(tx);
             last_success = receipt.result.success;
             last_error_code = receipt.result.error_code;
-            // avm.state.pretty_print();
+            avm.state.pretty_print();
             // avm.memory_manager.dump_all_pages_linear();
 
             if let Some(abi) = &case.abi {

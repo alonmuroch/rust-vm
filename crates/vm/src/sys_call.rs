@@ -43,6 +43,34 @@ pub trait SyscallHandler: std::fmt::Debug {
 #[derive(Debug)]
 pub struct DefaultSyscallHandler;
 
+impl SyscallHandler for DefaultSyscallHandler {
+    fn handle_syscall(
+        &mut self,
+        call_id: u32,
+        args: [u32; 5],
+        memory: Rc<RefCell<MemoryPage>>,
+        storage: Rc<RefCell<Storage>>,
+        host: &mut Box<dyn HostInterface>,
+        regs: &mut [u32; 32],
+    ) -> (u32, bool) {
+        let result = match call_id {
+            SYSCALL_STORAGE_GET => self.sys_storage_get(args, memory, storage),
+            SYSCALL_STORAGE_SET => self.sys_storage_set(args, memory, storage),
+            SYSCALL_PANIC => self.sys_panic_with_message(regs, memory),
+            SYSCALL_LOG => self.sys_log(args, memory),
+            SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, host),
+            SYSCALL_FIRE_EVENT => self.sys_fire_event(args, memory, host),
+            _ => {
+                panic!("Unknown syscall: {}", call_id);
+            }
+        };
+        (result, true)
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 impl DefaultSyscallHandler {
 	pub fn sys_fire_event(&mut self, args: [u32; 5], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>,) -> u32 {
         // EDUCATIONAL: Extract key pointer and length from arguments
@@ -98,16 +126,15 @@ impl DefaultSyscallHandler {
             None => return 0,
         };
         let key_slice = key_slice_ref.as_ref();
-        let key: &str = match core::str::from_utf8(key_slice) {
-            Ok(s) => s,
-            Err(_) => return 0,
-        };
         let value_slice_ref = match borrowed_memory.mem_slice(val_ptr, val_ptr + val_len) {
             Some(r) => r,
             None => return 0,
         };
         let value_slice = value_slice_ref.as_ref();
-        storage.borrow_mut().set(key, value_slice.to_vec());
+        
+        // Convert binary key to hex string for storage
+        let key_hex = key_slice.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("");
+        storage.borrow_mut().set(&key_hex, value_slice.to_vec());
         0
     }
 
@@ -278,30 +305,4 @@ impl DefaultSyscallHandler {
     }
 }
 
-impl SyscallHandler for DefaultSyscallHandler {
-    fn handle_syscall(
-        &mut self,
-        call_id: u32,
-        args: [u32; 5],
-        memory: Rc<RefCell<MemoryPage>>,
-        storage: Rc<RefCell<Storage>>,
-        host: &mut Box<dyn HostInterface>,
-        regs: &mut [u32; 32],
-    ) -> (u32, bool) {
-        let result = match call_id {
-            SYSCALL_STORAGE_GET => self.sys_storage_get(args, memory, storage),
-            SYSCALL_STORAGE_SET => self.sys_storage_set(args, memory, storage),
-            SYSCALL_PANIC => self.sys_panic_with_message(regs, memory),
-            SYSCALL_LOG => self.sys_log(args, memory),
-            SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, host),
-            SYSCALL_FIRE_EVENT => self.sys_fire_event(args, memory, host),
-            _ => {
-                panic!("Unknown syscall: {}", call_id);
-            }
-        };
-        (result, true)
-    }
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
+

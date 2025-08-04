@@ -33,9 +33,9 @@ impl StorageMap {
             core::arch::asm!(
                 "li a7, 1", // syscall_storage_read
                 "ecall",
-                in("x11") full_key.as_ptr(), // a1
-                in("x12") key.len(), // a2
-                out("x10") value_ptr, // a0
+                in("a1") full_key.as_ptr(), // a1
+                in("a2") key.len(), // a2
+                out("a0") value_ptr, // a0
             );
 
             if value_ptr == 0 {
@@ -69,15 +69,16 @@ impl StorageMap {
 
         let val_bytes = unsafe {
             core::slice::from_raw_parts((&val as *const V) as *const u8, size_of::<V>())
-        };        
+        };
+        
         unsafe {
             core::arch::asm!(
                 "li a7, 2", // syscall_storage_write
                 "ecall",
-                in("x11") full_key.as_ptr(), // a1
-                in("x12") key.len(), // a2
-                in("x13") val_bytes.as_ptr(), // a3
-                in("x14") val_bytes.len(), // a4
+                in("a1") full_key.as_ptr(), // a1
+                in("a2") key.len(), // a2
+                in("a3") val_bytes.as_ptr(), // a3
+                in("a4") val_bytes.len(), // a4
                 options(readonly, nostack, preserves_flags)
             );
         }

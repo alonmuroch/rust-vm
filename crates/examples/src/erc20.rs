@@ -20,19 +20,12 @@ event!(Minted {
     amount => u32,
 });
 
-// Map!(Balances);
+Map!(Balances);
 
 unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {   
     route(data, program, caller, 
          |to, from, call| match call.selector {
         0x01 => {
-            
-            // let c = Address::from_ptr(caller_ptr).expect("Invalid address format");
-            // let caller_ptr = &caller;
-            // logf!(b"caller 2 ptr %d", (caller_ptr as *const Address) as u32);
-            // for (i, b) in from.0.iter().enumerate() {
-            //     logf!(b"2 addr[%d] = %d", i as u32, *b as u32);
-            // }
             init(caller, call.args);
             Result { success: true, error_code: 0 }
         },
@@ -74,14 +67,8 @@ fn init(caller: Address, args: &[u8]) {
 
 fn mint(caller: Address, val: u32) {
     logf!(b"minting: %d tokens", val);
-    let e = Minted::new(caller, val);//);12, val, val + 1, *b"hello00000",*b"hello11111");
-    // fire_event!();
-
-    // logf!(b"id byte[3]=%x", e.id[3]);
-    // logf!(b"caller byte[3]=%x", e.caller.0[3]);
-    // logf!(b"caller byte[15]=%x", e.caller.0[15]);
-    fire_event!(e);
-    // Balances::set(caller, val);
+    fire_event!(Minted::new(caller, val));
+    Balances::set(caller, val);
 }
 
 // fn transfer(caller: Address, args: &[u8]) {
