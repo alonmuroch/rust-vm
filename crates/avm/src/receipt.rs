@@ -91,48 +91,79 @@ impl TransactionReceipt {
         let data = &event[32..];
 
         if let Some(abi) = abi_registry.iter().find(|abi| abi.id() == id) {
-            println!("Event: {}(", abi.name);
+            println!("Event: (");
             let mut offset = 0;
 
+            println!("        ID: 0x{}", hex::encode(id));
             for (i, param) in abi.inputs.iter().enumerate() {
                 let val = if param.indexed {
                     "<indexed>".to_string()
                 } else {
                     match param.kind {
                         ParamType::Address => {
-                            let bytes = &data[offset + 12..offset + 32];
-                            offset += 32;
+                            // Address is 20 bytes, not padded to 32
+                            if offset + 20 > data.len() {
+                                println!("  {}: <invalid - data too short>", param.name);
+                                break;
+                            }
+                            let bytes: &[u8] = &data[offset..offset + 20];
+                            offset += 20;
                             format!("0x{}", hex::encode(bytes))
                         }
                         ParamType::Uint(256) | ParamType::Uint(32) => {
-                            let bytes = &data[offset..offset + 32];
-                            offset += 32;
+                            // u32 is 4 bytes, not padded to 32
+                            if offset + 4 > data.len() {
+                                println!("  {}: <invalid - data too short>", param.name);
+                                break;
+                            }
+                            let bytes = &data[offset..offset + 4];
+                            offset += 4;
                             match param.kind {
                                 ParamType::Uint(32) => {
-                                    let raw = u32::from_be_bytes(bytes[28..32].try_into().unwrap());
+                                    let raw = u32::from_le_bytes(bytes.try_into().unwrap());
                                     format!("{}", raw)
                                 }
                                 ParamType::Uint(256) => {
-                                    let raw = u128::from_be_bytes(bytes[16..32].try_into().unwrap());
+                                    // For u256, we'd need more bytes, but let's handle u32 for now
+                                    let raw = u32::from_le_bytes(bytes.try_into().unwrap());
                                     format!("{}", raw)
                                 }
                                 _ => unreachable!()
                             }
                         }
                         ParamType::Bool => {
-                            let b = data[offset + 31];
-                            offset += 32;
+                            if offset + 1 > data.len() {
+                                println!("  {}: <invalid - data too short>", param.name);
+                                break;
+                            }
+                            let b = data[offset];
+                            offset += 1;
                             format!("{}", b != 0)
                         }
+                        ParamType::Bytes => {
+                            if offset + 1 > data.len() {
+                                println!("  {}: <invalid - data too short>", param.name);
+                                break;
+                            }
+                            let len = data[offset] as usize;
+                            offset += 1;
+                            if offset + len > data.len() {
+                                println!("  {}: <invalid - data too short>", param.name);
+                                break;
+                            }
+                            let bytes = &data[offset..offset + len];
+                            offset += len;
+                            format!("0x{}", hex::encode(bytes))
+                        }
                         _ => {
-                            offset += 32;
-                            "<unimplemented>".to_string()
+                            println!("  {}: <unimplemented type>", param.name);
+                            break;
                         }
                     }
                 };
 
                 let comma = if i + 1 < abi.inputs.len() { "," } else { "" };
-                println!("  {}: {}{}", param.name, val, comma);
+                println!("\t{}: {}{}", param.name, val, comma);
             }
 
             println!(")");

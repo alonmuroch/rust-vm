@@ -44,7 +44,7 @@ pub trait SyscallHandler: std::fmt::Debug {
 pub struct DefaultSyscallHandler;
 
 impl DefaultSyscallHandler {
-	pub fn sys_fire_event(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>,) -> u32 {
+	pub fn sys_fire_event(&mut self, args: [u32; 5], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>,) -> u32 {
         // EDUCATIONAL: Extract key pointer and length from arguments
         let ptr = args[0] as usize;
         let len = args[1] as usize;
@@ -294,6 +294,7 @@ impl SyscallHandler for DefaultSyscallHandler {
             SYSCALL_PANIC => self.sys_panic_with_message(regs, memory),
             SYSCALL_LOG => self.sys_log(args, memory),
             SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, host),
+            SYSCALL_FIRE_EVENT => self.sys_fire_event(args, memory, host),
             _ => {
                 panic!("Unknown syscall: {}", call_id);
             }

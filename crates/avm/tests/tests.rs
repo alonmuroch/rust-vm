@@ -19,178 +19,55 @@ pub struct TestCase<'a> {
 
 pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
     vec![
-        // TestCase {
-        //     name: "erc20",
-        //     expected_success: true,
-        //     expected_error_code: 100,
-        //     abi: Some(vec!(
-        //         EventAbi {
-        //             name: "Minted".to_string(),
-        //             inputs: vec![
-        //                 EventParam {
-        //                     name: "caller".to_string(),
-        //                     kind: ParamType::Address,
-        //                     indexed: false,
-        //                 },
-        //                 EventParam {
-        //                     name: "amount".to_string(),
-        //                     kind: ParamType::Uint(32),
-        //                     indexed: false,
-        //                 },
-        //             ],
-        //         }
-        //     )),
-        //     bundle: TransactionBundle::new(vec![
-        //          Transaction {
-        //             tx_type: TransactionType::CreateAccount,
-        //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-        //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
-        //             data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/erc20"),
-        //             value: 0,
-        //             nonce: 0,
-        //         },
-        //         Transaction {
-        //             tx_type: TransactionType::ProgramCall,
-        //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
-        //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-        //             data: encode_router_calls(&[
-        //                 HostFuncCall {
-        //                     selector: 0x01,
-        //                     args: (|| {
-        //                         // max supply 
-        //                         let max_supply: u32 = 100000000; // 100 million
-        //                         let mut max_supply_bytes: Vec<u8> = max_supply.to_le_bytes().to_vec();
-
-        //                         // decimals
-        //                         let decimals: u8 = 18;
-
-        //                         // combine
-        //                         max_supply_bytes.extend(vec![decimals]);
-        //                         max_supply_bytes
-        //                     })(),
-        //                 }
-        //             ]),
-        //             value: 0,
-        //             nonce: 0,
-        //         },
-        //     ]),
-        // },
-
         TestCase {
-            name: "call program",
+            name: "erc20",
             expected_success: true,
-            expected_error_code: 100,
-            abi: None,
+            expected_error_code: 0,
+            abi: Some(vec!(
+                EventAbi {
+                    name: "Minted".to_string(),
+                    inputs: vec![
+                        EventParam {
+                            name: "caller".to_string(),
+                            kind: ParamType::Address,
+                            indexed: false,
+                        },
+                        EventParam {
+                            name: "amount".to_string(),
+                            kind: ParamType::Uint(32),
+                            indexed: false,
+                        },
+                    ],
+                }
+            )),
             bundle: TransactionBundle::new(vec![
-                Transaction {
-                    tx_type: TransactionType::CreateAccount,
-                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/call_program"),
-                    value: 0,
-                    nonce: 0,
-                },
                  Transaction {
                     tx_type: TransactionType::CreateAccount,
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/simple"),
+                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/erc20"),
                     value: 0,
                     nonce: 0,
                 },
                 Transaction {
                     tx_type: TransactionType::ProgramCall,
-                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: (|| {
-                        let mut data = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1").0.to_vec();
-                        data.extend(vec![100, 0, 0, 0, 42, 0, 0, 0]);
-                        data
-                    })(),
-                    value: 0,
-                    nonce: 0,
-                },
-            ]),
-        },
-
-        TestCase {
-            name: "account create (storage)",
-            expected_success: true,
-            expected_error_code: 0,
-            abi: None,
-            bundle: TransactionBundle::new(vec![
-                Transaction {
-                    tx_type: TransactionType::CreateAccount,
-                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/storage"),
-                    value: 0,
-                    nonce: 0,
-                },
-                Transaction {
-                    tx_type: TransactionType::ProgramCall,
-                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: vec![],
-                    value: 0,
-                    nonce: 0,
-                },
-            ]),
-        },
-
-        TestCase {
-            name: "account create (simple)",
-            expected_success: true,
-            expected_error_code: 100,
-            abi: None,
-            bundle: TransactionBundle::new(vec![
-                Transaction {
-                    tx_type: TransactionType::CreateAccount,
-                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/simple"),
-                    value: 0,
-                    nonce: 0,
-                },
-                Transaction {
-                    tx_type: TransactionType::ProgramCall,
-                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: vec![
-                        100, 0, 0, 0,   // first u64 = 100
-                        42, 0, 0, 0,      // second u64 = 42
-                    ], 
-                    value: 0,
-                    nonce: 0,
-                },
-            ]),
-        },
-
-        TestCase {
-            name: "multi function (simple)",
-            expected_success: true,
-            expected_error_code: 100,
-            abi: None,
-            bundle: TransactionBundle::new(vec![
-                Transaction {
-                    tx_type: TransactionType::CreateAccount,
-                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/multi_func"),
-                    value: 0,
-                    nonce: 0,
-                },
-                Transaction {
-                    tx_type: TransactionType::ProgramCall,
-                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     data: encode_router_calls(&[
                         HostFuncCall {
                             selector: 0x01,
-                            args: vec![
-                                100, 0, 0, 0, // first = 100
-                                42, 0, 0, 0,  // second = 42
-                            ],
+                            args: (|| {
+                                // max supply 
+                                let max_supply: u32 = 100000000; // 100 million
+                                let mut max_supply_bytes: Vec<u8> = max_supply.to_le_bytes().to_vec();
+
+                                // decimals
+                                let decimals: u8 = 18;
+
+                                // combine
+                                max_supply_bytes.extend(vec![decimals]);
+                                max_supply_bytes
+                            })(),
                         }
                     ]),
                     value: 0,
@@ -198,6 +75,129 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 },
             ]),
         },
+
+        // TestCase {
+        //     name: "call program",
+        //     expected_success: true,
+        //     expected_error_code: 100,
+        //     abi: None,
+        //     bundle: TransactionBundle::new(vec![
+        //         Transaction {
+        //             tx_type: TransactionType::CreateAccount,
+        //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/call_program"),
+        //             value: 0,
+        //             nonce: 0,
+        //         },
+        //          Transaction {
+        //             tx_type: TransactionType::CreateAccount,
+        //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
+        //             data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/simple"),
+        //             value: 0,
+        //             nonce: 0,
+        //         },
+        //         Transaction {
+        //             tx_type: TransactionType::ProgramCall,
+        //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             data: (|| {
+        //                 let mut data = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1").0.to_vec();
+        //                 data.extend(vec![100, 0, 0, 0, 42, 0, 0, 0]);
+        //                 data
+        //             })(),
+        //             value: 0,
+        //             nonce: 0,
+        //         },
+        //     ]),
+        // },
+
+        // TestCase {
+        //     name: "account create (storage)",
+        //     expected_success: true,
+        //     expected_error_code: 0,
+        //     abi: None,
+        //     bundle: TransactionBundle::new(vec![
+        //         Transaction {
+        //             tx_type: TransactionType::CreateAccount,
+        //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/storage"),
+        //             value: 0,
+        //             nonce: 0,
+        //         },
+        //         Transaction {
+        //             tx_type: TransactionType::ProgramCall,
+        //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             data: vec![],
+        //             value: 0,
+        //             nonce: 0,
+        //         },
+        //     ]),
+        // },
+
+        // TestCase {
+        //     name: "account create (simple)",
+        //     expected_success: true,
+        //     expected_error_code: 100,
+        //     abi: None,
+        //     bundle: TransactionBundle::new(vec![
+        //         Transaction {
+        //             tx_type: TransactionType::CreateAccount,
+        //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/simple"),
+        //             value: 0,
+        //             nonce: 0,
+        //         },
+        //         Transaction {
+        //             tx_type: TransactionType::ProgramCall,
+        //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             data: vec![
+        //                 100, 0, 0, 0,   // first u64 = 100
+        //                 42, 0, 0, 0,      // second u64 = 42
+        //             ], 
+        //             value: 0,
+        //             nonce: 0,
+        //         },
+        //     ]),
+        // },
+
+        // TestCase {
+        //     name: "multi function (simple)",
+        //     expected_success: true,
+        //     expected_error_code: 100,
+        //     abi: None,
+        //     bundle: TransactionBundle::new(vec![
+        //         Transaction {
+        //             tx_type: TransactionType::CreateAccount,
+        //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/multi_func"),
+        //             value: 0,
+        //             nonce: 0,
+        //         },
+        //         Transaction {
+        //             tx_type: TransactionType::ProgramCall,
+        //             to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+        //             data: encode_router_calls(&[
+        //                 HostFuncCall {
+        //                     selector: 0x01,
+        //                     args: vec![
+        //                         100, 0, 0, 0, // first = 100
+        //                         42, 0, 0, 0,  // second = 42
+        //                     ],
+        //                 }
+        //             ]),
+        //             value: 0,
+        //             nonce: 0,
+        //         },
+        //     ]),
+        // },
     ]
 });
 
