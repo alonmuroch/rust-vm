@@ -518,10 +518,15 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 
         CompressedOpcode::RegOrJump => {
             let bit12  = (hword >> 12) & 0b1;
+            
+            // === EBREAK: rs1 = 0 and rs2 = 0 (regardless of bit12) ===
+            if rs1 == 0 && rs2 == 0 {
+                return Some(Instruction::Ebreak);
+            }
+            
             if bit12 == 0 {
-                // === Bit 12 = 0: JR, RET, MV, EBREAK ===
+                // === Bit 12 = 0: JR, RET, MV ===
                 match (rs1, rs2) {
-                    (0, 0) => Some(Instruction::Ebreak),
                     (1, 0) => Some(Instruction::Ret),                       // C.RET
                     (rs1, 0) => Some(Instruction::Jr { rs1 }),              // C.JR
                     (rd, rs2) => Some(Instruction::Mv { rd, rs2 }),        // C.MV

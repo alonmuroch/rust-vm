@@ -38,7 +38,7 @@ use program::types::address::Address;
 fn my_vm_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
     // EDUCATIONAL: Validate input data length to prevent buffer overflows
     // This is a critical security practice in smart contracts
-    require(data.len() == 8, b"Input data must be at least 8 bytes long");
+    require(data.len() >= 8, b"Input data must be at least 8 bytes long");
 
     // EDUCATIONAL: Extract two 32-bit integers from the input data
     // This demonstrates how to parse binary data in smart contracts
