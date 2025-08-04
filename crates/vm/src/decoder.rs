@@ -180,8 +180,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
         // EDUCATIONAL: Atomic Memory Operations (A extension)
         // These instructions use rs1, rs2, and rd registers
         Opcode::Amo => {
-            // Debug output for all AMO instructions to see patterns
-            println!("DEBUG: AMO decode - funct3=0x{:x}, funct7=0x{:x}, rd={}, rs1={}, rs2={}", funct3, funct7, rd, rs1, rs2);
+            
             
             if funct3 == 0x2 {
                 match funct7 {
@@ -463,9 +462,19 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
                 Some(Instruction::Addi16sp { imm })
             } else if rd != 0 {
                 // C.LUI
-                let imm = (((hword >> 2) & 0x1F) | ((hword >> 12) & 0x1) << 5) as u32;
-                let imm = imm << 12;
-                Some(Instruction::Lui { rd, imm: imm as i32 })
+                // According to spec: 
+                // - imm[5] (bit 12) = nzimm[17] (sign bit)
+                // - imm[4:0] (bits 6:2) = nzimm[16:12]
+                let nzimm_17 = (hword >> 12) & 0x1; // nzimm[17] from bit 12
+                let nzimm_16_12 = (hword >> 2) & 0x1F; // nzimm[16:12] from bits 6:2
+                let nzimm = (nzimm_17 << 5) | nzimm_16_12; // Combine into 6-bit nzimm[17:12]
+                
+                // C.LUI expands into lui rd, nzimm[17:12]
+                // The 6-bit nzimm is used as imm[17:12] of the 20-bit LUI immediate                
+                // Sign-extend bit 17 (nzimm[17]) into all higher bits [31:18]
+                let signed_nzimm = (((nzimm as i32) << 26) >> 26);
+                
+                Some(Instruction::Lui { rd, imm: signed_nzimm})
             } else {
                 None
             }
@@ -600,14 +609,30 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
             let funct2 = (hword >> 5) & 0b11;
             let rd = 8 + ((hword >> 7) & 0b111) as usize;
             let rs2 = 8 + ((hword >> 2) & 0b111) as usize;
-            let op = match funct2 {
-                0b00 => MiscAluOp::Sub,
-                0b01 => MiscAluOp::Xor,
-                0b10 => MiscAluOp::Or,
-                0b11 => MiscAluOp::And,
-                _ => return None,
-            };
-            Some(Instruction::MiscAlu { rd, rs2, op })
+            
+            // Check if this is an immediate operation (CB format) or register operation (CA format)
+            let is_immediate = (hword >> 12) & 0b1 == 0; // Bit 12 distinguishes CB vs CA format
+            
+            if is_immediate {
+                // CB format: C.SRLI, C.SRAI, C.ANDI
+                let shamt = ((hword >> 2) & 0x1f) as u8;
+                match funct2 {
+                    0b00 => Some(Instruction::Srli { rd, rs1: rd, shamt }),
+                    0b01 => Some(Instruction::Srai { rd, rs1: rd, shamt }),
+                    0b10 => Some(Instruction::Andi { rd, rs1: rd, imm: shamt as i32 }),
+                    _ => return None,
+                }
+            } else {
+                // CA format: C.SUB, C.XOR, C.OR, C.AND
+                let op = match funct2 {
+                    0b00 => MiscAluOp::Sub,
+                    0b01 => MiscAluOp::Xor,
+                    0b10 => MiscAluOp::Or,
+                    0b11 => MiscAluOp::And,
+                    _ => return None,
+                };
+                Some(Instruction::MiscAlu { rd, rs2, op })
+            }
         }
 
         CompressedOpcode::Swsp => {
