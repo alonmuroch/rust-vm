@@ -570,16 +570,15 @@ impl CPU {
             Instruction::Ecall => {
                 // Prepare syscall args from registers
                 let args = [
-                    self.regs[Register::T0 as usize],
-                    self.regs[Register::T1 as usize],
-                    self.regs[Register::T2 as usize],
-                    self.regs[Register::T3 as usize],
-                    self.regs[Register::T4 as usize],
-                    self.regs[Register::T5 as usize],
+                    self.regs[Register::A1 as usize],
+                    self.regs[Register::A2 as usize],
+                    self.regs[Register::A3 as usize],
+                    self.regs[Register::A4 as usize],
+                    self.regs[Register::A5 as usize],
                 ];
                 let call_id = self.regs[Register::A7 as usize];
                 let (result, cont) = self.syscall_handler.handle_syscall(call_id, args, memory, storage, host, &mut self.regs);
-                self.regs[Register::T6 as usize] = result;
+                self.regs[Register::A0 as usize] = result;
                 return cont;
             }
             Instruction::Ebreak => {

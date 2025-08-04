@@ -13,7 +13,7 @@ fn test_entrypoint_function() {
 
         let transactions = case.bundle.transactions.clone();
         let mut avm = AVM::new(MAX_MEMORY_PAGES, VM_MEMORY_SIZE);
-        // avm.set_verbosity(true);
+        avm.set_verbosity(true);
         let mut last_success: bool = false;
         let mut last_error_code: u32 = 0;
         for tx in transactions {

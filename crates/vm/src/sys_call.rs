@@ -31,7 +31,7 @@ pub trait SyscallHandler: std::fmt::Debug {
     fn handle_syscall(
         &mut self,
         call_id: u32,
-        args: [u32; 6],
+        args: [u32; 5],
         memory: Rc<RefCell<MemoryPage>>,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
@@ -44,7 +44,6 @@ pub trait SyscallHandler: std::fmt::Debug {
 pub struct DefaultSyscallHandler;
 
 impl DefaultSyscallHandler {
-
 	pub fn sys_fire_event(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>,) -> u32 {
         // EDUCATIONAL: Extract key pointer and length from arguments
         let ptr = args[0] as usize;
@@ -63,7 +62,7 @@ impl DefaultSyscallHandler {
         0
     }
 
-    fn sys_storage_get(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
+    fn sys_storage_get(&mut self, args: [u32; 5], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
         let key_ptr = args[0] as usize;
         let key_len = args[1] as usize;
         let borrowed_memory = memory.borrow();
@@ -88,7 +87,7 @@ impl DefaultSyscallHandler {
         }
     }
 
-    fn sys_storage_set(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
+    fn sys_storage_set(&mut self, args: [u32; 5], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
         let key_ptr = args[0] as usize;
         let key_len = args[1] as usize;
         let val_ptr = args[2] as usize;
@@ -125,7 +124,7 @@ impl DefaultSyscallHandler {
         panic!("🔥 Guest panic: {}", msg);
     }
 
-    fn sys_log(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>) -> u32 {
+    fn sys_log(&mut self, args: [u32; 5], memory: Rc<RefCell<MemoryPage>>) -> u32 {
         let [fmt_ptr, fmt_len, arg_ptr, arg_len, ..] = args;
         let borrowed_memory = memory.borrow();
         let fmt_slice = match borrowed_memory.mem_slice(fmt_ptr as usize, (fmt_ptr + fmt_len) as usize) {
@@ -240,7 +239,7 @@ impl DefaultSyscallHandler {
         0
     }
 
-    fn sys_call_program(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>) -> u32 {
+    fn sys_call_program(&mut self, args: [u32; 5], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>) -> u32 {
         let to_ptr = args[0] as usize;
         let from_ptr = args[1] as usize;
         let input_ptr = args[2] as usize;
@@ -283,7 +282,7 @@ impl SyscallHandler for DefaultSyscallHandler {
     fn handle_syscall(
         &mut self,
         call_id: u32,
-        args: [u32; 6],
+        args: [u32; 5],
         memory: Rc<RefCell<MemoryPage>>,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
