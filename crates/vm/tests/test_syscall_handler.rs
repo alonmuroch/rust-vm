@@ -49,7 +49,7 @@ impl SyscallHandler for TestSyscallHandler {
     fn handle_syscall(
         &mut self,
         call_id: u32,
-        _args: [u32; 6],
+        _args: [u32; 5],
         memory: Rc<RefCell<MemoryPage>>,
         _storage: Rc<RefCell<Storage>>,
         _host: &mut Box<dyn HostInterface>,
