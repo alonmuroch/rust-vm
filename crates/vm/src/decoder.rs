@@ -363,6 +363,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             Some(Instruction::Jal { 
                 rd, 
                 offset: imm, 
+                compressed: false,
             })
         },
         
@@ -375,6 +376,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                 rd, 
                 rs1, 
                 offset: imm, 
+                compressed: false,
             })
         },
         
@@ -506,20 +508,30 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
 
         CompressedOpcode::Jal => {
             let imm = decode_cj_imm(hword); // implement CJ immediate decoder
-            Some(Instruction::Jal { rd: 1, offset: imm }) // rd = x1
+            Some(Instruction::Jal { rd: 1, offset: imm, compressed: true }) // rd = x1
         }
 
         CompressedOpcode::J => {
             let imm = decode_cj_imm(hword);
-            Some(Instruction::Jal { rd: 0, offset: imm }) // jump without link
+            Some(Instruction::Jal { rd: 0, offset: imm, compressed: true }) // jump without link
         }
 
         CompressedOpcode::RegOrJump => {
-            match (rs1, rs2) {
+            let bit12  = (hword >> 12) & 0b1;
+            if bit12 == 0 {
+                // === Bit 12 = 0: JR, RET, MV, EBREAK ===
+                match (rs1, rs2) {
                     (0, 0) => Some(Instruction::Ebreak),
-                    (1, 0) => Some(Instruction::Ret),                // C.RET (alias of JR x1)
-                    (_, 0) => Some(Instruction::Jr { rs1 }),         // C.JR
-                    (_, _) => Some(Instruction::Mv { rd: rs1, rs2 }),// C.MV (rd ≠ 0, rs2 ≠ 0)
+                    (1, 0) => Some(Instruction::Ret),                       // C.RET
+                    (rs1, 0) => Some(Instruction::Jr { rs1 }),              // C.JR
+                    (rd, rs2) => Some(Instruction::Mv { rd, rs2 }),        // C.MV
+                }
+            } else {
+                // === Bit 12 = 1: JALR, ADD ===
+                match (rs1, rs2) {
+                    (_, 0) => Some(Instruction::Jalr { rd: 1, rs1: rs1, offset: 0, compressed: true }), // C.JALR (implicit rd = x1)
+                    (rd, rs2) => Some(Instruction::Add { rd, rs1: rd, rs2 }), // C.ADD
+                }
             }
         }
 

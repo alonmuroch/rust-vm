@@ -468,22 +468,25 @@ impl CPU {
                 }
             }
             // EDUCATIONAL: Jump and Link instructions - for function calls
-            Instruction::Jal { rd, offset } => {
+            Instruction::Jal { rd, offset, compressed } => {
                 // EDUCATIONAL: JAL (Jump and Link) - unconditional jump with return address
                 // Used for function calls and long-distance jumps
                 // The return address is stored in rd (usually x1/ra)
-                let return_address = self.pc + 4;
+                let return_address = if compressed { self.pc + 2 } else { self.pc + 4 };
                 self.write_reg(rd, return_address);
                 self.pc = self.pc.wrapping_add(offset as u32);
                 return true;
             }
-            Instruction::Jalr { rd, rs1, offset } => {
+            Instruction::Jalr { rd, rs1, offset , compressed} => {
                 // EDUCATIONAL: JALR (Jump and Link Register) - indirect function calls
                 // Target address = base register + offset, with bottom bit cleared
                 // This ensures proper alignment and is required by RISC-V spec
                 let base = self.regs[rs1];
                 let target = base.wrapping_add(offset as u32) & !1;
-                let return_address = self.pc + 4;
+                
+                // For compressed instructions (c.jalr), return address should be pc + 2
+                // For regular instructions (jalr), return address should be pc + 4
+                let return_address = if compressed { self.pc + 2 } else { self.pc + 4 };
 
                 self.write_reg(rd, return_address);
 

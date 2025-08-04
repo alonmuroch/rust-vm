@@ -241,14 +241,14 @@ pub enum Instruction {
     /// EDUCATIONAL: Jump and link (unconditional jump with return address). Saves the return address
     /// (PC + 4) in rd, then jumps to PC + offset. Used for function calls and long-distance jumps.
     /// This is a J-type instruction (jump operation).
-    Jal { rd: usize, offset: i32 },
+    Jal { rd: usize, offset: i32, compressed: bool },
     
     /// JALR: rd = pc + 4; pc = rs1 + offset
     /// EDUCATIONAL: Jump and link register (indirect function call). Saves the return address
     /// (PC + 4) in rd, then jumps to rs1 + offset (with bottom bit cleared for alignment).
     /// Used for indirect function calls and virtual function tables.
     /// This is an I-type instruction (register-immediate operation).
-    Jalr { rd: usize, rs1: usize, offset: i32 },
+    Jalr { rd: usize, rs1: usize, offset: i32, compressed: bool },
 
     /// LUI: rd = imm << 12
     /// EDUCATIONAL: Load upper immediate. Loads a 20-bit immediate into bits 31-12 of rd,
@@ -571,9 +571,9 @@ impl Instruction {
             Instruction::Bgeu { rs1, rs2, offset } =>
                 format!("bgeu {}, {}, pc+{}", reg(*rs1), reg(*rs2), offset),
 
-            Instruction::Jal { rd, offset } =>
+            Instruction::Jal { rd, offset, compressed: _ } =>
                 format!("jal  {}, pc+{}", reg(*rd), offset),
-            Instruction::Jalr { rd, rs1, offset } =>
+            Instruction::Jalr { rd, rs1, offset, compressed: _ } =>
                 format!("jalr {}, {}({})", reg(*rd), offset, reg(*rs1)),
 
             Instruction::Lui { rd, imm } =>
