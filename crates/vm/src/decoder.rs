@@ -562,7 +562,12 @@ pub fn decode_compressed(hword: u16) -> Option<Instruction> {
         CompressedOpcode::Sw => {
             let rd_ = ((hword >> 2) & 0b111) + 8;   // rs2'
             let rs1_ = ((hword >> 7) & 0b111) + 8;  // rs1'
-            let imm = ((hword >> 10) & 0b111) << 3 | ((hword >> 5) & 0b11) << 6;
+            
+            // Fix: Correct immediate extraction for C.SW according to RISC-V spec
+            // imm[6] from bit 5, imm[5:3] from bits 12-10, imm[2] from bit 6
+            let imm = ((hword >> 5) & 0b1) << 6      // imm[6] from bit 5
+                    | ((hword >> 10) & 0b111) << 3    // imm[5:3] from bits 12-10
+                    | ((hword >> 6) & 0b1) << 2;      // imm[2] from bit 6
             let offset = imm as i32; // no sign-extension needed
 
             Some(Instruction::Sw {
