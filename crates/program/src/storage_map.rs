@@ -92,7 +92,9 @@ macro_rules! Map {
         pub struct $name;
 
         impl $name {
-            const PREFIX: &'static [u8] = concat!("-",stringify!($name),"").as_bytes();
+            pub const DOMAIN_NAME: &'static str = stringify!($name);
+            pub const DOMAIN_NAME_LEN: usize = stringify!($name).len();
+            const PREFIX: &'static [u8] = concat!(stringify!($name)).as_bytes();
             const MAX_KEY_LEN: usize = 64;
 
             fn build_key<K: $crate::StorageKey>(key: K, out: &mut [u8]) -> usize {

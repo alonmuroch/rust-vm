@@ -218,10 +218,46 @@ impl State {
             for (key, value) in &acc.storage {
                 // EDUCATIONAL: Convert storage values to hexadecimal for readability
                 let value_hex: Vec<String> = value.iter().map(|b| format!("{:02x}", b)).collect();
-                println!("          Key: {:<20} | Value ({} bytes): {}", key, value.len(), value_hex.join(" "));
+                
+                // Try to parse the key as a storage map key (address + domain)
+                if let Some((address, domain)) = Self::parse_storage_map_key(key) {
+                    println!("          Key: {}-{} | Value ({} bytes): {}", domain, address, value.len(), value_hex.join(" "));
+                } else {
+                    // Fall back to showing the raw key
+                    println!("          Key: {:<20} | Value ({} bytes): {}", key, value.len(), value_hex.join(" "));
+                }
             }
             println!();
         }
         println!("--------------------");
+    }
+    
+    /// Parses a storage map key to extract address and domain components.
+    /// 
+    /// Storage map keys are formatted as: [address_bytes][domain]
+    /// where address_bytes is 20 bytes and domain is like "-Balances"
+    fn parse_storage_map_key(key: &str) -> Option<(String, String)> {
+        // Check if the key is long enough to contain an address (20 bytes = 40 hex chars)
+        if key.len() < 40 {
+            return None;
+        }
+        
+        // Try to parse the first 40 characters as a hex address
+        if let Ok(address_bytes) = hex::decode(&key[..40]) {
+            if address_bytes.len() == 20 {
+                // Convert to proper address format
+                let address = format!("0x{}", &key[..40]);
+                
+                // Parse the domain (remaining hex characters)
+                let domain_hex = &key[40..];
+                if let Ok(domain_bytes) = hex::decode(domain_hex) {
+                    if let Ok(domain_str) = String::from_utf8(domain_bytes) {
+                        return Some((address, domain_str));
+                    }
+                }
+            }
+        }
+        
+        None
     }
 }
