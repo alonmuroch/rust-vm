@@ -189,7 +189,7 @@ impl AVM {
     /// 
     /// MEMORY SAFETY: Validates that the result pointer is within bounds
     /// to prevent reading invalid memory.
-    fn extract_result(&self, result_ptr: u32, context_index: usize) -> Result {
+    fn extract_result(&self, _result_ptr: u32, context_index: usize) -> Result {
         // EDUCATIONAL: Get the memory page where the result was stored
         let ee = self.context_stack.get(context_index).expect("missing execution context");
         let vm = ee.vm.borrow();
@@ -199,7 +199,7 @@ impl AVM {
         // EDUCATIONAL: Borrow the memory page to read from it
         // let page = page_rc.borrow();
         let mem = page.mem();
-        let start = result_ptr as usize;
+        let start = Config::RESULT_ADDR as usize; // Fixed result address
 
         // EDUCATIONAL: Validate memory bounds to prevent out-of-bounds access
         if start + 5 > mem.len() {
@@ -349,10 +349,9 @@ impl AVM {
             );
         }
 
-        // EDUCATIONAL: Set up input data and result pointer
+        // EDUCATIONAL: Set up input data (no result pointer needed)
         let _input_ptr = context.vm.borrow_mut().set_reg_to_data(Register::A2, &context.input_data);          // Input data
         context.vm.borrow_mut().set_reg_u32(Register::A3, input_len as u32);                          // Input length
-        let result_ptr = context.vm.borrow_mut().set_reg_to_data(Register::A4, &[0u8; 5]);           // Result buffer
 
         // EDUCATIONAL: Run the VM safely with panic handling
         let result = catch_unwind(AssertUnwindSafe(|| {
@@ -374,7 +373,7 @@ impl AVM {
         // EDUCATIONAL: set context execution done
         context.exe_done = true;
 
-        (result_ptr, context_index)
+        (Config::RESULT_ADDR, context_index) // Fixed result address
     }
 
     /// Peek the current active execution context.

@@ -39,8 +39,12 @@ macro_rules! entrypoint {
             from_ptr: *const u8,       // Pointer to caller address (20 bytes)
             input_ptr: *const u8,        // Pointer to input data
             input_len: usize,            // Length of input data
-            result_ptr: *mut $crate::types::result::Result,  // Pointer to write result
         ) {
+            // EDUCATIONAL: Write result directly to predetermined memory location
+            // This prevents conflicts with macros that might overwrite A4
+            // Must match Config::RESULT_ADDR in crates/avm/src/global.rs
+            const RESULT_ADDR: usize = 0x100; // Predetermined memory address for result object
+
             // EDUCATIONAL: Convert raw pointer to contract address
             // This demonstrates safe pointer handling in unsafe code
             let to = {
@@ -71,8 +75,8 @@ macro_rules! entrypoint {
             // EDUCATIONAL: Call the user's contract function with safe types
             let result = $func(to, from, input);
             
-            // EDUCATIONAL: Write the result back to the VM's memory
-            core::ptr::write(result_ptr, result);
+            // EDUCATIONAL: Write the result directly to the predetermined memory location
+            core::ptr::write(RESULT_ADDR as *mut $crate::types::result::Result, result);
 
             // EDUCATIONAL: Explicitly halt execution to prevent undefined behavior
             // This is crucial because the VM expects the contract to halt, not return

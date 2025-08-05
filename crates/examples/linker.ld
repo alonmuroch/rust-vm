@@ -1,6 +1,13 @@
 SECTIONS
 {
-    . = 0x0100;  /* Start address for first section */
+    /* Dedicated section for result object at a fixed address */
+    .result : {
+        . = 0x100;  /* Fixed address for result object */
+        . = ALIGN(8);  /* Ensure 8-byte alignment */
+        *(.result*)
+    }
+
+    . = 0x400;  /* Start address for program code */
 
     .text.entrypoint : {
         KEEP(*(.text.entrypoint))

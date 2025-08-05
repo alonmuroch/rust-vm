@@ -131,15 +131,26 @@ impl DefaultSyscallHandler {
         // Convert binary key to hex string for storage
         let key = key_slice.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("");
         
-        println!("🔍 Storage GET - Domain: '{}', Key: '{}'", domain, key);
+        // Format key for display based on domain
+        let display_key = if domain == "P" {
+            // For persistent domain, try to display key as ASCII
+            match core::str::from_utf8(&key_slice) {
+                Ok(s) => s.to_string(),
+                Err(_) => key.clone(), // fallback to hex if not valid UTF-8
+            }
+        } else {
+            // For other domains, show domain as ASCII and key as hex
+            format!("{}:{}", domain, key)
+        };
         
         if let Some(value) = storage.borrow().get(domain, &key) {
             let mut buf = (value.len() as u32).to_le_bytes().to_vec();
             buf.extend_from_slice(value.as_slice());
             let addr = borrowed_memory.alloc_on_heap(&buf);
+            println!("✅ Found value for domain: '{}', Key: '{}'", domain, display_key);
             return addr;
         } else {
-            println!("❌ No value found for domain: '{}', key: '{}'", domain, key);
+            println!("❌ No value found for domain: '{}', key: '{}'", domain, display_key);
             0
         }
     }
@@ -183,6 +194,18 @@ impl DefaultSyscallHandler {
         // Convert binary key to hex string for storage
         let key = key_slice.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("");
         
+        // Format key for display based on domain
+        let display_key = if domain == "P" {
+            // For persistent domain, try to display key as ASCII
+            match core::str::from_utf8(key_slice) {
+                Ok(s) => s.to_string(),
+                Err(_) => key.clone(), // fallback to hex if not valid UTF-8
+            }
+        } else {
+            // For other domains, show domain as ASCII and key as hex
+            format!("{}:{}", domain, key)
+        };
+        
         // Parse value
         let value_slice_ref = match borrowed_memory.mem_slice(val_ptr, val_ptr + val_len) {
             Some(r) => r,
@@ -194,7 +217,7 @@ impl DefaultSyscallHandler {
         let value_slice = value_slice_ref.as_ref();
         
         println!("💾 Storage SET - Domain: '{}', Key: '{}', Value: {:?} ({} bytes)", 
-                domain, key, value_slice, value_slice.len());
+                domain, display_key, value_slice, value_slice.len());
         
         storage.borrow_mut().set(domain, &key, value_slice.to_vec());
         0
