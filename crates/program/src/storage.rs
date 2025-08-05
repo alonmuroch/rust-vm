@@ -1,4 +1,8 @@
 use types::O;
+
+/// Domain constant for persistent storage
+pub const PERSISTENT_DOMAIN: &str = "P";
+
 /// Trait for persistent structs
 pub trait Persistent {
     fn load() -> O<Self>
@@ -75,8 +79,8 @@ macro_rules! persist_struct {
                     core::arch::asm!(
                         "li a7, 1",  // syscall_storage_read
                         "ecall",
-                        in("a1") key_ptr, // domain ptr (using key as domain for backward compatibility)
-                        in("a2") key_len, // domain len
+                        in("a1") $crate::PERSISTENT_DOMAIN.as_ptr(), // domain ptr - use constant
+                        in("a2") $crate::PERSISTENT_DOMAIN.len(), // domain len
                         in("a3") key_ptr, // key ptr
                         in("a4") key_len, // key len
                         out("a0") value_ptr,
@@ -131,8 +135,8 @@ macro_rules! persist_struct {
                     core::arch::asm!(
                         "li a7, 2", // syscall_storage_write
                         "ecall",
-                        in("a1") key_ptr, // domain ptr (using key as domain for backward compatibility)
-                        in("a2") key_len, // domain len
+                        in("a1") $crate::PERSISTENT_DOMAIN.as_ptr(), // domain ptr - use constant
+                        in("a2") $crate::PERSISTENT_DOMAIN.len(), // domain len
                         in("a3") key_ptr, // key ptr
                         in("a4") key_len, // key len
                         in("a5") val_ptr, // value ptr

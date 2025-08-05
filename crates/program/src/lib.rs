@@ -38,6 +38,7 @@ pub mod entrypoint;
 #[macro_use]
 pub mod storage;
 pub use storage::Persistent; // Allow `$crate::Persistent` in macros
+pub use storage::PERSISTENT_DOMAIN; // Allow `$crate::PERSISTENT_DOMAIN` in macros
 
 // Router
 pub mod router;

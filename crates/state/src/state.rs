@@ -219,9 +219,19 @@ impl State {
                 // EDUCATIONAL: Convert storage values to hexadecimal for readability
                 let value_hex: Vec<String> = value.iter().map(|b| format!("{:02x}", b)).collect();
                 
-                // Try to parse the key as a storage map key (address + domain)
-                if let Some((address, domain)) = Self::parse_storage_map_key(key) {
-                    println!("          Key: {}-{} | Value ({} bytes): {}", domain, address, value.len(), value_hex.join(" "));
+                // Parse the key as "domain:key" format
+                if let Some((domain, key_part)) = Self::parse_domain_key(key) {
+                    if domain == "P" {
+                        // For persistent storage, treat key as ASCII
+                        if let Ok(ascii_key) = String::from_utf8(hex::decode(&key_part).unwrap_or_default()) {
+                            println!("          Key: {}:{} | Value ({} bytes): {}", domain, ascii_key, value.len(), value_hex.join(" "));
+                        } else {
+                            println!("          Key: {}:{} | Value ({} bytes): {}", domain, key_part, value.len(), value_hex.join(" "));
+                        }
+                    } else {
+                        // For storage maps, treat domain as ASCII and key as hex
+                        println!("          Key: {}:{} | Value ({} bytes): {}", domain, key_part, value.len(), value_hex.join(" "));
+                    }
                 } else {
                     // Fall back to showing the raw key
                     println!("          Key: {:<20} | Value ({} bytes): {}", key, value.len(), value_hex.join(" "));
@@ -230,6 +240,21 @@ impl State {
             println!();
         }
         println!("--------------------");
+    }
+    
+    /// Parses a storage key in "domain:key" format to extract domain and key components.
+    /// 
+    /// Storage keys are formatted as: "domain:key"
+    /// where domain is like "P" or "Balances" and key is hex-encoded
+    fn parse_domain_key(key: &str) -> Option<(String, String)> {
+        // Find the first colon to separate domain and key
+        if let Some(colon_pos) = key.find(':') {
+            let domain = key[..colon_pos].to_string();
+            let key_part = key[colon_pos + 1..].to_string();
+            return Some((domain, key_part));
+        }
+        
+        None
     }
     
     /// Parses a storage map key to extract address and domain components.
