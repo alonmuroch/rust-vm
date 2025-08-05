@@ -9,8 +9,7 @@ use program::{entrypoint, event,
 
 
 // Persistent structs
-static PERSIST_METADATA: [u8; 9] = *b"metadata\0";
-persist_struct!(Metadata, PERSIST_METADATA, {
+persist_struct!(Metadata {
     total_supply: u32,
     decimals: u8,
 });

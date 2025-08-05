@@ -15,9 +15,11 @@ pub trait Persistent {
 /// Macro that defines persistent structs with embedded static key
 #[macro_export]
 macro_rules! persist_struct {
-    ($name:ident, $key_ident:ident, {
-        $($field:ident : $type:ty),* $(,)?
-    }) => {
+    (
+        $name:ident {
+            $($field:ident : $type:ty),* $(,)?
+        }
+    ) => {
         #[repr(C)]
         #[derive(Copy, Clone, Debug)]
         pub struct $name {
@@ -25,12 +27,14 @@ macro_rules! persist_struct {
         }
 
         impl $name {
+            const PERSIST_KEY: &'static [u8] = stringify!($name).as_bytes();
+
             fn key_ptr() -> *const u8 {
-                $key_ident.as_ptr()
+                Self::PERSIST_KEY.as_ptr()
             }
 
             fn key_len() -> usize {
-                $key_ident.len()
+                Self::PERSIST_KEY.len()
             }
             pub fn as_bytes(&self) -> &[u8] {
                 let ptr = self as *const _ as *const u8;
@@ -98,7 +102,6 @@ macro_rules! persist_struct {
                         len_bytes[3],
                     ]) as usize;
 
-                        
                     if value_len == 0 {
                         $crate::require(value_len > 0, b"Decoded value len is 0 for bytes");
                         return $crate::types::O::None;
@@ -107,7 +110,6 @@ macro_rules! persist_struct {
                     let data_ptr = (value_ptr + 4) as *const u8;
                     let value_buf = core::slice::from_raw_parts(data_ptr, value_len);
 
-                
                     Self::from_bytes(value_buf)
                 }
             }

@@ -6,19 +6,15 @@ use program::{entrypoint, types::result::Result, require};
 use program::types::address::Address; 
 use program::persist_struct;
 
-pub static PERSIST_USER: [u8; 5] = *b"user\0";
-pub static PERSIST_CONFIG: [u8; 7] = *b"config\0";
-pub static PERSIST_SESSION: [u8; 8] = *b"session\0";
-
 // Struct 1: User profile
-persist_struct!(User, PERSIST_USER, {
+persist_struct!(User {
     id: u64,
     active: bool,
     level: u8,
 });
 
 // Struct 2: Config
-persist_struct!(Config, PERSIST_CONFIG, {
+persist_struct!(Config {
     retries: u64,
     timeout_ms: u64,
 });
