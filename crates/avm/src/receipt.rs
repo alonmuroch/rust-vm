@@ -91,7 +91,7 @@ impl TransactionReceipt {
         let data = &event[32..];
 
         if let Some(abi) = abi_registry.iter().find(|abi| abi.id() == id) {
-            println!("Event: (");
+            println!("Event {}: (", abi.name);
             let mut offset = 0;
 
             println!("        ID: 0x{}", hex::encode(id));

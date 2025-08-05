@@ -38,6 +38,26 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                             indexed: false,
                         },
                     ],
+                },
+                EventAbi {
+                    name: "Transfer".to_string(),
+                    inputs: vec![
+                        EventParam {
+                            name: "from".to_string(),
+                            kind: ParamType::Address,
+                            indexed: false,
+                        },
+                        EventParam {
+                            name: "to".to_string(),
+                            kind: ParamType::Address,
+                            indexed: false,
+                        },
+                        EventParam {
+                            name: "value".to_string(),
+                            kind: ParamType::Uint(32),
+                            indexed: false,
+                        },
+                    ],
                 }
             )),
             bundle: TransactionBundle::new(vec![
@@ -67,6 +87,29 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                                 // combine
                                 max_supply_bytes.extend(vec![decimals]);
                                 max_supply_bytes
+                            })(),
+                        }
+                    ]),
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: encode_router_calls(&[
+                        HostFuncCall {
+                            selector: 0x02, // transfer
+                            args: (|| {
+                                // to address (20 bytes)
+                                let to_addr = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d2");
+                                let mut args = to_addr.0.to_vec();
+                                
+                                // amount (4 bytes)
+                                let amount: u32 = 50000000; // 50 million tokens
+                                args.extend(amount.to_le_bytes());
+                                
+                                args
                             })(),
                         }
                     ]),

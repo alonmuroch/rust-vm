@@ -20,6 +20,12 @@ event!(Minted {
     amount => u32,
 });
 
+event!(Transfer {
+    from => Address,
+    to => Address,
+    value => u32,
+});
+
 Map!(Balances);
 
 unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {   
@@ -29,14 +35,14 @@ unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
             init(caller, call.args);
             Result { success: true, error_code: 0 }
         },
-        // 0x02 => {
-        //     transfer(caller, call.args);
-        //     Result { success: true, error_code: 0 }
-        // },
-        // 0x05 => {
-        //     let b = balance_of(call.args);
-        //     Result { success: true, error_code: b as u32 }
-        // },
+        0x02 => {
+            transfer(caller, call.args);
+            Result { success: true, error_code: 0 }
+        },
+        0x05 => {
+            let b = balance_of(call.args);
+            Result { success: true, error_code: b as u32 }
+        },
         _ => vm_panic(b"unknown selector"),
     });
     Result { success: true, error_code: 0 }
@@ -71,54 +77,36 @@ fn mint(caller: Address, val: u32) {
     Balances::set(caller, val);
 }
 
-// fn transfer(caller: Address, args: &[u8]) {
-//     let to = Address::from_ptr(&args[..20]).expect("Invalid address format");
-//     let amount = read_u32(&args[20..28]);
+fn transfer(caller: Address, args: &[u8]) {
+    let to = Address::from_ptr(&args[..20]).expect("Invalid address format");
+    let amount = read_u32(&args[20..24]);
 
-//     let mut balances = Balances::load().expect("balances not found");
-//     let from_bal = get_balance(&balances, caller);
-//     if from_bal < amount {
-//         vm_panic(b"insufficient");
-//     }
+    let from_bal = match Balances::get(caller) {
+        O::Some(bal) => bal,
+        O::None => 0,
+    };
+    
+    if from_bal < amount {
+        vm_panic(b"insufficient");
+    }
 
-//     insert_balance(&mut balances, caller, from_bal - amount);
-//     let to_bal = get_balance(&balances, to);
-//     insert_balance(&mut balances, to, to_bal + amount);
+    let to_bal = match Balances::get(to) {
+        O::Some(bal) => bal,
+        O::None => 0,
+    };
+    
+    Balances::set(caller, from_bal - amount);
+    Balances::set(to, to_bal + amount);
+    
+    fire_event!(Transfer::new(caller, to, amount));
+}
 
-//     balances.store();
-// }
-
-// fn balance_of(args: &[u8]) -> u32 {
-//     let owner = Address::from_ptr(&args[..20]).expect("Invalid address format");
-//     let balances = Balances::load().expect("balances not found");
-//     get_balance(&balances, owner)
-// }
-
-// // ---- Internal helpers ----
-
-// fn get_balance(bal: &Balances, addr: Address) -> u32 {
-//     for (a, v) in bal.entries.iter() {
-//         if *a == addr {
-//             return *v;
-//         }
-//     }
-//     0
-// }
-
-// fn insert_balance(bal: &mut Balances, addr: Address, val: u32) {
-//     for (a, v) in bal.entries.iter_mut() {
-//         if *a == addr {
-//             *v = val;
-//             return;
-//         }
-//     }
-//     for slot in bal.entries.iter_mut() {
-//         if slot.0 == Address([0u8; 20]) {
-//             *slot = (addr, val);
-//             return;
-//         }
-//     }
-//     vm_panic(b"no space");
-// }
+fn balance_of(args: &[u8]) -> u32 {
+    let owner = Address::from_ptr(&args[..20]).expect("Invalid address format");
+    match Balances::get(owner) {
+        O::Some(bal) => bal,
+        O::None => 0,
+    }
+}
 // ---- Entry point ----
 entrypoint!(main_entry);
