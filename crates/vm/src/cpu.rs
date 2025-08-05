@@ -581,6 +581,7 @@ impl CPU {
                     self.regs[Register::A3 as usize],
                     self.regs[Register::A4 as usize],
                     self.regs[Register::A5 as usize],
+                    self.regs[Register::A6 as usize],
                 ];
                 let call_id = self.regs[Register::A7 as usize];
                 let (result, cont) = self.syscall_handler.handle_syscall(call_id, args, memory, storage, host, &mut self.regs);

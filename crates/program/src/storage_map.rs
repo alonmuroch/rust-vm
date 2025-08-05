@@ -19,11 +19,12 @@ impl StorageKey for Address {
 pub struct StorageMap;
 
 impl StorageMap {
-    pub fn get<V>(key: &[u8]) -> O<V>
+    pub fn get<V>(domain: &[u8], key: &[u8]) -> O<V>
     where
         V: Copy + Default,
     {
         require(key.len() <= 64, b"key too long");
+        require(domain.len() <= 64, b"domain too long");
 
         let mut full_key = [0u8; 64];
         full_key[..key.len()].copy_from_slice(key);
@@ -33,8 +34,10 @@ impl StorageMap {
             core::arch::asm!(
                 "li a7, 1", // syscall_storage_read
                 "ecall",
-                in("a1") full_key.as_ptr(), // a1
-                in("a2") key.len(), // a2
+                in("a1") domain.as_ptr(), // a1 - domain ptr
+                in("a2") domain.len(), // a2 - domain len
+                in("a3") full_key.as_ptr(), // a3 - key ptr
+                in("a4") key.len(), // a4 - key len
                 out("a0") value_ptr, // a0
             );
 
@@ -58,11 +61,12 @@ impl StorageMap {
         }
     }
 
-    pub fn set<V>(key: &[u8], val: V)
+    pub fn set<V>(domain: &[u8], key: &[u8], val: V)
     where
         V: Copy,
     {
         require(key.len() <= 64, b"key too long");
+        require(domain.len() <= 64, b"domain too long");
 
         let mut full_key = [0u8; 64];
         full_key[..key.len()].copy_from_slice(key);
@@ -75,10 +79,12 @@ impl StorageMap {
             core::arch::asm!(
                 "li a7, 2", // syscall_storage_write
                 "ecall",
-                in("a1") full_key.as_ptr(), // a1
-                in("a2") key.len(), // a2
-                in("a3") val_bytes.as_ptr(), // a3
-                in("a4") val_bytes.len(), // a4
+                in("a1") domain.as_ptr(), // a1 - domain ptr
+                in("a2") domain.len(), // a2 - domain len
+                in("a3") full_key.as_ptr(), // a3 - key ptr
+                in("a4") key.len(), // a4 - key len
+                in("a5") val_bytes.as_ptr(), // a5 - value ptr
+                in("a6") val_bytes.len(), // a6 - value len
                 options(readonly, nostack, preserves_flags)
             );
         }
@@ -94,11 +100,9 @@ macro_rules! Map {
         impl $name {
             pub const DOMAIN_NAME: &'static str = stringify!($name);
             pub const DOMAIN_NAME_LEN: usize = stringify!($name).len();
-            const PREFIX: &'static [u8] = concat!(stringify!($name)).as_bytes();
             const MAX_KEY_LEN: usize = 64;
 
             fn build_key<K: $crate::StorageKey>(key: K, out: &mut [u8]) -> usize {
-                let prefix_len = Self::PREFIX.len();
                 let key_bytes = key.as_storage_key();
                 let key_len = key_bytes.len();
 
@@ -106,18 +110,13 @@ macro_rules! Map {
                 let mut tmp = [0u8; 64];
                 tmp[..key_len].copy_from_slice(key_bytes);
 
-                // ✅ Write key first, then prefix
+                // ✅ Write key to output buffer
                 out[..key_len].copy_from_slice(&tmp[..key_len]);
-                out[key_len..key_len+prefix_len].copy_from_slice(Self::PREFIX);
 
-                let total_len = key_len + prefix_len;
-                $crate::require(total_len <= Self::MAX_KEY_LEN, b"key too long");
+                $crate::require(key_len <= Self::MAX_KEY_LEN, b"key too long");
 
-                total_len
+                key_len
             }
-
-
-
 
             pub fn get<K, V>(key: K) -> $crate::types::O<V>
             where
@@ -126,7 +125,7 @@ macro_rules! Map {
             {
                 let mut buf = [0u8; Self::MAX_KEY_LEN];
                 let total_len = Self::build_key(key, &mut buf);
-                $crate::StorageMap::get::<V>(&buf[..total_len])
+                $crate::StorageMap::get::<V>(Self::DOMAIN_NAME.as_bytes(), &buf[..total_len])
             }
 
             pub fn set<K, V>(key: K, val: V)
@@ -136,7 +135,7 @@ macro_rules! Map {
             {
                 let mut buf = [0u8; Self::MAX_KEY_LEN];
                 let total_len = Self::build_key(key, &mut buf);
-                $crate::StorageMap::set::<V>(&buf[..total_len], val);
+                $crate::StorageMap::set::<V>(Self::DOMAIN_NAME.as_bytes(), &buf[..total_len], val);
             }
         }
     };

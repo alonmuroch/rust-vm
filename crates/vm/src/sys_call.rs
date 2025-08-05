@@ -31,7 +31,7 @@ pub trait SyscallHandler: std::fmt::Debug {
     fn handle_syscall(
         &mut self,
         call_id: u32,
-        args: [u32; 5],
+        args: [u32; 6],
         memory: Rc<RefCell<MemoryPage>>,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
@@ -47,7 +47,7 @@ impl SyscallHandler for DefaultSyscallHandler {
     fn handle_syscall(
         &mut self,
         call_id: u32,
-        args: [u32; 5],
+        args: [u32; 6],
         memory: Rc<RefCell<MemoryPage>>,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
@@ -72,7 +72,7 @@ impl SyscallHandler for DefaultSyscallHandler {
 }
 
 impl DefaultSyscallHandler {
-	pub fn sys_fire_event(&mut self, args: [u32; 5], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>,) -> u32 {
+	pub fn sys_fire_event(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>,) -> u32 {
         // EDUCATIONAL: Extract key pointer and length from arguments
         let ptr = args[0] as usize;
         let len = args[1] as usize;
@@ -90,51 +90,113 @@ impl DefaultSyscallHandler {
         0
     }
 
-    fn sys_storage_get(&mut self, args: [u32; 5], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
-        let key_ptr = args[0] as usize;
-        let key_len = args[1] as usize;
+    fn sys_storage_get(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
+        let domain_ptr = args[0] as usize;
+        let domain_len = args[1] as usize;
+        let key_ptr = args[2] as usize;
+        let key_len = args[3] as usize;
+        
         let borrowed_memory = memory.borrow();
+        
+        // Parse domain
+        let domain_slice = {
+            let domain_slice_ref = match borrowed_memory.mem_slice(domain_ptr, domain_ptr + domain_len) {
+                Some(r) => r,
+                None => {
+                    println!("❌ Storage GET - Invalid domain memory access: ptr={}, len={}", domain_ptr, domain_len);
+                    return 0;
+                }
+            };
+            domain_slice_ref.as_ref().to_vec()
+        };
+        let domain = match core::str::from_utf8(&domain_slice) {
+            Ok(s) => s,
+            Err(_) => {
+                println!("❌ Storage GET - Invalid UTF-8 in domain: {:?}", domain_slice);
+                return 0;
+            }
+        };
+        
+        // Parse key
         let key_slice = {
             let key_slice_ref = match borrowed_memory.mem_slice(key_ptr, key_ptr + key_len) {
                 Some(r) => r,
-                None => return 0,
+                None => {
+                    println!("❌ Storage GET - Invalid key memory access: ptr={}, len={}", key_ptr, key_len);
+                    return 0;
+                }
             };
             key_slice_ref.as_ref().to_vec()
         };
-        let key = match core::str::from_utf8(&key_slice) {
-            Ok(s) => s,
-            Err(_) => return 0,
-        };
-        if let Some(value) = storage.borrow().get(key) {
+        // Convert binary key to hex string for storage
+        let key = key_slice.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("");
+        
+        println!("🔍 Storage GET - Domain: '{}', Key: '{}'", domain, key);
+        
+        if let Some(value) = storage.borrow().get(domain, &key) {
             let mut buf = (value.len() as u32).to_le_bytes().to_vec();
             buf.extend_from_slice(value.as_slice());
             let addr = borrowed_memory.alloc_on_heap(&buf);
             return addr;
         } else {
+            println!("❌ No value found for domain: '{}', key: '{}'", domain, key);
             0
         }
     }
 
-    fn sys_storage_set(&mut self, args: [u32; 5], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
-        let key_ptr = args[0] as usize;
-        let key_len = args[1] as usize;
-        let val_ptr = args[2] as usize;
-        let val_len = args[3] as usize;
+    fn sys_storage_set(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
+        let domain_ptr = args[0] as usize;
+        let domain_len = args[1] as usize;
+        let key_ptr = args[2] as usize;
+        let key_len = args[3] as usize;
+        let val_ptr = args[4] as usize;
+        let val_len = args[5] as usize;
+        
         let borrowed_memory = memory.borrow();
+        
+        // Parse domain
+        let domain_slice_ref = match borrowed_memory.mem_slice(domain_ptr, domain_ptr + domain_len) {
+            Some(r) => r,
+            None => {
+                println!("❌ Storage SET - Invalid domain memory access: ptr={}, len={}", domain_ptr, domain_len);
+                return 0;
+            }
+        };
+        let domain_slice = domain_slice_ref.as_ref();
+        let domain = match core::str::from_utf8(domain_slice) {
+            Ok(s) => s,
+            Err(_) => {
+                println!("❌ Storage SET - Invalid UTF-8 in domain: {:?}", domain_slice);
+                return 0;
+            }
+        };
+        
+        // Parse key
         let key_slice_ref = match borrowed_memory.mem_slice(key_ptr, key_ptr + key_len) {
             Some(r) => r,
-            None => return 0,
+            None => {
+                println!("❌ Storage SET - Invalid key memory access: ptr={}, len={}", key_ptr, key_len);
+                return 0;
+            }
         };
         let key_slice = key_slice_ref.as_ref();
+        // Convert binary key to hex string for storage
+        let key = key_slice.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("");
+        
+        // Parse value
         let value_slice_ref = match borrowed_memory.mem_slice(val_ptr, val_ptr + val_len) {
             Some(r) => r,
-            None => return 0,
+            None => {
+                println!("❌ Storage SET - Invalid value memory access: ptr={}, len={}", val_ptr, val_len);
+                return 0;
+            }
         };
         let value_slice = value_slice_ref.as_ref();
         
-        // Convert binary key to hex string for storage
-        let key_hex = key_slice.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("");
-        storage.borrow_mut().set(&key_hex, value_slice.to_vec());
+        println!("💾 Storage SET - Domain: '{}', Key: '{}', Value: {:?} ({} bytes)", 
+                domain, key, value_slice, value_slice.len());
+        
+        storage.borrow_mut().set(domain, &key, value_slice.to_vec());
         0
     }
 
@@ -151,7 +213,7 @@ impl DefaultSyscallHandler {
         panic!("🔥 Guest panic: {}", msg);
     }
 
-    fn sys_log(&mut self, args: [u32; 5], memory: Rc<RefCell<MemoryPage>>) -> u32 {
+    fn sys_log(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>) -> u32 {
         let [fmt_ptr, fmt_len, arg_ptr, arg_len, ..] = args;
         let borrowed_memory = memory.borrow();
         let fmt_slice = match borrowed_memory.mem_slice(fmt_ptr as usize, (fmt_ptr + fmt_len) as usize) {
@@ -266,7 +328,7 @@ impl DefaultSyscallHandler {
         0
     }
 
-    fn sys_call_program(&mut self, args: [u32; 5], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>) -> u32 {
+    fn sys_call_program(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>) -> u32 {
         let to_ptr = args[0] as usize;
         let from_ptr = args[1] as usize;
         let input_ptr = args[2] as usize;

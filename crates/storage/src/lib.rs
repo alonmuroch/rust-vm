@@ -19,6 +19,7 @@ use alloc::string::String;
 /// - Persistent across VM restarts
 /// - Thread-safe access using RefCell
 /// - Ordered storage using BTreeMap
+/// - Domain-based storage organization
 /// 
 /// REAL-WORLD BLOCKCHAIN COMPARISON:
 /// In Ethereum, storage is organized differently:
@@ -83,10 +84,27 @@ impl Storage {
         }
     }
 
-    /// Retrieves a value from storage by key.
+    /// Builds a composite key from domain and key components.
     /// 
-    /// EDUCATIONAL PURPOSE: This demonstrates safe storage access.
-    /// Returns None if the key doesn't exist, which is common in
+    /// EDUCATIONAL PURPOSE: This demonstrates how to create hierarchical
+    /// storage keys that include domain information for better organization.
+    /// 
+    /// KEY FORMAT: The composite key is formatted as "domain:key" to
+    /// ensure proper separation and avoid key collisions between domains.
+    /// 
+    /// PARAMETERS:
+    /// - domain: The storage domain (e.g., contract name, module name)
+    /// - key: The specific key within that domain
+    /// 
+    /// RETURNS: A composite key string in the format "domain:key"
+    fn build_composite_key(domain: &str, key: &str) -> String {
+        format!("{}:{}", domain, key)
+    }
+
+    /// Retrieves a value from storage by domain and key.
+    /// 
+    /// EDUCATIONAL PURPOSE: This demonstrates safe storage access with domain
+    /// separation. Returns None if the key doesn't exist, which is common in
     /// blockchain systems where storage is sparse.
     /// 
     /// MEMORY SAFETY: Uses RefCell::borrow() to get immutable access
@@ -97,32 +115,37 @@ impl Storage {
     /// memory management to avoid copying large values.
     /// 
     /// PARAMETERS:
-    /// - key: The storage key to look up
+    /// - domain: The storage domain
+    /// - key: The storage key to look up within the domain
     /// 
     /// RETURNS: Some(value) if the key exists, None otherwise
-    pub fn get(&self, key: &str) -> Option<Vec<u8>> {
-        self.map.borrow().get(key).cloned()
+    pub fn get(&self, domain: &str, key: &str) -> Option<Vec<u8>> {
+        let composite_key = Self::build_composite_key(domain, key);
+        self.map.borrow().get(&composite_key).cloned()
     }
 
-    /// Stores a value in storage with the specified key.
+    /// Stores a value in storage with the specified domain and key.
     /// 
-    /// EDUCATIONAL PURPOSE: This demonstrates persistent storage updates.
-    /// In blockchain systems, storage changes are part of the transaction
-    /// and are committed atomically with the rest of the state changes.
+    /// EDUCATIONAL PURPOSE: This demonstrates persistent storage updates with
+    /// domain organization. In blockchain systems, storage changes are part
+    /// of the transaction and are committed atomically with the rest of the
+    /// state changes.
     /// 
     /// MUTABILITY: Uses RefCell::borrow_mut() to get mutable access
     /// to the storage map. This allows modification while maintaining
     /// Rust's borrowing rules.
     /// 
-    /// KEY OWNERSHIP: The key is converted to a String to ensure
+    /// KEY OWNERSHIP: The composite key is converted to a String to ensure
     /// ownership. In a production system, you might use more efficient
     /// key representations or avoid unnecessary allocations.
     /// 
     /// PARAMETERS:
-    /// - key: The storage key
+    /// - domain: The storage domain
+    /// - key: The storage key within the domain
     /// - value: The data to store
-    pub fn set(&self, key: &str, value: Vec<u8>) {
-        self.map.borrow_mut().insert(key.to_string(), value);
+    pub fn set(&self, domain: &str, key: &str, value: Vec<u8>) {
+        let composite_key = Self::build_composite_key(domain, key);
+        self.map.borrow_mut().insert(composite_key, value);
     }
 
     /// Dumps the contents of persistent storage for debugging.

@@ -75,8 +75,10 @@ macro_rules! persist_struct {
                     core::arch::asm!(
                         "li a7, 1",  // syscall_storage_read
                         "ecall",
-                        in("a1") key_ptr,
-                        in("a2") key_len,
+                        in("a1") key_ptr, // domain ptr (using key as domain for backward compatibility)
+                        in("a2") key_len, // domain len
+                        in("a3") key_ptr, // key ptr
+                        in("a4") key_len, // key len
                         out("a0") value_ptr,
                     );
 
@@ -129,10 +131,12 @@ macro_rules! persist_struct {
                     core::arch::asm!(
                         "li a7, 2", // syscall_storage_write
                         "ecall",
-                        in("a1") key_ptr,
-                        in("a2") key_len,
-                        in("a3") val_ptr,
-                        in("a4") val_len,
+                        in("a1") key_ptr, // domain ptr (using key as domain for backward compatibility)
+                        in("a2") key_len, // domain len
+                        in("a3") key_ptr, // key ptr
+                        in("a4") key_len, // key len
+                        in("a5") val_ptr, // value ptr
+                        in("a6") val_len, // value len
                         options(readonly, nostack, preserves_flags)
                     );
                 }
