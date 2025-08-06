@@ -82,7 +82,13 @@ macro_rules! entrypoint {
             // This is crucial because the VM expects the contract to halt, not return
             // The ebreak instruction triggers a breakpoint, and the infinite loop
             // ensures the function never returns normally
+            #[cfg(target_arch = "riscv32")]
             unsafe { core::arch::asm!("ebreak") };
+            #[cfg(not(target_arch = "riscv32"))]
+            {
+                // For non-RISC-V targets, just panic
+                panic!("entrypoint: execution should halt");
+            }
             loop {}
         }
     };

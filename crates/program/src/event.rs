@@ -77,6 +77,7 @@ macro_rules! fire_event {
         let written = $event.write_bytes(&mut buffer);
         let ptr = buffer.as_ptr() as u32;
         let len = written as u32;
+        #[cfg(target_arch = "riscv32")]
         unsafe {
             core::arch::asm!(
                 "li a7, 6",
@@ -84,6 +85,10 @@ macro_rules! fire_event {
                 in("a1") ptr,
                 in("a2") len,
             );
+        }
+        #[cfg(not(target_arch = "riscv32"))]
+        {
+            // For non-RISC-V targets, do nothing
         }
     }};
 }

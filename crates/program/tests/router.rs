@@ -1,5 +1,5 @@
 use program::router::{decode_calls, route, FuncCall};
-use program::{Result, vm_panic};
+use types::{Result, Address};
 
 #[test]
 fn test_decode_single_call() {
@@ -35,7 +35,10 @@ fn test_route_with_two_calls() {
         0x20, 0x02, 1, 2,
     ];
 
-    let result = route(&input, 4, |call| {
+    let to = Address([0u8; 20]);
+    let from = Address([0u8; 20]);
+
+    let result = route(&input, to, from, |_to, _from, call| {
         match call.selector {
             0x10 => {
                 assert_eq!(call.args, &[42]);

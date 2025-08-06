@@ -69,6 +69,7 @@ macro_rules! persist_struct {
 
         impl $crate::Persistent for $name {
             fn load() -> $crate::types::O<Self> {
+                #[cfg(target_arch = "riscv32")]
                 unsafe {
                     let key_ptr = $name::key_ptr();
                     let key_len = $name::key_len();
@@ -112,9 +113,16 @@ macro_rules! persist_struct {
 
                     Self::from_bytes(value_buf)
                 }
+
+                #[cfg(not(target_arch = "riscv32"))]
+                {
+                    // For non-RISC-V targets, return None
+                    $crate::types::O::None
+                }
             }
 
             fn store(&self) {
+                #[cfg(target_arch = "riscv32")]
                 unsafe {
                     let key_ptr = $name::key_ptr();
                     let key_len = $name::key_len();
@@ -145,6 +153,11 @@ macro_rules! persist_struct {
                         in("a6") val_len, // value len
                         options(readonly, nostack, preserves_flags)
                     );
+                }
+
+                #[cfg(not(target_arch = "riscv32"))]
+                {
+                    // For non-RISC-V targets, do nothing
                 }
             }
         }

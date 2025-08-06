@@ -1,6 +1,7 @@
 #[macro_export]
 macro_rules! logf_syscall {
     ($fmt_ptr:expr, $fmt_len:expr, $args_ptr:expr, $args_len:expr) => {{
+        #[cfg(target_arch = "riscv32")]
         unsafe {
             core::arch::asm!(
                 "li a7, 4",  // syscall_log
@@ -10,6 +11,10 @@ macro_rules! logf_syscall {
                 in("a3") $args_ptr,
                 in("a4") $args_len,
             );
+        }
+        #[cfg(not(target_arch = "riscv32"))]
+        {
+            // For non-RISC-V targets, do nothing
         }
     }};
 }

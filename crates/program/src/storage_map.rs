@@ -29,6 +29,7 @@ impl StorageMap {
         let mut full_key = [0u8; 64];
         full_key[..key.len()].copy_from_slice(key);
 
+        #[cfg(target_arch = "riscv32")]
         unsafe {
             let mut value_ptr: u32;
             core::arch::asm!(
@@ -59,6 +60,12 @@ impl StorageMap {
             core::ptr::copy_nonoverlapping(buf.as_ptr(), val.as_mut_ptr() as *mut u8, value_len);
             O::Some(val.assume_init())
         }
+
+        #[cfg(not(target_arch = "riscv32"))]
+        {
+            // For non-RISC-V targets, return None
+            O::None
+        }
     }
 
     pub fn set<V>(domain: &[u8], key: &[u8], val: V)
@@ -75,6 +82,7 @@ impl StorageMap {
             core::slice::from_raw_parts((&val as *const V) as *const u8, size_of::<V>())
         };
         
+        #[cfg(target_arch = "riscv32")]
         unsafe {
             core::arch::asm!(
                 "li a7, 2", // syscall_storage_write
@@ -87,6 +95,11 @@ impl StorageMap {
                 in("a6") val_bytes.len(), // a6 - value len
                 options(readonly, nostack, preserves_flags)
             );
+        }
+
+        #[cfg(not(target_arch = "riscv32"))]
+        {
+            // For non-RISC-V targets, do nothing
         }
     }
 }
