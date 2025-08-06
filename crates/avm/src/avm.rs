@@ -147,11 +147,11 @@ impl AVM {
                 }));
 
                 // EDUCATIONAL: Handle deployment failures gracefully
-                if let Err(_e) = result {
-                    return TransactionReceipt::new(tx, Result { error_code: 1, success: false }) ;
-                } else { 
-                    return TransactionReceipt::new(tx, Result { error_code: 0, success: true });
-                }
+                        if let Err(_e) = result {
+            return TransactionReceipt::new(tx, Result::new(false, 1));
+        } else {
+            return TransactionReceipt::new(tx, Result::new(true, 0));
+        }
             }
 
             TransactionType::ProgramCall => {
@@ -183,9 +183,11 @@ impl AVM {
     /// back to the caller. The contract writes its result to a specific memory location,
     /// and this function reads it.
     /// 
-    /// RESULT FORMAT: The result is stored as a 5-byte structure:
-    /// - 4 bytes: error code (u32)
+    /// RESULT FORMAT: The result is stored as a 261-byte structure:
     /// - 1 byte: success flag (0 = false, non-zero = true)
+    /// - 4 bytes: error code (u32)
+    /// - 4 bytes: data length (u32)
+    /// - 256 bytes: data array
     /// 
     /// MEMORY SAFETY: Validates that the result pointer is within bounds
     /// to prevent reading invalid memory.
@@ -194,23 +196,37 @@ impl AVM {
         let ee = self.context_stack.get(context_index).expect("missing execution context");
         let vm = ee.vm.borrow();
         let page = vm.memory.borrow();
-        // let page_rc = self.memory_manager.first_page().expect("No memory page allocated");
 
-        // EDUCATIONAL: Borrow the memory page to read from it
-        // let page = page_rc.borrow();
-        let mem = page.mem();
-        let start = Config::RESULT_ADDR as usize; // Fixed result address
+        // EDUCATIONAL: Use the memory page's offset calculation to get the correct memory location
+        let start = page.offset(Config::RESULT_ADDR as usize); // Use memory page offset
 
         // EDUCATIONAL: Validate memory bounds to prevent out-of-bounds access
-        if start + 5 > mem.len() {
+        if start + Config::MAX_RESULT_SIZE > page.size() {
             panic!("Result struct out of bounds at 0x{:08x}", start);
         }
 
-        // EDUCATIONAL: Extract the result fields from memory
-        let error_code = u32::from_le_bytes(mem[start+1..start + 5].try_into().unwrap());
+        // EDUCATIONAL: Extract the result fields from memory using the correct offset
+        let mem = page.mem();
+        
+        // Debug output to see what's in memory
+        if self.verbose {
+            println!("DEBUG: Reading result from memory at offset {}", start);
+            println!("DEBUG: Memory at result location: {:?}", &mem[start..start+20]);
+        }
+        
         let success = mem[start] != 0;
+        let error_code = u32::from_le_bytes(mem[start+1..start + 5].try_into().unwrap());
+        let data_len = u32::from_le_bytes(mem[start+5..start + 9].try_into().unwrap());
+        
+        // EDUCATIONAL: Extract the data array
+        let mut data = [0u8; 256];
+        data.copy_from_slice(&mem[start+9..start + 265]);
 
-        return Result { error_code, success };
+        if self.verbose {
+            println!("DEBUG: Extracted result - success: {}, error_code: {}, data_len: {}", success, error_code, data_len);
+        }
+
+        return Result { success, error_code, data_len, data };
     }
 
     /// Creates a new account (smart contract) with the provided code.

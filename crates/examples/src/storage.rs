@@ -54,10 +54,7 @@ fn my_vm_entry(_self_address: Address, _caller: Address, _data: &[u8]) -> Result
     require(reloaded_config.retries == 13, b"config retries must be 13");
     require(reloaded_config.timeout_ms == 100000, b"config timeout_ms must be 100000");
 
-    Result {
-        success: true,
-        error_code:0,
-    }
+    Result::new(true, 0)
 }
 
 entrypoint!(my_vm_entry);

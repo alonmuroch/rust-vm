@@ -13,6 +13,7 @@ pub struct TestCase<'a> {
     pub name: &'a str,
     pub expected_success: bool,
     pub expected_error_code: u32,
+    pub expected_data: Option<Vec<u8>>,
     pub bundle: TransactionBundle,
     pub abi: Option<Vec<EventAbi>>
 }
@@ -23,6 +24,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             name: "erc20",
             expected_success: true,
             expected_error_code: 0,
+            expected_data: None,
             abi: Some(vec!(
                 EventAbi {
                     name: "Minted".to_string(),
@@ -122,7 +124,8 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
         TestCase {
             name: "call program",
             expected_success: true,
-            expected_error_code: 100,
+            expected_error_code: 0,
+            expected_data: Some(vec![100, 0, 0, 0]), // Expected data: 100 in little-endian
             abi: None,
             bundle: TransactionBundle::new(vec![
                 Transaction {
@@ -160,6 +163,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             name: "account create (storage)",
             expected_success: true,
             expected_error_code: 0,
+            expected_data: None,
             abi: None,
             bundle: TransactionBundle::new(vec![
                 Transaction {
@@ -184,7 +188,8 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
         TestCase {
             name: "account create (simple)",
             expected_success: true,
-            expected_error_code: 100,
+            expected_error_code: 0,
+            expected_data: Some(vec![100, 0, 0, 0]), // Expected data: 100 in little-endian
             abi: None,
             bundle: TransactionBundle::new(vec![
                 Transaction {
@@ -212,7 +217,8 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
         TestCase {
             name: "multi function (simple)",
             expected_success: true,
-            expected_error_code: 100,
+            expected_error_code: 0,
+            expected_data: Some(vec![100, 0, 0, 0]), // Expected data: 100 in little-endian
             abi: None,
             bundle: TransactionBundle::new(vec![
                 Transaction {

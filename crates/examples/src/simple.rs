@@ -10,13 +10,13 @@ use program::types::address::Address;
 /// EDUCATIONAL PURPOSE: This demonstrates a basic smart contract that:
 /// - Accepts input data (two 32-bit integers)
 /// - Performs a simple comparison operation
-/// - Returns a result indicating success/failure
+/// - Returns a result with the larger number stored in data
 /// 
 /// CONTRACT BEHAVIOR:
 /// - Takes 8 bytes of input data (two 32-bit integers)
 /// - Compares the first integer with the second
 /// - Returns success=true if first > second, success=false otherwise
-/// - Uses the larger value as the error_code
+/// - Stores the larger value in the data field
 /// 
 /// INPUT FORMAT: The contract expects exactly 8 bytes:
 /// - Bytes 0-3: First 32-bit integer (little-endian)
@@ -24,7 +24,9 @@ use program::types::address::Address;
 /// 
 /// OUTPUT FORMAT: Returns a Result struct with:
 /// - success: true if first > second, false otherwise
-/// - error_code: The larger of the two input values
+/// - error_code: 0 (no error)
+/// - data_len: 4 (size of u32)
+/// - data: The larger of the two input values stored as 4 bytes
 /// 
 /// REAL-WORLD USAGE: This type of contract could be used for:
 /// - Simple validation logic
@@ -55,9 +57,11 @@ fn my_vm_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result 
     // EDUCATIONAL: Perform the comparison and return appropriate result
     // This demonstrates conditional logic in smart contracts
     if first > second { 
-        return Result { success: true, error_code:first as u32}
+        // Return success with the larger number (first) stored in data
+        return Result::with_u32(first);
     } else {
-        return Result { success: false, error_code: second as u32}
+        // Return success with the larger number (second) stored in data
+        return Result::with_u32(second);
     };
 }
 

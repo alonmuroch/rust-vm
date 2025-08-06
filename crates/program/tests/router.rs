@@ -39,20 +39,20 @@ fn test_route_with_two_calls() {
     let from = Address([0u8; 20]);
 
     let result = route(&input, to, from, |_to, _from, call| {
-        match call.selector {
-            0x10 => {
-                assert_eq!(call.args, &[42]);
-                Result { success: true, error_code: 10 }
-            },
-            0x20 => {
-                assert_eq!(call.args, &[1, 2]);
-                Result { success: false, error_code: 20 }
-            },
-            _ => Result { success: false, error_code: 999 },
-        }
+                    match call.selector {
+                0x10 => {
+                    assert_eq!(call.args, &[42]);
+                    Result::new(true, 10)
+                },
+                0x20 => {
+                    assert_eq!(call.args, &[1, 2]);
+                    Result::new(false, 20)
+                },
+                _ => Result::new(false, 999),
+            }
     });
 
-    assert_eq!(result, Result { success: false, error_code: 20 });
+    assert_eq!(result, Result::new(false, 20));
 }
 
 #[test]

@@ -6,6 +6,7 @@ use std::rc::Rc;
 use core::cell::RefCell;
 use crate::host_interface::HostInterface;
 use std::any::Any;
+use types::result::RESULT_SIZE;
 
 /// System call IDs for the VM.
 pub const SYSCALL_STORAGE_GET: u32 = 1;
@@ -381,7 +382,7 @@ impl DefaultSyscallHandler {
         }
         {
             let borrowed_memory = memory.borrow_mut();
-            let result_bytes = match host.read_memory_page(page_index, result_ptr, 5) {
+            let result_bytes = match host.read_memory_page(page_index, result_ptr, RESULT_SIZE) {
                 Some(b) => b,
                 None => return 0,
             };

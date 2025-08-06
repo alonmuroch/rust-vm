@@ -70,10 +70,10 @@ fn compare(data: &[u8]) -> Result {
     // EDUCATIONAL: Compare the integers and return appropriate result
     if a > b {
         // First number is larger - return success with the larger number
-        Result { success: true, error_code: a }
+        Result::with_u32(a)
     } else {
         // Second number is larger or equal - return failure with the larger number
-        Result { success: false, error_code: b }
+        Result::with_u32(b)
     }
 }
 

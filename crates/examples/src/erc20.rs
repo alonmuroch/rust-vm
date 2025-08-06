@@ -32,19 +32,19 @@ unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
          |to, from, call| match call.selector {
         0x01 => {
             init(caller, call.args);
-            Result { success: true, error_code: 0 }
+            Result::new(true, 0)
         },
         0x02 => {
             transfer(caller, call.args);
-            Result { success: true, error_code: 0 }
+            Result::new(true, 0)
         },
         0x05 => {
             let b = balance_of(call.args);
-            Result { success: true, error_code: b as u32 }
+            Result::new(true, b as u32)
         },
         _ => vm_panic(b"unknown selector"),
     });
-    Result { success: true, error_code: 0 }
+    Result::new(true, 0)
 }
 
 fn init(caller: Address, args: &[u8]) {
