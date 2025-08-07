@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use crate::abi::{ContractAbi, FunctionAbi, EventAbi, EventParam, ParamType};
+use crate::abi::{ContractAbi, FunctionAbi, FunctionParam, EventAbi, EventParam, ParamType};
 
 /// ABI Generator that analyzes Rust source code to extract function and event definitions
 pub struct AbiGenerator {
@@ -164,109 +164,81 @@ impl AbiGenerator {
         // Look for router patterns and function selectors
         let lines: Vec<&str> = self.source_code.lines().collect();
         
-        let mut functions_to_add = Vec::new();
-        
-        for (i, line) in lines.iter().enumerate() {
-            if line.contains("call.selector") {
-                self.collect_functions_from_router(&lines, i, &mut functions_to_add);
-            }
-        }
+        let functions = self.collect_functions_from_router(&lines);
         
         // Add all collected functions
-        for function in functions_to_add {
+        for function in functions {
             self.abi.add_function(function);
         }
     }
 
     /// Collect functions from router match patterns
-    fn collect_functions_from_router(&self, lines: &[&str], router_line_index: usize, functions: &mut Vec<FunctionAbi>) {
-        // Look for match patterns like: 0x01 => function_name(call.args)
-        for i in router_line_index..lines.len() {
-            let line = lines[i].trim();
+    fn collect_functions_from_router(&self, lines: &[&str]) -> Vec<FunctionAbi> {
+        let mut functions = vec![];
+        
+        for (i, line) in lines.iter().enumerate() {
+            let line = line.trim();
             
+            // Look for selector patterns like "0x01 => {"
             if line.starts_with("0x") && line.contains("=>") {
-                println!("Processing line: {}", line);
-                
-                // Extract selector from current line
-                let parts: Vec<&str> = line.split("=>").collect();
-                if parts.len() != 2 {
-                    continue;
-                }
-                
-                let selector_str = parts[0].trim();
-                if !selector_str.starts_with("0x") {
-                    continue;
-                }
-                
-                let selector = match u8::from_str_radix(&selector_str[2..], 16) {
-                    Ok(s) => s,
-                    Err(_) => continue,
-                };
-                
-                // Look for function call on the next few lines
-                let mut function_name = None;
-                for j in (i + 1)..(i + 5).min(lines.len()) {
-                    let next_line = lines[j].trim();
-                    if next_line.starts_with('}') {
-                        break;
-                    }
-                    
-                    // Look for function call pattern: function_name(...)
-                    if let Some(start) = next_line.find('(') {
-                        let potential_name = next_line[..start].trim();
-                        if !potential_name.is_empty() && 
-                           !potential_name.contains(' ') && 
-                           !potential_name.contains("::") &&  // Skip method calls like Result::with_u32
-                           !potential_name.contains('.') {     // Skip method calls
-                            function_name = Some(potential_name);
-                            break;
+                if let Some(selector) = self.parse_selector_from_line(line) {
+                    // Check if this line has a direct function call (e.g., "0x01 => compare(call.args),")
+                    if let Some(function_name) = self.extract_direct_function_call(line) {
+                        if let Some(function) = self.find_function_definition(lines, i, &function_name) {
+                            let mut function = function;
+                            function.selector = selector;
+                            functions.push(function);
                         }
+                        continue;
                     }
                     
-                    // Also look for patterns like "let b = balance_of(call.args)"
-                    if next_line.contains("let") && next_line.contains('=') {
-                        if let Some(equals_pos) = next_line.find('=') {
-                            let after_equals = &next_line[equals_pos + 1..];
-                            if let Some(start) = after_equals.find('(') {
-                                let potential_name = after_equals[..start].trim();
-                                if !potential_name.is_empty() && 
-                                   !potential_name.contains(' ') && 
-                                   !potential_name.contains("::") && 
-                                   !potential_name.contains('.') {
-                                    function_name = Some(potential_name);
-                                    break;
+                    // Check for multi-line pattern with braces
+                    if line.contains('{') {
+                        // Look for function calls in subsequent lines within braces
+                        let mut brace_count = 0;
+                        let mut in_braces = false;
+                        
+                        for j in i..lines.len() {
+                            let next_line = lines[j].trim();
+                            
+                            // Count braces to track scope
+                            for ch in next_line.chars() {
+                                match ch {
+                                    '{' => {
+                                        brace_count += 1;
+                                        in_braces = true;
+                                    }
+                                    '}' => {
+                                        brace_count -= 1;
+                                        if brace_count == 0 {
+                                            in_braces = false;
+                                        }
+                                    }
+                                    _ => {}
                                 }
+                            }
+                            
+                            if in_braces && brace_count > 0 {
+                                // Look for function calls in this line
+                                if let Some(function_name) = self.extract_function_call_from_line(next_line) {
+                                    if let Some(function) = self.find_function_definition(lines, j, &function_name) {
+                                        let mut function = function;
+                                        function.selector = selector;
+                                        functions.push(function);
+                                    }
+                                }
+                            }
+                            
+                            if !in_braces && brace_count == 0 {
+                                break;
                             }
                         }
                     }
                 }
-                
-                if let Some(name) = function_name {
-                    println!("Found function: selector={}, name='{}'", selector, name);
-                    // Try to find the function definition
-                    if let Some(mut function) = self.find_function_definition(lines, name) {
-                        function.selector = selector;
-                        functions.push(function);
-                    } else {
-                        // If we can't find the function definition, create a basic one
-                        println!("Creating basic function for: {}", name);
-                        functions.push(FunctionAbi {
-                            name: name.to_string(),
-                            selector,
-                            inputs: Vec::new(),
-                            outputs: vec![ParamType::Uint(32)],
-                        });
-                    }
-                } else {
-                    println!("Failed to find function name for selector: {}", selector);
-                }
-            }
-            
-            // Stop when we hit the end of the match block
-            if line == "}" {
-                break;
             }
         }
+        
+        functions
     }
 
     /// Parse a selector pattern like "0x01 => function_name(call.args)" or "0x01 => { function_name(caller, call.args); }"
@@ -316,19 +288,190 @@ impl AbiGenerator {
     }
 
     /// Find function definition and create FunctionAbi
-    fn find_function_definition(&self, lines: &[&str], function_name: &str) -> Option<FunctionAbi> {
-        for line in lines {
-            if line.contains(&format!("fn {}", function_name)) {
-                // For now, create a basic function ABI
-                // In a full implementation, you'd parse the function signature
-                return Some(FunctionAbi {
-                    name: function_name.to_string(),
-                    selector: 0, // Will be set by the router parser
-                    inputs: Vec::new(), // Would parse from function signature
-                    outputs: vec![ParamType::Uint(32)], // Default output
-                });
+    fn find_function_definition(&self, lines: &[&str], start_line: usize, function_name: &str) -> Option<FunctionAbi> {
+        // Look for function definition pattern: fn function_name(...)
+        for i in 0..lines.len() {
+            let trimmed = lines[i].trim();
+            if trimmed.starts_with("fn ") && trimmed.contains(function_name) {
+                // Extract function signature
+                if let Some(signature) = self.extract_function_signature(lines, i) {
+                    return Some(self.parse_function_signature(function_name, signature));
+                }
             }
         }
+        
+        None
+    }
+    
+    pub fn extract_function_signature(&self, lines: &[&str], start_line: usize) -> Option<String> {
+        let mut signature = String::new();
+        
+        for i in start_line..lines.len() {
+            let line = lines[i].trim();
+            
+            if line.starts_with("fn ") {
+                // Start collecting the signature
+                signature.push_str(line);
+                
+                // Check if this line contains the opening brace
+                if line.contains('{') {
+                    // Remove everything from the opening brace onwards
+                    if let Some(brace_pos) = line.find('{') {
+                        signature = line[..brace_pos].trim().to_string();
+                    }
+                    return Some(signature);
+                }
+                
+                // Continue to next line if no opening brace
+                continue;
+            }
+            
+            // If we're already collecting a signature, add this line
+            if !signature.is_empty() {
+                signature.push_str(line);
+                
+                // Check if this line contains the opening brace
+                if line.contains('{') {
+                    // Remove everything from the opening brace onwards
+                    if let Some(brace_pos) = line.find('{') {
+                        signature = signature[..signature.len() - (line.len() - brace_pos)].trim().to_string();
+                    }
+                    return Some(signature);
+                }
+            }
+        }
+        
+        None
+    }
+    
+    pub fn parse_function_signature(&self, function_name: &str, signature: String) -> FunctionAbi {
+        let mut inputs = vec![];
+        let mut outputs = vec![]; // Start with empty outputs for void functions
+        
+        // Parse function signature like: fn init(caller: Address, args: &[u8])
+        if let Some(params_start) = signature.find('(') {
+            if let Some(params_end) = signature.find(')') {
+                let params_str = &signature[params_start + 1..params_end];
+                
+                // Parse parameters
+                for param in params_str.split(',') {
+                    let param = param.trim();
+                    if !param.is_empty() {
+                        if let Some((name, param_type)) = self.parse_parameter(param) {
+                            inputs.push(FunctionParam {
+                                name: name.to_string(),
+                                kind: param_type,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Parse return type if present
+        if let Some(arrow_pos) = signature.find("->") {
+            let after_arrow = &signature[arrow_pos + 2..].trim();
+            // Find the end of the return type (first space or brace)
+            let return_type_end = after_arrow.find(' ').unwrap_or(after_arrow.find('{').unwrap_or(after_arrow.len()));
+            let return_type_str = &after_arrow[..return_type_end];
+            if let Some(param_type) = self.parse_param_type_from_str(return_type_str) {
+                outputs = vec![param_type];
+            }
+        }
+        
+        FunctionAbi {
+            name: function_name.to_string(),
+            selector: 0, // Will be set by caller
+            inputs,
+            outputs,
+        }
+    }
+    
+    fn parse_parameter(&self, param_str: &str) -> Option<(String, ParamType)> {
+        // Parse parameter like: "caller: Address" or "args: &[u8]"
+        if let Some(colon_pos) = param_str.find(':') {
+            let name = param_str[..colon_pos].trim();
+            let type_str = param_str[colon_pos + 1..].trim();
+            
+            if let Some(param_type) = self.parse_param_type_from_str(type_str) {
+                return Some((name.to_string(), param_type));
+            }
+        }
+        None
+    }
+    
+    pub fn parse_param_type_from_str(&self, type_str: &str) -> Option<ParamType> {
+        match type_str {
+            "Address" => Some(ParamType::Address),
+            "u32" => Some(ParamType::Uint(32)),
+            "u64" => Some(ParamType::Uint(64)),
+            "u8" => Some(ParamType::Uint(8)),
+            "bool" => Some(ParamType::Bool),
+            "String" => Some(ParamType::String),
+            "&[u8]" | "[u8]" => Some(ParamType::Bytes),
+            _ => None,
+        }
+    }
+
+    fn parse_selector_from_line(&self, line: &str) -> Option<u8> {
+        let parts: Vec<&str> = line.split("=>").collect();
+        if parts.len() != 2 {
+            return None;
+        }
+        
+        let selector_str = parts[0].trim();
+        if !selector_str.starts_with("0x") {
+            return None;
+        }
+        
+        u8::from_str_radix(&selector_str[2..], 16).ok()
+    }
+    
+    fn extract_direct_function_call(&self, line: &str) -> Option<String> {
+        // Look for pattern like "0x01 => compare(call.args),"
+        if let Some(arrow_pos) = line.find("=>") {
+            let after_arrow = &line[arrow_pos + 2..].trim();
+            if let Some(start) = after_arrow.find('(') {
+                let function_name = after_arrow[..start].trim();
+                if !function_name.is_empty() && 
+                   !function_name.contains(' ') && 
+                   !function_name.contains("::") && 
+                   !function_name.contains('.') {
+                    return Some(function_name.to_string());
+                }
+            }
+        }
+        None
+    }
+    
+    fn extract_function_call_from_line(&self, line: &str) -> Option<String> {
+        // Look for function call pattern: function_name(...)
+        if let Some(start) = line.find('(') {
+            let potential_name = line[..start].trim();
+            if !potential_name.is_empty() && 
+               !potential_name.contains(' ') && 
+               !potential_name.contains("::") && 
+               !potential_name.contains('.') {
+                return Some(potential_name.to_string());
+            }
+        }
+        
+        // Also look for patterns like "let b = balance_of(call.args)"
+        if line.contains("let") && line.contains('=') {
+            if let Some(equals_pos) = line.find('=') {
+                let after_equals = &line[equals_pos + 1..];
+                if let Some(start) = after_equals.find('(') {
+                    let potential_name = after_equals[..start].trim();
+                    if !potential_name.is_empty() && 
+                       !potential_name.contains(' ') && 
+                       !potential_name.contains("::") && 
+                       !potential_name.contains('.') {
+                        return Some(potential_name.to_string());
+                    }
+                }
+            }
+        }
+        
         None
     }
 

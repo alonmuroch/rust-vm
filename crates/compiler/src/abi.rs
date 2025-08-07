@@ -36,7 +36,7 @@ pub struct FunctionParam {
     pub kind: ParamType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParamType {
     Address,
     Uint(usize), // bits
