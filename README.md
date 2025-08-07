@@ -19,7 +19,17 @@ This first chapter introduces the fundamental concepts behind blockchain virtual
 - The design philosophy behind our educational approach
 - What you'll learn by studying this implementation
 
-*More chapters coming soon covering instruction sets, memory management, smart contract execution, and more!*
+### 🎯 **Chapter 2: AVM Report #2, Now Supports A Full ERC-20 Implementation**
+**[Read the full article on Medium →](https://alonmuroch-65570.medium.com/avm-report-2-now-supports-a-full-erc-20-implementation-feed40e297ba)**
+
+This second chapter covers the evolution of AVM from a basic instruction interpreter into a modular, extensible smart contract runtime. You'll learn about:
+- Cross-program contract calls and composability
+- RISC-V IMAC instruction compliance testing
+- Persistent key-value storage systems
+- A complete ERC-20 implementation with events and logging
+- Transaction receipts and event decoding
+
+*More chapters coming soon covering advanced features, optimizations, and real-world applications!*
 
 ---
 
@@ -100,14 +110,23 @@ Blockchain technology is revolutionizing how we think about trust, decentralizat
 rust-vm/
 ├── crates/
 │   ├── avm/           # Application Virtual Machine - main orchestrator
-│   ├── compiler/      # Rust-to-bytecode compiler (future)
+│   ├── compiler/      # Rust-to-bytecode compiler
 │   ├── examples/      # Smart contract examples and tutorials
+│   │   └── src/
+│   │       ├── simple.rs      # Basic smart contract example
+│   │       ├── erc20.rs       # Full ERC-20 implementation
+│   │       ├── storage.rs     # Storage system examples
+│   │       ├── multi_func.rs  # Multi-function contract
+│   │       └── call_program.rs # Cross-program calls
 │   ├── program/       # Smart contract runtime library
 │   ├── state/         # Blockchain state management
 │   ├── storage/       # Persistent storage system
 │   ├── types/         # Common types and data structures
 │   └── vm/            # RISC-V virtual machine core
+│       └── tests/     # RISC-V compliance tests
+│           └── riscv-tests/   # Official RISC-V test suite
 ├── Cargo.toml         # Workspace configuration
+├── Makefile           # Build and test automation
 └── README.md          # This file
 ```
 
@@ -158,29 +177,10 @@ rust-vm/
    - **State**: `crates/state/src/state.rs` - Understand blockchain state management
    - **AVM**: `crates/avm/src/avm.rs` - The main virtual machine orchestrator
 
-4. **Run the Tests**
+4. **Build and Run Tests**
    ```bash
-   cargo test
+   make all
    ```
-
----
-
-## 📚 Learning Path
-
-### 🥇 **Beginner Level**
-1. Read the simple contract example and understand how it works
-2. Explore the `program` crate to see the smart contract runtime
-3. Understand how transactions are processed in the `avm` crate
-
-### 🥈 **Intermediate Level**
-1. Dive into the RISC-V instruction set in `vm/src/instruction.rs`
-2. Study the instruction decoder to understand binary encoding
-3. Explore memory management and storage systems
-
-### 🥉 **Advanced Level**
-1. Understand the complete virtual machine architecture
-2. Study how this compares to Ethereum's EVM
-3. Consider how you would add new features or optimizations
 
 ---
 
@@ -262,21 +262,9 @@ This project is designed for learning and education. Contributions that improve:
 
 ### Online Resources
 - [RISC-V Foundation](https://riscv.org/)
+- [RISC-V Specification](https://riscv.org/specifications/) (also available in `crates/vm/tests/riscv-tests/`)
 - [Ethereum Documentation](https://ethereum.org/developers/)
 - [Rust Book](https://doc.rust-lang.org/book/)
-
----
-
-## 🏆 What You'll Gain
-
-After studying this project, you'll have:
-
-- **🧠 Deep Understanding**: How virtual machines actually work
-- **🔗 Blockchain Knowledge**: Real insight into smart contract execution
-- **🦀 Rust Skills**: Advanced systems programming techniques
-- **🏗️ Architecture Sense**: How to design complex systems
-- **🔍 Debugging Skills**: How to trace through low-level code
-- **📚 Learning Framework**: A mental model for understanding other VMs
 
 ---
 
