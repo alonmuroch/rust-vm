@@ -6,7 +6,6 @@ extern crate std;
 /* --------------------------------- Imports --------------------------------- */
 
 // External crates
-pub extern crate hex;
 pub extern crate types;
 
 /* --------------------------------- Modules --------------------------------- */

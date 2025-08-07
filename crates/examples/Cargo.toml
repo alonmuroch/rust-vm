@@ -6,28 +6,45 @@ edition = "2024"
 [dependencies]
 program = { path = "../program" }
 
+[dev-dependencies]
+types = { path = "../types" }  # adjust path as needed
+compiler = { path = "../compiler" }  # adjust path as needed
+avm = { path = "../avm" }  # adjust path as needed
+once_cell = "1.19.0"
+
+[features]
+default = []
+binaries = []  # Enable this feature to build RISC-V binaries
+
 [profile.dev]
 panic = "abort"
 
 [profile.release]
 panic = "abort"
 
+# Note: These binaries are designed for RISC-V target and will cause linking errors
+# when building for host architecture during tests. Use --features binaries to build them.
 [[bin]]
 name = "simple"
 path = "src/simple.rs"
+required-features = ["binaries"]
 
 [[bin]]
 name = "storage"
 path = "src/storage.rs"
+required-features = ["binaries"]
 
 [[bin]]
 name = "call_program"
 path = "src/call_program.rs"
+required-features = ["binaries"]
 
 [[bin]]
 name = "multi_func"
 path = "src/multi_func.rs"
+required-features = ["binaries"]
 
 [[bin]]
 name = "erc20"
 path = "src/erc20.rs"
+required-features = ["binaries"]

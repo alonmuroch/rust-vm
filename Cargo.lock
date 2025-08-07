@@ -8,7 +8,6 @@ version = "0.1.0"
 dependencies = [
  "compiler",
  "hex",
- "once_cell",
  "state",
  "storage",
  "types",
@@ -26,7 +25,11 @@ dependencies = [
 name = "examples"
 version = "0.1.0"
 dependencies = [
+ "avm",
+ "compiler",
+ "once_cell",
  "program",
+ "types",
 ]
 
 [[package]]
@@ -77,7 +80,6 @@ dependencies = [
 name = "program"
 version = "0.1.0"
 dependencies = [
- "hex",
  "types",
 ]
 
