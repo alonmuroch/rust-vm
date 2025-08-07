@@ -36,7 +36,6 @@ Session.vim
 ## Configuration
 /bootstrap.toml
 /config.toml
-/Makefile
 config.mk
 config.stamp
 no_llvm_build

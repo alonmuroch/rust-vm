@@ -1,0 +1,49 @@
+.PHONY: all
+
+all: clean program example_programs test summary
+
+program:
+	@echo "=== Building program ==="
+	cargo clean -p program
+	cargo build -p program --target riscv32imac-unknown-none-elf
+	@echo "=== Program build complete ==="
+
+example_programs:
+	@echo "=== Building example programs ==="
+	$(MAKE) -C crates/examples
+	@echo "=== Example programs build complete ==="
+
+test:
+	@echo "=== Running tests ==="
+	cargo test -p types -p storage -p state
+	cargo test -p program --lib
+	cargo test -p vm --lib
+	@echo "=== Tests complete ==="
+
+summary:
+	@echo ""
+	@echo "🎉 BUILD SUMMARY"
+	@echo "================"
+	@echo "✅ Cleaned project artifacts"
+	@echo "✅ Built program crate for RISC-V target"
+	@echo "✅ Built 5 example programs:"
+	@echo "   - call_program"
+	@echo "   - erc20"
+	@echo "   - multi_func"
+	@echo "   - simple"
+	@echo "   - storage"
+	@echo "✅ Ran tests for all library crates:"
+	@echo "   - types"
+	@echo "   - storage"
+	@echo "   - state"
+	@echo "   - program"
+	@echo "   - vm"
+	@echo ""
+	@echo "🚀 All targets completed successfully!"
+	@echo ""
+
+clean:
+	@echo "=== Cleaning project ==="
+	cargo clean
+	$(MAKE) -C crates/examples clean
+	@echo "=== Clean complete ==="
