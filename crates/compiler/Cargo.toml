@@ -5,3 +5,7 @@ edition = "2021"
 
 [dependencies]
 goblin = "0.10"
+
+[[bin]]
+name = "abi_generator"
+path = "src/bin/abi_generator.rs"

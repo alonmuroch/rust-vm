@@ -2,6 +2,7 @@
 bin/*.o
 bin/*.bin
 bin/*.elf
+bin/*.json
 
 # Do not ignore this .gitignore file
 !.gitignore

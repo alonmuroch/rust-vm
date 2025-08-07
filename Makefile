@@ -18,6 +18,7 @@ test:
 	cargo test -p types -p storage -p state
 	cargo test -p program --lib
 	cargo test -p vm --lib
+	cargo test -p compiler --lib
 	cd crates/examples && cargo test -- --nocapture
 	@echo "=== Tests complete ==="
 
@@ -39,6 +40,7 @@ summary:
 	@echo "   - state"
 	@echo "   - program"
 	@echo "   - vm"
+	@echo "   - compiler"
 	@echo "✅ Ran example tests"
 	@echo ""
 	@echo "🚀 All targets completed successfully!"
