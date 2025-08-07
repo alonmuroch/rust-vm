@@ -24,7 +24,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             name: "erc20",
             expected_success: true,
             expected_error_code: 0,
-            expected_data: None,
+            expected_data: Some(vec![128, 240, 250, 2]), // Expected data: 50,000,000 in little-endian
             abi: Some(vec!(
                 EventAbi {
                     name: "Minted".to_string(),
@@ -77,7 +77,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     data: encode_router_calls(&[
                         HostFuncCall {
-                            selector: 0x01,
+                            selector: 0x01, // initialize
                             args: (|| {
                                 // max supply 
                                 let max_supply: u32 = 100000000; // 100 million
@@ -112,6 +112,23 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                                 args.extend(amount.to_le_bytes());
                                 
                                 args
+                            })(),
+                        }
+                    ]),
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: encode_router_calls(&[
+                        HostFuncCall {
+                            selector: 0x05, // balance_of
+                            args: (|| {
+                                // check balance of the original caller (d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0)
+                                let owner_addr = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0");
+                                owner_addr.0.to_vec()
                             })(),
                         }
                     ]),

@@ -40,11 +40,10 @@ unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
         },
         0x05 => {
             let b = balance_of(call.args);
-            Result::new(true, b as u32)
+            Result::with_u32(b)
         },
         _ => vm_panic(b"unknown selector"),
-    });
-    Result::new(true, 0)
+    })
 }
 
 fn init(caller: Address, args: &[u8]) {

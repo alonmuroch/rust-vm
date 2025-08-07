@@ -35,6 +35,7 @@ fn test_entrypoint_function() {
 
             if let Some(abi) = &case.abi {
                 receipt.print_events_pretty(abi);
+                println!("{}", receipt);
             } else {
                 println!("{}", receipt);
             }
