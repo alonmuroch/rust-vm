@@ -43,6 +43,7 @@ pub enum ParamType {
     Bool,
     Bytes,
     String,
+    Result, // Represents the Result struct with success, error_code, data_len, and data fields
     // Extend as needed
 }
 
@@ -55,6 +56,7 @@ impl ParamType {
             ParamType::Bool => "bool".to_string(),
             ParamType::Bytes => "bytes".to_string(),
             ParamType::String => "string".to_string(),
+            ParamType::Result => "result".to_string(),
         }
     }
 }

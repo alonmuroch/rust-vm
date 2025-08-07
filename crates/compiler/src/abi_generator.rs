@@ -401,14 +401,17 @@ impl AbiGenerator {
     }
     
     pub fn parse_param_type_from_str(&self, type_str: &str) -> Option<ParamType> {
-        match type_str {
+        match type_str.trim() {
             "Address" => Some(ParamType::Address),
+            "u8" => Some(ParamType::Uint(8)),
+            "u16" => Some(ParamType::Uint(16)),
             "u32" => Some(ParamType::Uint(32)),
             "u64" => Some(ParamType::Uint(64)),
-            "u8" => Some(ParamType::Uint(8)),
+            "u128" => Some(ParamType::Uint(128)),
             "bool" => Some(ParamType::Bool),
-            "String" => Some(ParamType::String),
             "&[u8]" | "[u8]" => Some(ParamType::Bytes),
+            "String" | "&str" => Some(ParamType::String),
+            "Result" => Some(ParamType::Result), // Proper Result type
             _ => None,
         }
     }
