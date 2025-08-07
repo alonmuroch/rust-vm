@@ -13,7 +13,7 @@ example_programs:
 	$(MAKE) -C crates/examples
 	@echo "=== Example programs build complete ==="
 
-test:
+test: generate_abis
 	@echo "=== Running tests ==="
 	cargo test -p types -p storage -p state
 	cargo test -p program --lib
@@ -21,6 +21,11 @@ test:
 	cargo test -p compiler --lib
 	cd crates/examples && cargo test -- --nocapture
 	@echo "=== Tests complete ==="
+
+generate_abis:
+	@echo "=== Generating ABIs ==="
+	cd crates/examples && $(MAKE) abi
+	@echo "=== ABI generation complete ==="
 
 summary:
 	@echo ""
@@ -34,6 +39,7 @@ summary:
 	@echo "   - multi_func"
 	@echo "   - simple"
 	@echo "   - storage"
+	@echo "✅ Generated ABIs for all example programs"
 	@echo "✅ Ran tests for all library crates:"
 	@echo "   - types"
 	@echo "   - storage"
@@ -41,7 +47,7 @@ summary:
 	@echo "   - program"
 	@echo "   - vm"
 	@echo "   - compiler"
-	@echo "✅ Ran example tests"
+	@echo "✅ Ran example tests using generated ABIs"
 	@echo ""
 	@echo "🚀 All targets completed successfully!"
 	@echo ""

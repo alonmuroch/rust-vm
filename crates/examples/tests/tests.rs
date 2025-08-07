@@ -7,6 +7,7 @@ use std::path::Path;
 use compiler::elf::parse_elf_from_bytes;
 use avm::global::Config;
 use compiler::{EventParam, EventAbi, ParamType};
+use serde_json::Value;
 
 #[derive(Debug)]
 pub struct TestCase<'a> {
@@ -25,43 +26,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             expected_success: true,
             expected_error_code: 0,
             expected_data: Some(vec![128, 240, 250, 2]), // Expected data: 50,000,000 in little-endian
-            abi: Some(vec!(
-                EventAbi {
-                    name: "Minted".to_string(),
-                    inputs: vec![
-                        EventParam {
-                            name: "caller".to_string(),
-                            kind: ParamType::Address,
-                            indexed: false,
-                        },
-                        EventParam {
-                            name: "amount".to_string(),
-                            kind: ParamType::Uint(32),
-                            indexed: false,
-                        },
-                    ],
-                },
-                EventAbi {
-                    name: "Transfer".to_string(),
-                    inputs: vec![
-                        EventParam {
-                            name: "from".to_string(),
-                            kind: ParamType::Address,
-                            indexed: false,
-                        },
-                        EventParam {
-                            name: "to".to_string(),
-                            kind: ParamType::Address,
-                            indexed: false,
-                        },
-                        EventParam {
-                            name: "value".to_string(),
-                            kind: ParamType::Uint(32),
-                            indexed: false,
-                        },
-                    ],
-                }
-            )),
+            abi: load_abi_from_file("bin/erc20.abi.json"),
             bundle: TransactionBundle::new(vec![
                  Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -288,6 +253,55 @@ pub fn to_address(hex: &str) -> Address {
     }
 
     Address(bytes)
+}
+
+pub fn load_abi_from_file<P: AsRef<Path>>(path: P) -> Option<Vec<EventAbi>> {
+    let content = fs::read_to_string(&path)
+        .unwrap_or_else(|_| panic!("❌ Failed to read ABI file from {}", path.as_ref().display()));
+    
+    let json: Value = serde_json::from_str(&content)
+        .unwrap_or_else(|_| panic!("❌ Failed to parse ABI JSON from {}", path.as_ref().display()));
+    
+    let events = json.get("events")?;
+    let events_array = events.as_array()?;
+    
+    let mut event_abis = Vec::new();
+    for event in events_array {
+        let name = event.get("name")?.as_str()?.to_string();
+        let inputs = event.get("inputs")?.as_array()?;
+        
+        let mut params = Vec::new();
+        for input in inputs {
+            let param_name = input.get("name")?.as_str()?.to_string();
+            let param_type_str = input.get("type")?.as_str()?;
+            let indexed = input.get("indexed").and_then(|v| v.as_bool()).unwrap_or(false);
+            
+            let param_type = match param_type_str {
+                "address" => ParamType::Address,
+                "uint32" => ParamType::Uint(32),
+                "uint64" => ParamType::Uint(64),
+                "uint128" => ParamType::Uint(128),
+                "uint256" => ParamType::Uint(256),
+                "bool" => ParamType::Bool,
+                "string" => ParamType::String,
+                "bytes" => ParamType::Bytes,
+                _ => panic!("❌ Unsupported parameter type: {}", param_type_str),
+            };
+            
+            params.push(EventParam {
+                name: param_name,
+                kind: param_type,
+                indexed,
+            });
+        }
+        
+        event_abis.push(EventAbi {
+            name,
+            inputs: params,
+        });
+    }
+    
+    Some(event_abis)
 }
 
 pub fn get_program_code<P: AsRef<Path>>(path: P) -> Vec<u8> {
