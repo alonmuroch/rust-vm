@@ -136,7 +136,7 @@ impl MemoryPage {
         addr = (addr + (align - 1)) & !(align - 1);
         
         let end = addr + data.len() as u32;
-        assert!(end as usize <= self.size());
+        assert!(end as usize <= self.size(), "Out of memory: trying to allocate {} bytes, but only {} bytes available", data.len(), self.size() - addr as usize);
 
         self.mem.borrow_mut()[addr as usize..end as usize].copy_from_slice(data);
         self.next_heap.set(end);

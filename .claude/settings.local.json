@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make test:*)",
+      "Bash(make:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo:*)",
+      "Bash(rm:*)",
+      "Bash(make:*)",
+      "Bash(grep:*)",
+      "Bash(timeout 10 cargo test -p examples --test program_exec)",
+      "Bash(RUST_BACKTRACE=0 cargo test -p examples --test program_exec --nocapture)",
+      "Bash(RUST_BACKTRACE=0 cargo test -p examples --test program_exec -- --nocapture)",
+      "Bash(timeout 30 make all)",
+      "Bash(timeout 30s cargo test -p examples)"
+    ],
+    "deny": []
+  }
+}

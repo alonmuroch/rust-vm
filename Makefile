@@ -2,13 +2,19 @@
 
 all: clean program example_programs test summary
 
-program:
+clean:
+	@echo "=== Cleaning project ==="
+	cargo clean
+	$(MAKE) -C crates/examples clean
+	@echo "=== Clean complete ==="
+
+program: 
 	@echo "=== Building program ==="
 	cargo clean -p program
 	cargo build -p program --target riscv32imac-unknown-none-elf
 	@echo "=== Program build complete ==="
 
-example_programs:
+example_programs: clean
 	@echo "=== Building example programs ==="
 	$(MAKE) -C crates/examples
 	@echo "=== Example programs build complete ==="
@@ -51,9 +57,3 @@ summary:
 	@echo ""
 	@echo "🚀 All targets completed successfully!"
 	@echo ""
-
-clean:
-	@echo "=== Cleaning project ==="
-	cargo clean
-	$(MAKE) -C crates/examples clean
-	@echo "=== Clean complete ==="

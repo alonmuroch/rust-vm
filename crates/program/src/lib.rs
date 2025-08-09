@@ -3,6 +3,8 @@
 #[cfg(test)]
 extern crate std;
 
+extern crate alloc;
+
 /* --------------------------------- Imports --------------------------------- */
 
 // External crates
@@ -46,6 +48,16 @@ pub use router::{decode_calls, route, FuncCall};
 // Panic handling
 mod panic;
 pub use panic::vm_panic;
+
+// Memory allocator
+pub mod allocator;
+
+// Global allocator - automatically provides heap allocation for all guest programs
+// Only enable for RISC-V target to avoid recursion on host
+#[cfg(target_arch = "riscv32")]
+#[global_allocator]
+static ALLOCATOR: allocator::VmAllocator = allocator::VmAllocator;
+
 
 /* --------------------------- Assertion Utilities -------------------------- */
 

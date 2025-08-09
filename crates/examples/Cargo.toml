@@ -49,3 +49,8 @@ required-features = ["binaries"]
 name = "erc20"
 path = "src/erc20.rs"
 required-features = ["binaries"]
+
+[[bin]]
+name = "allocator_demo"
+path = "src/allocator_demo.rs"
+required-features = ["binaries"]

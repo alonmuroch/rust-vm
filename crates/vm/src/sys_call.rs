@@ -1,5 +1,4 @@
-use crate::cpu::CPU;
-use crate::memory_page::MemoryPage;
+use crate::memory_page::{MemoryPage, HEAP_PTR_OFFSET};
 use storage::Storage;
 use crate::registers::Register;
 use std::rc::Rc;
@@ -15,6 +14,8 @@ pub const SYSCALL_PANIC: u32 = 3;
 pub const SYSCALL_LOG: u32 = 4;
 pub const SYSCALL_CALL_PROGRAM: u32 = 5;
 pub const SYSCALL_FIRE_EVENT: u32 = 6;
+pub const SYSCALL_ALLOC: u32 = 7;
+pub const SYSCALL_DEALLOC: u32 = 8;
 /// Represents different types of arguments that can be passed to system calls.
 /// 
 /// EDUCATIONAL: This enum demonstrates how to handle different data types
@@ -61,6 +62,8 @@ impl SyscallHandler for DefaultSyscallHandler {
             SYSCALL_LOG => self.sys_log(args, memory),
             SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, host),
             SYSCALL_FIRE_EVENT => self.sys_fire_event(args, memory, host),
+            SYSCALL_ALLOC => self.sys_alloc(args, memory),
+            SYSCALL_DEALLOC => self.sys_dealloc(args, memory),
             _ => {
                 panic!("Unknown syscall: {}", call_id);
             }
@@ -388,6 +391,62 @@ impl DefaultSyscallHandler {
             };
             borrowed_memory.alloc_on_heap(&result_bytes)
         }
+    }
+
+    fn sys_alloc(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>) -> u32 {
+        let size = args[0] as usize;  // A0 register
+        let align = args[1] as usize; // A1 register
+        
+        if size == 0 {
+            println!("VM Alloc: Invalid size 0");
+            return 0;
+        }
+        
+        // Validate alignment (must be power of 2)
+        if align == 0 || (align & (align - 1)) != 0 {
+            println!("VM Alloc: Invalid alignment {}", align);
+            return 0;
+        }
+        
+        let current_heap = memory.borrow().next_heap.get();
+        
+        // Initialize heap pointer if not set (no code has been written)
+        if current_heap == 0 {
+            memory.borrow().next_heap.set(HEAP_PTR_OFFSET);
+        }
+        
+        // Allocate aligned memory on heap
+        let data = vec![0u8; size];
+        let ptr = memory.borrow().alloc_on_heap(&data);
+        
+        if ptr == 0 {
+            println!("VM Alloc: Out of memory, failed to allocate {} bytes", size);
+            return 0;
+        }
+        
+        // Check if allocated address meets alignment requirements
+        if (ptr as usize) % align != 0 {
+            // Re-allocate with enough space for alignment
+            let total_size = size + align - 1;
+            let padded_data = vec![0u8; total_size];
+            let padded_ptr = memory.borrow().alloc_on_heap(&padded_data);
+            if padded_ptr == 0 {
+                println!("VM Alloc: Out of memory, failed to allocate {} bytes for alignment", total_size);
+                return 0;
+            }
+            // Return properly aligned pointer within the allocated region
+            let aligned_ptr = ((padded_ptr as usize + align - 1) & !(align - 1)) as u32;
+            return aligned_ptr;
+        }
+        
+        ptr
+    }
+    
+    fn sys_dealloc(&mut self, _args: [u32; 6], _memory: Rc<RefCell<MemoryPage>>) -> u32 {
+        // Note: This VM uses a simple bump allocator, so we can't actually free memory
+        // In a real VM, you'd implement a proper allocator with free lists
+        // For now, this is a no-op since the memory will be reclaimed when the VM exits
+        0
     }
 }
 
