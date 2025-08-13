@@ -112,6 +112,7 @@ rust-vm/
 │   ├── avm/           # Application Virtual Machine - main orchestrator
 │   ├── compiler/      # Rust-to-bytecode compiler
 │   ├── examples/      # Smart contract examples and tutorials
+│   │   ├── README.md  # 📖 [Detailed guide to all examples](crates/examples/README.md)
 │   │   └── src/
 │   │       ├── simple.rs      # Basic smart contract example
 │   │       ├── erc20.rs       # Full ERC-20 implementation
@@ -168,8 +169,11 @@ rust-vm/
    cd rust-vm
    ```
 
-2. **Read the Examples**
-   Start with `crates/examples/src/simple.rs` - a basic smart contract that compares two numbers. Every line is documented with educational insights.
+2. **Explore the Examples**
+   We provide comprehensive examples with detailed documentation:
+   - **📖 [Examples Guide](crates/examples/README.md)** - Complete guide to all smart contract examples
+   - Start with `crates/examples/src/simple.rs` - a basic smart contract that compares two numbers
+   - Progress through increasingly complex examples like ERC-20 tokens and cross-contract calls
 
 3. **Explore the Core Components**
    - **CPU**: `crates/vm/src/cpu.rs` - See how instructions are executed

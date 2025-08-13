@@ -14,7 +14,11 @@
       "Bash(timeout 30 make all)",
       "Bash(timeout 30s cargo test -p examples)",
       "Bash(mv:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(find:*)",
+      "Bash(echo $?)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

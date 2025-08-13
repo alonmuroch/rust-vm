@@ -9,3 +9,7 @@ goblin = "0.10"
 [[bin]]
 name = "abi_generator"
 path = "src/bin/abi_generator.rs"
+
+[[bin]]
+name = "abi_codegen"
+path = "src/bin/abi_codegen.rs"
