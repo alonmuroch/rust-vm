@@ -3,8 +3,8 @@ mod tests;
 use avm::avm::AVM;
 use crate::tests::TEST_CASES;
 
-pub const VM_MEMORY_SIZE: usize = 15 * 1024; // 15 KB
-pub const MAX_MEMORY_PAGES: usize = 10; 
+pub const VM_MEMORY_SIZE: usize = 64 * 1024; // 64 KB - increased to support larger programs with external libraries
+pub const MAX_MEMORY_PAGES: usize = 20;  // Increased memory pages 
 
 #[test]
 fn test_entrypoint_function() {

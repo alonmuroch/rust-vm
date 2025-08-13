@@ -255,6 +255,38 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 },
             ]),
         },
+
+        TestCase {
+            name: "lib_import - SHA256 of 'hello world'",
+            expected_success: true,
+            expected_error_code: 0,
+            // SHA-256 hash of "hello world" = b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
+            expected_data: Some(vec![
+                0xb9, 0x4d, 0x27, 0xb9, 0x93, 0x4d, 0x3e, 0x08,
+                0xa5, 0x2e, 0x52, 0xd7, 0xda, 0x7d, 0xab, 0xfa,
+                0xc4, 0x84, 0xef, 0xe3, 0x7a, 0x53, 0x80, 0xee,
+                0x90, 0x88, 0xf7, 0xac, 0xe2, 0xef, 0xcd, 0xe9
+            ]),
+            abi: None,
+            bundle: TransactionBundle::new(vec![
+                Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/lib_import"),
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: b"hello world".to_vec(), // Input data to hash
+                    value: 0,
+                    nonce: 0,
+                },
+            ]),
+        },
     ]
 });
 

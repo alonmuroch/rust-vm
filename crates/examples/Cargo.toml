@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 program = { path = "../program" }
+sha2 = { version = "0.10", default-features = false }
 
 [dev-dependencies]
 types = { path = "../types" }  # adjust path as needed
@@ -53,4 +54,9 @@ required-features = ["binaries"]
 [[bin]]
 name = "allocator_demo"
 path = "src/allocator_demo.rs"
+required-features = ["binaries"]
+
+[[bin]]
+name = "lib_import"
+path = "src/lib_import.rs"
 required-features = ["binaries"]
