@@ -18,7 +18,8 @@
       "Bash(find:*)",
       "Bash(echo $?)",
       "Bash(echo \"Exit code: $?\")",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   }
