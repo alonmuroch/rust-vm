@@ -19,6 +19,74 @@ macro_rules! logf_syscall {
     }};
 }
 
+// Helper macro that handles array arguments
+#[macro_export]
+macro_rules! logf_impl {
+    // Base case: format string only
+    (@parse $fmt:expr, $args:expr, $idx:expr, []) => {};
+    
+    // Array format specifiers - automatically extract ptr and len
+    (@parse $fmt:expr, $args:expr, $idx:expr, [%a $($rest:tt)*], $arg:expr $(, $more:expr)*) => {{
+        let arr = &$arg;
+        $args[$idx] = arr.as_ptr() as u32;
+        $args[$idx + 1] = arr.len() as u32;
+        logf_impl!(@parse $fmt, $args, $idx + 2, [$($rest)*] $(, $more)*);
+    }};
+    
+    (@parse $fmt:expr, $args:expr, $idx:expr, [%A $($rest:tt)*], $arg:expr $(, $more:expr)*) => {{
+        let arr = &$arg;
+        $args[$idx] = arr.as_ptr() as u32;
+        $args[$idx + 1] = arr.len() as u32;
+        logf_impl!(@parse $fmt, $args, $idx + 2, [$($rest)*] $(, $more)*);
+    }};
+    
+    (@parse $fmt:expr, $args:expr, $idx:expr, [%b $($rest:tt)*], $arg:expr $(, $more:expr)*) => {{
+        let arr = &$arg;
+        $args[$idx] = arr.as_ptr() as u32;
+        $args[$idx + 1] = arr.len() as u32;
+        logf_impl!(@parse $fmt, $args, $idx + 2, [$($rest)*] $(, $more)*);
+    }};
+    
+    (@parse $fmt:expr, $args:expr, $idx:expr, [%s $($rest:tt)*], $arg:expr $(, $more:expr)*) => {{
+        let s = &$arg;
+        $args[$idx] = s.as_ptr() as u32;
+        $args[$idx + 1] = s.len() as u32;
+        logf_impl!(@parse $fmt, $args, $idx + 2, [$($rest)*] $(, $more)*);
+    }};
+    
+    // Scalar format specifiers
+    (@parse $fmt:expr, $args:expr, $idx:expr, [%d $($rest:tt)*], $arg:expr $(, $more:expr)*) => {{
+        $args[$idx] = $arg as u32;
+        logf_impl!(@parse $fmt, $args, $idx + 1, [$($rest)*] $(, $more)*);
+    }};
+    
+    (@parse $fmt:expr, $args:expr, $idx:expr, [%u $($rest:tt)*], $arg:expr $(, $more:expr)*) => {{
+        $args[$idx] = $arg as u32;
+        logf_impl!(@parse $fmt, $args, $idx + 1, [$($rest)*] $(, $more)*);
+    }};
+    
+    (@parse $fmt:expr, $args:expr, $idx:expr, [%x $($rest:tt)*], $arg:expr $(, $more:expr)*) => {{
+        $args[$idx] = $arg as u32;
+        logf_impl!(@parse $fmt, $args, $idx + 1, [$($rest)*] $(, $more)*);
+    }};
+    
+    (@parse $fmt:expr, $args:expr, $idx:expr, [%c $($rest:tt)*], $arg:expr $(, $more:expr)*) => {{
+        $args[$idx] = $arg as u32;
+        logf_impl!(@parse $fmt, $args, $idx + 1, [$($rest)*] $(, $more)*);
+    }};
+    
+    (@parse $fmt:expr, $args:expr, $idx:expr, [%f $($rest:tt)*], $arg:expr $(, $more:expr)*) => {{
+        let f: f32 = $arg;
+        $args[$idx] = f.to_bits();
+        logf_impl!(@parse $fmt, $args, $idx + 1, [$($rest)*] $(, $more)*);
+    }};
+    
+    // Skip non-format characters
+    (@parse $fmt:expr, $args:expr, $idx:expr, [$other:tt $($rest:tt)*] $(, $arg:expr)*) => {
+        logf_impl!(@parse $fmt, $args, $idx, [$($rest)*] $(, $arg)*);
+    };
+}
+
 #[macro_export]
 macro_rules! logf {
     ($fmt:expr) => {{
@@ -29,8 +97,8 @@ macro_rules! logf {
     }};
 
     ($fmt:expr, $($arg:expr),+ $(,)?) => {{
-        // Simple approach: just pass raw values as u32s
-        // The host will interpret them based on format specifiers
+        // Simple fallback - just pass everything as u32s and let host figure it out
+        // For arrays, you still need to pass ptr and len manually
         const MAX_ARGS: usize = 32;
         let mut args_buf = [0u32; MAX_ARGS];
         let mut i = 0;
@@ -53,13 +121,11 @@ macro_rules! logf {
     }};
 }
 
-// Helper macro for arrays - passes pointer and length
+// Convenience macro for arrays that automatically handles ptr/len
 #[macro_export]
-macro_rules! log_array {
+macro_rules! logf_array {
     ($fmt:expr, $arr:expr) => {{
-        let arr_ref: &[_] = $arr;
-        let ptr = arr_ref.as_ptr() as u32;
-        let len = arr_ref.len() as u32;
-        $crate::logf!($fmt, ptr, len);
+        let arr = &$arr;
+        $crate::logf!($fmt, arr.as_ptr() as u32, arr.len() as u32);
     }};
 }

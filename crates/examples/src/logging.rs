@@ -2,7 +2,7 @@
 #![no_main]
 
 extern crate program;
-use program::{entrypoint, types::result::Result, logf, log_array};
+use program::{entrypoint, types::result::Result, logf, logf_array};
 use program::types::address::Address;
 
 /// Comprehensive logging demonstration showing all format specifiers
@@ -29,21 +29,21 @@ fn logging(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
     let pi_bits = 3.14159f32.to_bits();
     logf!(b"Pi approximation: %f", pi_bits);
     
-    // String logging (requires pointer and length)
+    // String logging
     let msg = b"Hello, VM!";
-    logf!(b"Message: %s", msg.as_ptr() as u32, msg.len() as u32);
+    logf_array!(b"Message: %s", msg);
     
     // Byte array logging (hex format)
     let bytes = [0xDE, 0xAD, 0xBE, 0xEF];
-    logf!(b"Bytes (hex): %b", bytes.as_ptr() as u32, bytes.len() as u32);
+    logf_array!(b"Bytes (hex): %b", &bytes);
     
     // Array of u32s
     let numbers = [1u32, 2, 3, 4, 5];
-    log_array!(b"Numbers: %a", &numbers);
+    logf_array!(b"Numbers: %a", &numbers);
     
     // Array of u8s (decimal format)
     let bytes_decimal = [10u8, 20, 30, 40, 50];
-    logf!(b"Bytes (decimal): %A", bytes_decimal.as_ptr() as u32, bytes_decimal.len() as u32);
+    logf_array!(b"Bytes (decimal): %A", &bytes_decimal);
     
     // Process input data
     if data.len() >= 4 {
@@ -55,10 +55,8 @@ fn logging(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
         // Log remaining bytes if any
         if data.len() > 4 {
             let remaining = &data[4..];
-            logf!(b"Remaining %d bytes: %b", 
-                  remaining.len() as u32,
-                  remaining.as_ptr() as u32, 
-                  remaining.len() as u32);
+            logf!(b"Remaining %d bytes: ", remaining.len() as u32);
+            logf_array!(b"%b", remaining);
         }
     } else {
         logf!(b"Input too short: %d bytes", data.len() as u32);
@@ -77,7 +75,7 @@ fn logging(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
     
     // Large array (partial display for efficiency)
     let large_array = [1u32, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-    log_array!(b"Large array: %a", &large_array);
+    logf_array!(b"Large array: %a", &large_array);
     
     logf!(b"=== Logging Demo Complete ===");
     
