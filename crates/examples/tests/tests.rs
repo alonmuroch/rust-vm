@@ -287,6 +287,31 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 },
             ]),
         },
+        TestCase {
+            name: "logging demo",
+            expected_success: true,
+            expected_error_code: 0,
+            expected_data: None, // Logging doesn't return specific data
+            abi: None,
+            bundle: TransactionBundle::new(vec![
+                Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0e0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/logging"),
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0e0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: vec![0x12, 0x34, 0x56, 0x78, 0xAB, 0xCD, 0xEF], // Some test data
+                    value: 0,
+                    nonce: 0,
+                },
+            ]),
+        },
     ]
 });
 

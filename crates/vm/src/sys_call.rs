@@ -311,6 +311,33 @@ impl DefaultSyscallHandler {
                         }
                     }
                 }
+                'a' => {
+                    // Array of u32s
+                    let ptr = next() as usize;
+                    let len = next() as usize;
+                    let byte_len = len * 4; // u32 is 4 bytes
+                    match borrowed_memory.mem_slice(ptr, ptr + byte_len) {
+                        Some(slice) => {
+                            args.push(Arg::Bytes(slice.to_vec()));
+                        }
+                        None => {
+                            args.push(Arg::Str("<invalid>".to_string()));
+                        }
+                    }
+                }
+                'A' => {
+                    // Array of u8s  
+                    let ptr = next() as usize;
+                    let len = next() as usize;
+                    match borrowed_memory.mem_slice(ptr, ptr + len) {
+                        Some(slice) => {
+                            args.push(Arg::Bytes(slice.to_vec()));
+                        }
+                        None => {
+                            args.push(Arg::Str("<invalid>".to_string()));
+                        }
+                    }
+                }
                 _ => args.push(Arg::Str("<bad-format>".to_string())),
             }
         }
@@ -341,7 +368,40 @@ impl DefaultSyscallHandler {
                         _ => output.push_str("<err>"),
                     },
                     Some('b') => match args_iter.next() {
-                        Some(Arg::Bytes(b)) => output.push_str(&format!("{:?}", b)),
+                        Some(Arg::Bytes(b)) => {
+                            // Format bytes array nicely
+                            output.push('[');
+                            for (i, byte) in b.iter().enumerate() {
+                                if i > 0 { output.push_str(", "); }
+                                output.push_str(&format!("0x{:02x}", byte));
+                            }
+                            output.push(']');
+                        },
+                        _ => output.push_str("<err>"),
+                    },
+                    Some('a') => match args_iter.next() {
+                        Some(Arg::Bytes(b)) => {
+                            // Format u32 array (bytes interpreted as u32s)
+                            output.push('[');
+                            for (i, chunk) in b.chunks_exact(4).enumerate() {
+                                if i > 0 { output.push_str(", "); }
+                                let val = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                                output.push_str(&format!("{}", val));
+                            }
+                            output.push(']');
+                        },
+                        _ => output.push_str("<err>"),
+                    },
+                    Some('A') => match args_iter.next() {
+                        Some(Arg::Bytes(b)) => {
+                            // Format u8 array 
+                            output.push('[');
+                            for (i, byte) in b.iter().enumerate() {
+                                if i > 0 { output.push_str(", "); }
+                                output.push_str(&format!("{}", byte));
+                            }
+                            output.push(']');
+                        },
                         _ => output.push_str("<err>"),
                     },
                     Some('%') => output.push('%'),
