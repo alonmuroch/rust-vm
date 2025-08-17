@@ -47,19 +47,19 @@ unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
 }
 
 fn init(caller: Address, args: &[u8]) {
-    logf!(b"init called");
+    logf!("init called");
     let mut meta = match Metadata::load() {
         O::Some(m) => vm_panic(b"already initialized"),
         O::None => Metadata { total_supply: 0, decimals: 0 },
     };
     
-    logf!(b"initializing");
+    logf!("initializing");
 
     let total_supply = read_u32(&args[0..4]);
     let decimals = args[4];
 
-    logf!(b"total supply: %d", total_supply);
-    logf!(b"decimals: %d", decimals);
+    logf!("total supply: %d", total_supply);
+    logf!("decimals: %d", decimals);
 
     meta.total_supply = total_supply;
     meta.decimals = decimals;
@@ -70,7 +70,7 @@ fn init(caller: Address, args: &[u8]) {
 }
 
 fn mint(caller: Address, val: u32) {
-    logf!(b"minting: %d tokens", val);
+    logf!("minting: %d tokens", val);
     fire_event!(Minted::new(caller, val));
     Balances::set(caller, val);
 }
