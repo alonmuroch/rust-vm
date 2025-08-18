@@ -29,6 +29,44 @@ macro_rules! logf {
         $crate::logf_syscall!(fmt_ptr, fmt_len, 0 as *const u32, 0usize);
     }};
 
+    // Special case for Debug trait formatting with %D
+    ($fmt:expr, debug: $obj:expr) => {{
+        use core::fmt::Write;
+        
+        // Buffer for Debug formatting
+        let mut buffer = [0u8; 256];
+        let len = {
+            let mut writer = $crate::BufferWriter::new(&mut buffer);
+            
+            // Format the object using Debug trait
+            let _ = core::write!(&mut writer, "{:?}", $obj);
+            writer.len()
+        };
+        
+        // Log the formatted string
+        let formatted = &buffer[..len];
+        $crate::log!($fmt, formatted);
+    }};
+    
+    // Special case for Display trait formatting with %S
+    ($fmt:expr, display: $obj:expr) => {{
+        use core::fmt::Write;
+        
+        // Buffer for Display formatting
+        let mut buffer = [0u8; 256];
+        let len = {
+            let mut writer = $crate::BufferWriter::new(&mut buffer);
+            
+            // Format the object using Display trait
+            let _ = core::write!(&mut writer, "{}", $obj);
+            writer.len()
+        };
+        
+        // Log the formatted string
+        let formatted = &buffer[..len];
+        $crate::log!($fmt, formatted);
+    }};
+
     ($fmt:expr, $($arg:expr),+ $(,)?) => {{
         // Simple approach: just pass raw values as u32s
         // The host will interpret them based on format specifiers
@@ -129,4 +167,38 @@ macro_rules! as_bytes {
         let s = &$s;
         s.as_bytes_ref()
     }};
+}
+
+// Simple buffer writer for no_std formatting
+pub struct BufferWriter<'a> {
+    buffer: &'a mut [u8],
+    position: usize,
+}
+
+impl<'a> BufferWriter<'a> {
+    pub fn new(buffer: &'a mut [u8]) -> Self {
+        BufferWriter { buffer, position: 0 }
+    }
+    
+    pub fn len(&self) -> usize {
+        self.position
+    }
+}
+
+impl<'a> core::fmt::Write for BufferWriter<'a> {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        let bytes = s.as_bytes();
+        let remaining = self.buffer.len() - self.position;
+        let to_write = bytes.len().min(remaining);
+        
+        self.buffer[self.position..self.position + to_write]
+            .copy_from_slice(&bytes[..to_write]);
+        self.position += to_write;
+        
+        if to_write < bytes.len() {
+            Err(core::fmt::Error)
+        } else {
+            Ok(())
+        }
+    }
 }

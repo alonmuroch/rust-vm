@@ -4,6 +4,7 @@
 extern crate program;
 use program::{entrypoint, types::result::Result, logf, log, concat_str};
 use program::types::address::Address;
+use core::fmt;
 
 /// Comprehensive logging demonstration showing all format specifiers
 unsafe fn logging(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
@@ -83,9 +84,50 @@ unsafe fn logging(_self_address: Address, _caller: Address, data: &[u8]) -> Resu
     let large_array = [1u32, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     log!("Large array: %a", large_array);
     
+    // Debug and Display trait demonstrations
+    logf!("=== Debug and Display Trait Logging ===");
+    
+    // Create a custom struct that implements Debug and Display
+    let point = Point { x: 10, y: 20 };
+    logf!("Point (Debug): %s", debug: point);
+    logf!("Point (Display): %s", display: point);
+    
+    // Test with Option types (implements Debug)
+    let some_value: Option<u32> = Some(42);
+    let none_value: Option<u32> = None;
+    logf!("Some value: %s", debug: some_value);
+    logf!("None value: %s", debug: none_value);
+    
+    // Test with Result types (implements Debug)
+    let ok_result: core::result::Result<u32, &str> = Ok(100);
+    let err_result: core::result::Result<u32, &str> = Err("error message");
+    logf!("Ok result: %s", debug: ok_result);
+    logf!("Err result: %s", debug: err_result);
+    
+    // Test with arrays (Debug)
+    let debug_array = [1, 2, 3, 4, 5];
+    logf!("Array debug: %s", debug: debug_array);
+    
+    // Test with tuples (Debug)
+    let tuple = (42, "hello", true);
+    logf!("Tuple: %s", debug: tuple);
+    
     logf!("=== Logging Demo Complete ===");
     
     Result::new(true, 0)
+}
+
+// Custom struct for demonstrating Debug and Display
+#[derive(Debug)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
 }
 
 entrypoint!(logging);

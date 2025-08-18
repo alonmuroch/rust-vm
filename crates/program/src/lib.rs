@@ -27,6 +27,7 @@ pub use event::*;
 
 // Logging macros
 pub mod log;
+pub use log::BufferWriter;
 
 // Contract call func
 pub mod call;
