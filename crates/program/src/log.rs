@@ -71,6 +71,15 @@ macro_rules! concat_str {
     }};
 }
 
+// Alternative: concat with internal buffer (no explicit buffer needed)
+#[macro_export]
+macro_rules! concat {
+    ($($part:expr),+) => {{
+        let mut _internal_buf = [0u8; 128]; // Default 128-byte buffer
+        $crate::concat_str!(_internal_buf, $($part),+)
+    }};
+}
+
 // Simplified logging macro that automatically handles arrays/strings
 #[macro_export]
 macro_rules! log {

@@ -21,7 +21,10 @@
       "Bash(git add:*)",
       "Bash(git push:*)",
       "Bash(RUST_LOG=debug cargo test -p examples -- --test-threads=1 --nocapture)",
-      "Bash(timeout 5 cargo test -p examples test_entrypoint_function)"
+      "Bash(timeout 5 cargo test -p examples test_entrypoint_function)",
+      "Bash(readelf:*)",
+      "Bash(objdump:*)",
+      "Bash(RUST_BACKTRACE=1 cargo test -p examples test_entrypoint_function)"
     ],
     "deny": []
   }

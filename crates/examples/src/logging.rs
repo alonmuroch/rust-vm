@@ -6,7 +6,7 @@ use program::{entrypoint, types::result::Result, logf, log, concat_str};
 use program::types::address::Address;
 
 /// Comprehensive logging demonstration showing all format specifiers
-fn logging(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
+unsafe fn logging(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
     // Simple string logging
     logf!("=== Logging Demo Started ===");
     
@@ -33,12 +33,11 @@ fn logging(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
     let msg = b"Hello, VM!";
     log!("Message: %s", msg);
     
-    // String concatenation - using the concat_str! macro
-    
-    // string concatenation
-    let mut buffer1 = [0u8; 64];
-    let greeting = concat_str!(buffer1, b"Hello, ", b"World", b"!");
+    // String concatenation - requires a buffer in no_std (even though we have an allocator)
+    let mut buffer = [0u8; 64];  // Stack-allocated storage
+    let greeting = concat_str!(buffer, b"Hello, ", b"World", b"!");
     log!("Concatenated: %s", greeting);
+    
     
     // Byte array logging (hex format) - simplified!
     let bytes = [0xDE, 0xAD, 0xBE, 0xEF];
