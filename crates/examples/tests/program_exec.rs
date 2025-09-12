@@ -2,42 +2,127 @@ mod tests;
 
 use avm::avm::AVM;
 use crate::tests::TEST_CASES;
+use std::rc::Rc;
+use core::cell::RefCell;
+use core::fmt::Write;
+use std::fs::File;
+use std::io::Write as IoWrite;
+
+// File writer for logging to disk
+struct FileWriter {
+    file: File,
+}
+
+impl FileWriter {
+    fn new(path: &str) -> std::io::Result<Self> {
+        Ok(FileWriter {
+            file: File::create(path)?,
+        })
+    }
+}
+
+impl Write for FileWriter {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        self.file.write_all(s.as_bytes()).map_err(|_| core::fmt::Error)?;
+        self.file.flush().map_err(|_| core::fmt::Error)?;
+        Ok(())
+    }
+}
 
 pub const VM_MEMORY_SIZE: usize = 64 * 1024; // 64 KB - increased to support larger programs with external libraries
-pub const MAX_MEMORY_PAGES: usize = 20;  // Increased memory pages 
+pub const MAX_MEMORY_PAGES: usize = 20;  // Increased memory pages
+pub const VERBOSE_LOGGING: bool = false;
+
+/// Console writer that wraps println!
+struct ConsoleWriter;
+
+impl Write for ConsoleWriter {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        print!("{}", s);
+        Ok(())
+    }
+}
 
 #[test]
 fn test_entrypoint_function() {
+    // Set up logging once for all test cases
+    // Choose your logging mode by uncommenting ONE of the lines below:
+    
+    // Option 1: Log to console with verbose output
+    let writer: Rc<RefCell<dyn Write>> = Rc::new(RefCell::new(ConsoleWriter));
+    
+    // Option 2: Log to file with verbose output  
+    // let log_path = "/Users/alonmuroch/Desktop/logs.txt";
+    // let writer: Rc<RefCell<dyn Write>> = match FileWriter::new(log_path) {
+    //     Ok(file_writer) => {
+    //         eprintln!("📝 All output will be written to: {}", log_path);
+    //         Rc::new(RefCell::new(file_writer))
+    //     }
+    //     Err(e) => {
+    //         eprintln!("⚠️ Failed to create log file at {}: {}", log_path, e);
+    //         eprintln!("   Falling back to console output");
+    //         Rc::new(RefCell::new(ConsoleWriter))
+    //     }
+    // };
+    
+    // Option 3: Default console output without verbose (comment out Option 2 above and uncomment below)
+    // let writer: Rc<RefCell<dyn Write>> = Rc::new(RefCell::new(ConsoleWriter));
+    // let verbose = false;
+    
+    writeln!(writer.borrow_mut(), "=== Starting Test Run ===").unwrap();
+    writeln!(writer.borrow_mut(), "Verbose logging: {}", if VERBOSE_LOGGING { "enabled" } else { "disabled" }).unwrap();
+    
     for case in TEST_CASES.iter() {
-        println!("\n############################################");
-        println!("#### Running test case: {} ####", case.name);
-        println!("############################################\n");
-
         let transactions = case.bundle.transactions.clone();
         let mut avm = AVM::new(MAX_MEMORY_PAGES, VM_MEMORY_SIZE);
-        // avm.set_verbosity(true);
+        
+        // Set up AVM with the chosen writer and verbosity
+        avm.set_verbosity(VERBOSE_LOGGING);
+        avm.set_verbose_writer(writer.clone());
+        
+        // Write test case header using the configured writer
+        writeln!(writer.borrow_mut(), "\n############################################").unwrap();
+        writeln!(writer.borrow_mut(), "#### Running test case: {} ####", case.name).unwrap();
+        writeln!(writer.borrow_mut(), "############################################\n").unwrap();
+        
         let mut last_success: bool = false;
         let mut last_error_code: u32 = 0;
         let mut last_result: Option<types::Result> = None;
         for tx in transactions {
-            // Log the transaction details
-            println!(
+            // Log the transaction details using the configured writer
+            writeln!(writer.borrow_mut(),
                 "Running {:?} tx:\n  From: {:?}\n  To: {:?}\n  Data len: {:?}",
                 tx.tx_type, tx.from, tx.to, tx.data.len()
-            );
+            ).unwrap();
 
             let receipt = avm.run_tx(tx);
             last_success = receipt.result.success;
             last_error_code = receipt.result.error_code;
             last_result = Some(receipt.result.clone());
-            avm.state.pretty_print();
-            // avm.memory_manager.dump_all_pages_linear();
+            
+            // Write state dump to the configured writer
+            writeln!(writer.borrow_mut(), "--- State Dump ---").unwrap();
+            for (address, account) in &avm.state.accounts {
+                writeln!(writer.borrow_mut(), "  🔑 Address: 0x{}", address).unwrap();
+                writeln!(writer.borrow_mut(), "      - Balance: {}", account.balance).unwrap();
+                writeln!(writer.borrow_mut(), "      - Nonce: {}", account.nonce).unwrap();
+                writeln!(writer.borrow_mut(), "      - Is contract?: {}", account.is_contract).unwrap();
+                writeln!(writer.borrow_mut(), "      - Code size: {} bytes", account.code.len()).unwrap();
+                writeln!(writer.borrow_mut(), "      - Storage:").unwrap();
+                for (key, value) in &account.storage {
+                    writeln!(writer.borrow_mut(), "        [{:?}] = {:?}", key, value).unwrap();
+                }
+                writeln!(writer.borrow_mut(), "").unwrap();
+            }
+            writeln!(writer.borrow_mut(), "--------------------").unwrap();
 
-            if let Some(abi) = &case.abi {
-                receipt.print_events_pretty(abi);
-                println!("{}", receipt);
+            // Write receipt to the configured writer
+            if let Some(_abi) = &case.abi {
+                // TODO: Update print_events_pretty to use the writer
+                // For now, just write the receipt
+                writeln!(writer.borrow_mut(), "{}", receipt).unwrap();
             } else {
-                println!("{}", receipt);
+                writeln!(writer.borrow_mut(), "{}", receipt).unwrap();
             }
         }
         assert_eq!(
@@ -63,6 +148,10 @@ fn test_entrypoint_function() {
             }
         }
     }
+    
+    // Write test summary
+    writeln!(writer.borrow_mut(), "\n=== Test Run Complete ===").unwrap();
+    writeln!(writer.borrow_mut(), "Total test cases: {}", TEST_CASES.len()).unwrap();
 }
 
 

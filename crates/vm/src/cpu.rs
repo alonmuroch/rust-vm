@@ -779,7 +779,6 @@ impl CPU {
                 self.write_reg(rd, value);
                 // Set reservation for this address
                 self.reservation_addr = Some(addr);
-                self.log(&format!("LR: Set reservation for addr 0x{:x}, loaded value 0x{:x}", addr, value), true);
             }
             Instruction::ScW { rd, rs1, rs2 } => {
                 let addr = self.regs[rs1] as usize;
@@ -792,11 +791,9 @@ impl CPU {
                     self.write_reg(rd, 0); // 0 = success
                     // Clear the reservation (it's consumed)
                     self.reservation_addr = None;
-                    self.log(&format!("SC: Success - stored 0x{:x} at addr 0x{:x}, cleared reservation", value_to_store, addr), true);
                 } else {
                     // No valid reservation, fail
                     self.write_reg(rd, 1); // 1 = failure
-                    self.log(&format!("SC: Failed - no reservation for addr 0x{:x}", addr), true);
                 }
             }
             _ => todo!("unhandled instruction"),

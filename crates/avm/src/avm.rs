@@ -249,11 +249,7 @@ impl AVM {
 
         // EDUCATIONAL: Extract the result fields from memory using the correct offset
         let mem = page.mem();
-        
-        // Debug output to see what's in memory
-        self.log(&format!("DEBUG: Reading result from memory at offset {}", start), true);
-        self.log(&format!("DEBUG: Memory at result location: {:?}", &mem[start..start+20]), true);
-        
+         
         let success = mem[start] != 0;
         let error_code = u32::from_le_bytes(mem[start+1..start + 5].try_into().unwrap());
         let data_len = u32::from_le_bytes(mem[start+5..start + 9].try_into().unwrap());
@@ -262,7 +258,7 @@ impl AVM {
         let mut data = [0u8; 256];
         data.copy_from_slice(&mem[start+9..start + 265]);
 
-        self.log(&format!("DEBUG: Extracted result - success: {}, error_code: {}, data_len: {}", success, error_code, data_len), true);
+        self.log(&format!("DEBUG: Extracted result - success: {}, error_code: {}, data_len: {}", success, error_code, data_len), false);
 
         return Result { success, error_code, data_len, data };
     }
@@ -294,7 +290,7 @@ impl AVM {
             to,
             is_contract,
             code_size
-        ), true);
+        ), false);
     
         // EDUCATIONAL: Check that the target address is not already in use
         // This prevents overwriting existing accounts
@@ -352,7 +348,7 @@ impl AVM {
             "Tx calling program at address {} with data 0x{}",
             to,
             hex::encode(&input_data)
-        ), true);
+        ), false);
 
         // SAFETY NOTE:
         // This line creates a HostShim containing a raw pointer (*mut AVM) to self.
