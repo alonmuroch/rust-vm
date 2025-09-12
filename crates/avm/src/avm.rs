@@ -13,6 +13,7 @@ use types::result::Result;
 use std::{panic::{catch_unwind, AssertUnwindSafe}, usize};
 use std::rc::Rc;
 use core::cell::RefCell;
+use core::fmt::Write;
 
 /// Application Virtual Machine (AVM) - the main orchestrator for smart contract execution.
 /// 
@@ -51,7 +52,6 @@ use core::cell::RefCell;
 /// - Memory isolation between contracts prevents interference
 /// - Input validation prevents resource exhaustion attacks
 /// - Context tracking prevents unauthorized cross-contract access
-#[derive(Debug)]
 pub struct AVM {
     /// Stack of execution contexts for nested contract calls.
     /// 
@@ -75,11 +75,52 @@ pub struct AVM {
     pub state: State,
 
     pub verbose: bool, // Enable verbose logging for debugging
+    
+    /// Optional writer for verbose output. If None, outputs to console.
+    pub verbose_writer: Option<Rc<RefCell<dyn Write>>>,
+}
+
+impl std::fmt::Debug for AVM {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AVM")
+            .field("context_stack", &self.context_stack)
+            .field("memory_manager", &self.memory_manager)
+            .field("state", &self.state)
+            .field("verbose", &self.verbose)
+            .field("verbose_writer", &self.verbose_writer.as_ref().map(|_| "Some(<writer>)"))
+            .finish()
+    }
 }
 
 impl AVM {
     pub fn set_verbosity(&mut self, value: bool) {
         self.verbose = value;
+    }
+    
+    /// Sets the output writer for verbose logging.
+    /// If set, verbose output will be written to this writer instead of console.
+    pub fn set_verbose_writer(&mut self, writer: Rc<RefCell<dyn Write>>) {
+        self.verbose_writer = Some(writer);
+    }
+    
+    /// Helper method to log output to either console or the configured writer
+    /// Only logs if verbose is true and self.verbose is enabled
+    fn log(&self, message: &str, verbose: bool) {
+        // Only log if this is not a verbose message, or if verbose logging is enabled
+        if verbose && !self.verbose {
+            return;
+        }
+        
+        match &self.verbose_writer {
+            Some(writer) => {
+                // Write to the provided writer (add newline manually)
+                let _ = write!(writer.borrow_mut(), "{}\n", message);
+            }
+            None => {
+                // Output to console
+                println!("{}", message);
+            }
+        }
     }
 
     /// Creates a new Application Virtual Machine with specified memory constraints.
@@ -100,6 +141,7 @@ impl AVM {
             memory_manager: MemoryPageManager::new(max_pages, page_size),
             state: State::new(),
             verbose: false, // Default to no verbose logging
+            verbose_writer: None, // Default to console output
         }
     }
 
@@ -209,10 +251,8 @@ impl AVM {
         let mem = page.mem();
         
         // Debug output to see what's in memory
-        if self.verbose {
-            println!("DEBUG: Reading result from memory at offset {}", start);
-            println!("DEBUG: Memory at result location: {:?}", &mem[start..start+20]);
-        }
+        self.log(&format!("DEBUG: Reading result from memory at offset {}", start), true);
+        self.log(&format!("DEBUG: Memory at result location: {:?}", &mem[start..start+20]), true);
         
         let success = mem[start] != 0;
         let error_code = u32::from_le_bytes(mem[start+1..start + 5].try_into().unwrap());
@@ -222,9 +262,7 @@ impl AVM {
         let mut data = [0u8; 256];
         data.copy_from_slice(&mem[start+9..start + 265]);
 
-        if self.verbose {
-            println!("DEBUG: Extracted result - success: {}, error_code: {}, data_len: {}", success, error_code, data_len);
-        }
+        self.log(&format!("DEBUG: Extracted result - success: {}, error_code: {}, data_len: {}", success, error_code, data_len), true);
 
         return Result { success, error_code, data_len, data };
     }
@@ -251,12 +289,12 @@ impl AVM {
         let is_contract = !data.is_empty();
         let code_size = data.len();
 
-        println!(
+        self.log(&format!(
             "Tx creating account at address {}. Is contract: {}. Code size: {} bytes.",
             to,
             is_contract,
             code_size
-        );
+        ), true);
     
         // EDUCATIONAL: Check that the target address is not already in use
         // This prevents overwriting existing accounts
@@ -310,11 +348,11 @@ impl AVM {
     /// - a3: Input data length
     /// - a4: Result pointer (where to write the result)
     pub fn call_contract(&mut self, from: Address, to: Address, input_data: Vec<u8>) -> (u32, usize) {
-        println!(
+        self.log(&format!(
             "Tx calling program at address {} with data 0x{}",
             to,
             hex::encode(&input_data)
-        );
+        ), true);
 
         // SAFETY NOTE:
         // This line creates a HostShim containing a raw pointer (*mut AVM) to self.
@@ -345,6 +383,11 @@ impl AVM {
         let mut vm: VM = VM::new(memory_page, storage.clone(), Box::new(shim));
         vm.set_code(0, Config::PROGRAM_START_ADDR, &account.code);
         vm.cpu.verbose = self.verbose;
+        
+        // Set up logging writer for CPU to use AVM's logging mechanism
+        if let Some(writer) = &self.verbose_writer {
+            vm.cpu.set_verbose_writer(writer.clone());
+        }
 
         // add new context execution
         let context_index = self.context_stack.push(from, to, input_data, vm);

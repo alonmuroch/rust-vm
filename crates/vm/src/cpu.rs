@@ -7,6 +7,7 @@ use core::cell::RefCell;
 use crate::host_interface::HostInterface;
 use crate::sys_call::SyscallHandler;
 use crate::registers::Register;
+use core::fmt::Write;
 
 /// Represents the Central Processing Unit (CPU) of our RISC-V virtual machine.
 /// 
@@ -43,7 +44,6 @@ use crate::registers::Register;
 /// like pipelining, out-of-order execution, and just-in-time compilation to
 /// achieve much higher performance. However, this simple approach is perfect
 /// for learning and understanding how CPUs work at a fundamental level.
-#[derive(Debug)]
 pub struct CPU {
     /// Program Counter - points to the next instruction to execute
     /// EDUCATIONAL: In real CPUs, this is a special register that automatically
@@ -66,6 +66,22 @@ pub struct CPU {
     /// EDUCATIONAL: This implements the Load-Reserved/Store-Conditional
     /// mechanism for atomic memory operations in RISC-V
     pub reservation_addr: Option<usize>,
+    
+    /// Optional writer for verbose output
+    /// If None, uses println! to console
+    pub verbose_writer: Option<Rc<RefCell<dyn Write>>>,
+}
+
+impl std::fmt::Debug for CPU {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CPU")
+            .field("pc", &self.pc)
+            .field("regs", &self.regs)
+            .field("verbose", &self.verbose)
+            .field("reservation_addr", &self.reservation_addr)
+            .field("verbose_writer", &self.verbose_writer.as_ref().map(|_| "Some(<writer>)"))
+            .finish()
+    }
 }
 
 impl CPU {
@@ -85,6 +101,30 @@ impl CPU {
             verbose: false,
             syscall_handler,
             reservation_addr: None,
+            verbose_writer: None,
+        }
+    }
+    
+    /// Sets a writer for verbose output
+    pub fn set_verbose_writer(&mut self, writer: Rc<RefCell<dyn Write>>) {
+        self.verbose_writer = Some(writer);
+    }
+    
+    /// Helper method to log output
+    /// Only logs if verbose is true and self.verbose is enabled
+    fn log(&self, message: &str, verbose: bool) {
+        // Only log if this is not a verbose message, or if verbose logging is enabled
+        if verbose && !self.verbose {
+            return;
+        }
+        
+        match &self.verbose_writer {
+            Some(writer) => {
+                let _ = write!(writer.borrow_mut(), "{}\n", message);
+            }
+            None => {
+                println!("{}", message);
+            }
         }
     }
 
@@ -161,14 +201,12 @@ impl CPU {
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>) -> bool {
         // EDUCATIONAL: Debug output to help understand what's happening
-        if self.verbose {
-            // Get the actual instruction bytes for debugging
-            if let Some(bytes) = memory.borrow().mem_slice(self.pc as usize, self.pc as usize + size as usize) {
-                let hex_bytes = bytes.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ");
-                println!("PC = 0x{:08x}, Bytes = [{}], Instr = {}", self.pc, hex_bytes, instr.pretty_print());
-            } else {
-                println!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print());
-            }
+        // Get the actual instruction bytes for debugging
+        if let Some(bytes) = memory.borrow().mem_slice(self.pc as usize, self.pc as usize + size as usize) {
+            let hex_bytes = bytes.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ");
+            self.log(&format!("PC = 0x{:08x}, Bytes = [{}], Instr = {}", self.pc, hex_bytes, instr.pretty_print()), true);
+        } else {
+            self.log(&format!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print()), true);
         }
         
         // EDUCATIONAL: Remember the old PC to detect if the instruction changed it
@@ -741,9 +779,7 @@ impl CPU {
                 self.write_reg(rd, value);
                 // Set reservation for this address
                 self.reservation_addr = Some(addr);
-                if self.verbose {
-                    println!("LR: Set reservation for addr 0x{:x}, loaded value 0x{:x}", addr, value);
-                }
+                self.log(&format!("LR: Set reservation for addr 0x{:x}, loaded value 0x{:x}", addr, value), true);
             }
             Instruction::ScW { rd, rs1, rs2 } => {
                 let addr = self.regs[rs1] as usize;
@@ -756,15 +792,11 @@ impl CPU {
                     self.write_reg(rd, 0); // 0 = success
                     // Clear the reservation (it's consumed)
                     self.reservation_addr = None;
-                    if self.verbose {
-                        println!("SC: Success - stored 0x{:x} at addr 0x{:x}, cleared reservation", value_to_store, addr);
-                    }
+                    self.log(&format!("SC: Success - stored 0x{:x} at addr 0x{:x}, cleared reservation", value_to_store, addr), true);
                 } else {
                     // No valid reservation, fail
                     self.write_reg(rd, 1); // 1 = failure
-                    if self.verbose {
-                        println!("SC: Failed - no reservation for addr 0x{:x}", addr);
-                    }
+                    self.log(&format!("SC: Failed - no reservation for addr 0x{:x}", addr), true);
                 }
             }
             _ => todo!("unhandled instruction"),
