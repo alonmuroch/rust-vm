@@ -376,7 +376,7 @@ impl AVM {
         // - Removes the need for lifetimes like &'a mut dyn HostInterface
         // - Enables recursive call_contract logic, since the Box owns the host and doesn't borrow `self`
         // Without Box, we would need to track lifetimes manually and would hit borrow checker issues.
-        let mut vm: VM = VM::new(memory_page, storage.clone(), Box::new(shim));
+        let mut vm: VM = VM::new_with_writer(memory_page, storage.clone(), Box::new(shim), self.verbose_writer.clone());
         vm.set_code(0, Config::PROGRAM_START_ADDR, &account.code);
         vm.cpu.verbose = self.verbose;
         

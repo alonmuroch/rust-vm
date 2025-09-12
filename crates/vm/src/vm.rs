@@ -43,7 +43,17 @@ impl VM {
         storage: Rc<RefCell<Storage>>, 
         host: Box<dyn HostInterface>,
     ) -> Self {
-        Self::new_with_syscall_handler(memory, storage, host, Box::new(DefaultSyscallHandler))
+        Self::new_with_syscall_handler(memory, storage, host, Box::new(DefaultSyscallHandler::new()))
+    }
+    
+    /// Creates a new virtual machine with a writer for logging output.
+    pub fn new_with_writer(
+        memory: Rc<RefCell<MemoryPage>>,
+        storage: Rc<RefCell<Storage>>, 
+        host: Box<dyn HostInterface>,
+        writer: Option<Rc<RefCell<dyn core::fmt::Write>>>,
+    ) -> Self {
+        Self::new_with_syscall_handler(memory, storage, host, Box::new(DefaultSyscallHandler::with_writer(writer)))
     }
 
     /// Creates a new virtual machine with a custom syscall handler.

@@ -6,6 +6,7 @@ use core::cell::RefCell;
 use crate::host_interface::HostInterface;
 use std::any::Any;
 use types::result::RESULT_SIZE;
+use core::fmt::Write;
 
 /// System call IDs for the VM.
 pub const SYSCALL_STORAGE_GET: u32 = 1;
@@ -42,8 +43,31 @@ pub trait SyscallHandler: std::fmt::Debug {
     fn as_any(&self) -> &dyn Any;
 }
 
-#[derive(Debug)]
-pub struct DefaultSyscallHandler;
+pub struct DefaultSyscallHandler {
+    verbose_writer: Option<Rc<RefCell<dyn Write>>>,
+}
+
+impl std::fmt::Debug for DefaultSyscallHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DefaultSyscallHandler")
+            .field("verbose_writer", &self.verbose_writer.as_ref().map(|_| "<dyn Write>"))
+            .finish()
+    }
+}
+
+impl DefaultSyscallHandler {
+    pub fn new() -> Self {
+        Self {
+            verbose_writer: None,
+        }
+    }
+    
+    pub fn with_writer(writer: Option<Rc<RefCell<dyn Write>>>) -> Self {
+        Self {
+            verbose_writer: writer,
+        }
+    }
+}
 
 impl SyscallHandler for DefaultSyscallHandler {
     fn handle_syscall(
@@ -411,7 +435,14 @@ impl DefaultSyscallHandler {
                 output.push(c);
             }
         }
-        println!("📜 Guest Log: {}", output);
+        match &self.verbose_writer {
+            Some(writer) => {
+                let _ = writeln!(writer.borrow_mut(), "📜 Guest Log: {}", output);
+            }
+            None => {
+                println!("📜 Guest Log: {}", output);
+            }
+        }
         0
     }
 

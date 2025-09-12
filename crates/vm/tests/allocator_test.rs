@@ -9,7 +9,7 @@ fn test_allocator_syscalls() {
     let memory = Rc::new(RefCell::new(memory_page::MemoryPage::new(8192)));
     let storage = Rc::new(RefCell::new(Storage::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
-    let mut syscall_handler = DefaultSyscallHandler;
+    let mut syscall_handler = DefaultSyscallHandler::new();
 
     // Test SYSCALL_ALLOC
     let args = [
@@ -54,7 +54,7 @@ fn test_multiple_allocations() {
     let memory = Rc::new(RefCell::new(memory_page::MemoryPage::new(8192)));
     let storage = Rc::new(RefCell::new(Storage::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
-    let mut syscall_handler = DefaultSyscallHandler;
+    let mut syscall_handler = DefaultSyscallHandler::new();
     let mut regs = [0u32; 32];
 
     let mut pointers = Vec::new();
@@ -96,7 +96,7 @@ fn test_alignment_requirements() {
     let memory = Rc::new(RefCell::new(memory_page::MemoryPage::new(8192)));
     let storage = Rc::new(RefCell::new(Storage::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
-    let mut syscall_handler = DefaultSyscallHandler;
+    let mut syscall_handler = DefaultSyscallHandler::new();
     let mut regs = [0u32; 32];
 
     // Test various alignments
@@ -125,7 +125,7 @@ fn test_invalid_alignment() {
     let memory = Rc::new(RefCell::new(memory_page::MemoryPage::new(8192)));
     let storage = Rc::new(RefCell::new(Storage::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
-    let mut syscall_handler = DefaultSyscallHandler;
+    let mut syscall_handler = DefaultSyscallHandler::new();
     let mut regs = [0u32; 32];
 
     // Test invalid alignments (not powers of 2)
