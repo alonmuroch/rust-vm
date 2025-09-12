@@ -16,6 +16,7 @@
 *.json
 *.log
 *.txt
+comparison_results.json
 
 # Temporary files
 *.tmp
