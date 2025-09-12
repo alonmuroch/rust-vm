@@ -1,11 +1,12 @@
 .PHONY: all
 
-all: clean program example_programs test summary
+all: clean program example_programs test utils summary
 
 clean:
 	@echo "=== Cleaning project ==="
 	cargo clean
 	$(MAKE) -C crates/examples clean
+	@cd utils/binary_comparison && $(MAKE) clean > /dev/null 2>&1 || true
 	@echo "=== Clean complete ==="
 
 program: 
@@ -33,6 +34,12 @@ generate_abis:
 	cd crates/examples && $(MAKE) abi
 	@echo "=== ABI generation complete ==="
 
+utils:
+	@echo "=== Building utilities ==="
+	@echo "📦 Building binary comparison tool..."
+	@cd utils/binary_comparison && $(MAKE) release
+	@echo "=== Utilities build complete ==="
+
 summary:
 	@echo ""
 	@echo "🎉 BUILD SUMMARY"
@@ -59,6 +66,8 @@ summary:
 	@echo "   - vm"
 	@echo "   - compiler"
 	@echo "✅ Ran example tests using generated ABIs"
+	@echo "✅ Built utilities:"
+	@echo "   - binary_comparison: Tool for comparing VM logs with ELF binaries"
 	@echo ""
 	@echo "🚀 All targets completed successfully!"
 	@echo ""

@@ -32,7 +32,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::CreateAccount,
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/erc20"),
+                    data: get_program_code("erc20"),
                     value: 0,
                     nonce: 0,
                 },
@@ -114,7 +114,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::CreateAccount,
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/call_program"),
+                    data: get_program_code("call_program"),
                     value: 0,
                     nonce: 0,
                 },
@@ -122,7 +122,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::CreateAccount,
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/simple"),
+                    data: get_program_code("simple"),
                     value: 0,
                     nonce: 0,
                 },
@@ -152,7 +152,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::CreateAccount,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/storage"),
+                    data: get_program_code("storage"),
                     value: 0,
                     nonce: 0,
                 },
@@ -178,7 +178,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::CreateAccount,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/simple"),
+                    data: get_program_code("simple"),
                     value: 0,
                     nonce: 0,
                 },
@@ -207,7 +207,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::CreateAccount,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/multi_func"),
+                    data: get_program_code("multi_func"),
                     value: 0,
                     nonce: 0,
                 },
@@ -241,7 +241,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::CreateAccount,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/allocator_demo"),
+                    data: get_program_code("allocator_demo"),
                     value: 0,
                     nonce: 0,
                 },
@@ -273,7 +273,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::CreateAccount,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/lib_import"),
+                    data: get_program_code("lib_import"),
                     value: 0,
                     nonce: 0,
                 },
@@ -298,7 +298,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::CreateAccount,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0e0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: get_program_code("../../target/riscv32imac-unknown-none-elf/release/logging"),
+                    data: get_program_code("logging"),
                     value: 0,
                     nonce: 0,
                 },
@@ -387,17 +387,25 @@ pub fn load_abi_from_file<P: AsRef<Path>>(path: P) -> Option<Vec<EventAbi>> {
     Some(event_abis)
 }
 
-pub fn get_program_code<P: AsRef<Path>>(path: P) -> Vec<u8> {
-    let path_str = path.as_ref().display();
-    let bytes = fs::read(&path)
-        .unwrap_or_else(|_| panic!("❌ Failed to read ELF file from {}", path_str));
+pub fn get_program_code(name: &str) -> Vec<u8> {
+    // Build the full path
+    let bin_path = format!("bin/{}", name);
+    
+    // Try reading from bin directory first (for compiled binaries)
+    let bytes = fs::read(&bin_path)
+        .or_else(|_| {
+            // Fallback to target directory for development
+            let target_path = format!("../../target/riscv32imac-unknown-none-elf/release/{}", name);
+            fs::read(&target_path)
+        })
+        .unwrap_or_else(|_| panic!("❌ Failed to read ELF file: {}", name));
 
     let elf = parse_elf_from_bytes(&bytes)
-        .unwrap_or_else(|_| panic!("❌ Failed to parse ELF from {}", path_str));
+        .unwrap_or_else(|_| panic!("❌ Failed to parse ELF from {}", name));
 
     let (code, code_start) = elf
     .get_flat_code()
-    .unwrap_or_else(|| panic!("❌ No code sections found in ELF {}", path_str));
+    .unwrap_or_else(|| panic!("❌ No code sections found in ELF {}", name));
 
     let (rodata, rodata_start) = elf
         .get_flat_rodata()

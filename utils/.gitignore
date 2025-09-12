@@ -1,0 +1,22 @@
+# Rust build artifacts
+*/target/
+**/target/
+
+# Cargo lock files for utilities
+*/Cargo.lock
+
+# IDE and editor files
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Output files from utilities
+*.json
+*.log
+*.txt
+
+# Temporary files
+*.tmp
+*.bak
