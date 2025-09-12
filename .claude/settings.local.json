@@ -24,7 +24,11 @@
       "Bash(timeout 5 cargo test -p examples test_entrypoint_function)",
       "Bash(readelf:*)",
       "Bash(objdump:*)",
-      "Bash(RUST_BACKTRACE=1 cargo test -p examples test_entrypoint_function)"
+      "Bash(RUST_BACKTRACE=1 cargo test -p examples test_entrypoint_function)",
+      "Bash(rustc:*)",
+      "Read(//Users/alonmuroch/Desktop/**)",
+      "Bash(timeout 5 cargo test -p examples test_entrypoint_function -- --nocapture)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }
