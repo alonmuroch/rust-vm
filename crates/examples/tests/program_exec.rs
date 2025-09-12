@@ -31,7 +31,7 @@ impl Write for FileWriter {
 
 pub const VM_MEMORY_SIZE: usize = 64 * 1024; // 64 KB - increased to support larger programs with external libraries
 pub const MAX_MEMORY_PAGES: usize = 20;  // Increased memory pages
-pub const VERBOSE_LOGGING: bool = true;
+pub const VERBOSE_LOGGING: bool = false;
 
 /// Console writer that wraps println!
 struct ConsoleWriter;
@@ -49,21 +49,21 @@ fn test_entrypoint_function() {
     // Choose your logging mode by uncommenting ONE of the lines below:
     
     // Option 1: Log to console with verbose output
-    // let writer: Rc<RefCell<dyn Write>> = Rc::new(RefCell::new(ConsoleWriter));
+    let writer: Rc<RefCell<dyn Write>> = Rc::new(RefCell::new(ConsoleWriter));
     
     // Option 2: Log to file with verbose output  
-    let log_path = "/Users/alonmuroch/Desktop/logs.txt";
-    let writer: Rc<RefCell<dyn Write>> = match FileWriter::new(log_path) {
-        Ok(file_writer) => {
-            eprintln!("📝 All output will be written to: {}", log_path);
-            Rc::new(RefCell::new(file_writer))
-        }
-        Err(e) => {
-            eprintln!("⚠️ Failed to create log file at {}: {}", log_path, e);
-            eprintln!("   Falling back to console output");
-            Rc::new(RefCell::new(ConsoleWriter))
-        }
-    };
+    // let log_path = "/Users/alonmuroch/Desktop/logs.txt";
+    // let writer: Rc<RefCell<dyn Write>> = match FileWriter::new(log_path) {
+    //     Ok(file_writer) => {
+    //         eprintln!("📝 All output will be written to: {}", log_path);
+    //         Rc::new(RefCell::new(file_writer))
+    //     }
+    //     Err(e) => {
+    //         eprintln!("⚠️ Failed to create log file at {}: {}", log_path, e);
+    //         eprintln!("   Falling back to console output");
+    //         Rc::new(RefCell::new(ConsoleWriter))
+    //     }
+    // };
     
     writeln!(writer.borrow_mut(), "=== Starting Test Run ===").unwrap();
     writeln!(writer.borrow_mut(), "Verbose logging: {}", if VERBOSE_LOGGING { "enabled" } else { "disabled" }).unwrap();

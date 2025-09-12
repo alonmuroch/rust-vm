@@ -312,6 +312,72 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 },
             ]),
         },
+        TestCase {
+            name: "calculator with client",
+            expected_success: true,
+            expected_error_code: 0,
+            expected_data: Some(vec![15, 0, 0, 0]), // Expected: 10 + 5 = 15
+            abi: None,
+            bundle: TransactionBundle::new(vec![
+                // Deploy calculator contract
+                Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0c1"), // Calculator address
+                    data: get_program_code("calculator"),
+                    value: 0,
+                    nonce: 0,
+                },
+                // Deploy calculator client contract
+                Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0c2"), // Client address
+                    data: get_program_code("calculator_client"),
+                    value: 0,
+                    nonce: 0,
+                },
+                // Call calculator directly to test it works (5 + 3 = 8)
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0c1"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: encode_router_calls(&[
+                        HostFuncCall {
+                            selector: 0x01, // add
+                            args: {
+                                let mut args = Vec::new();
+                                args.extend_from_slice(&5u32.to_le_bytes());
+                                args.extend_from_slice(&3u32.to_le_bytes());
+                                args
+                            },
+                        }
+                    ]),
+                    value: 0,
+                    nonce: 0,
+                },
+                // Call calculator client to call calculator (10 + 5 = 15)
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0c2"), // Client
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: {
+                        let mut data = Vec::new();
+                        // Calculator contract address (20 bytes)
+                        data.extend_from_slice(&to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0c1").0);
+                        // Operation: 1 = add
+                        data.push(1);
+                        // First operand: 10
+                        data.extend_from_slice(&10u32.to_le_bytes());
+                        // Second operand: 5
+                        data.extend_from_slice(&5u32.to_le_bytes());
+                        data
+                    },
+                    value: 0,
+                    nonce: 0,
+                },
+            ]),
+        },
     ]
 });
 
