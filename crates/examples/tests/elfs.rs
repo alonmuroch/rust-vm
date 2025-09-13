@@ -28,16 +28,6 @@ pub const ELF_BINARIES: &[ElfBinary] = &[
         description: "Storage operations test",
     },
     ElfBinary {
-        name: "calculator",
-        path: "bin/calculator",
-        description: "Calculator contract",
-    },
-    ElfBinary {
-        name: "calculator_client",
-        path: "bin/calculator_client",
-        description: "Calculator client contract",
-    },
-    ElfBinary {
         name: "call_program",
         path: "bin/call_program",
         description: "Program calling test",

@@ -28,48 +28,35 @@ Demonstrates a contract with multiple functions selected via a routing mechanism
 - **Features**: Function routing, selector-based dispatch
 - **Use cases**: Complex contracts with multiple operations
 
-### 3. **calculator.rs** - Calculator Contract
-A calculator contract with multiple mathematical operations accessible via function selectors.
-- **Purpose**: Demonstrate ABI-driven contract design with multiple functions
-- **Features**: Addition, subtraction, multiplication, division operations
-- **Use cases**: DeFi calculations, mathematical operations in contracts
-- **Note**: Has a corresponding `calculator_client.rs` that shows how to use auto-generated ABI client code
-
-### 4. **storage.rs** - Persistent Storage Demo
+### 3. **storage.rs** - Persistent Storage Demo
 Shows how to work with persistent key-value storage in smart contracts.
 - **Purpose**: Demonstrate state management and data persistence
 - **Features**: Store and retrieve user profiles and configuration data
 - **Use cases**: User data management, contract configuration storage
 
-### 5. **erc20.rs** - ERC-20 Token Implementation
+### 4. **erc20.rs** - ERC-20 Token Implementation
 A complete ERC-20 token implementation with standard functionality.
 - **Purpose**: Showcase a real-world smart contract implementation
 - **Features**: Token transfers, approvals, balance tracking, events
 - **Use cases**: Fungible tokens, DeFi applications
 
-### 6. **allocator_demo.rs** - Memory Allocation
+### 5. **allocator_demo.rs** - Memory Allocation
 Demonstrates heap memory allocation using VM syscalls.
 - **Purpose**: Show advanced memory management in contracts
 - **Features**: Dynamic memory allocation, vector operations
 - **Use cases**: Complex data structures, dynamic arrays
 
-### 7. **lib_import.rs** - External Library Usage
+### 6. **lib_import.rs** - External Library Usage
 Shows how to import and use external Rust libraries (sha2 in this example).
 - **Purpose**: Demonstrate library integration in smart contracts
 - **Features**: SHA-256 hashing using the sha2 crate
 - **Use cases**: Cryptographic operations, data integrity verification
 
-### 8. **call_program.rs** - Cross-Contract Calls
+### 7. **call_program.rs** - Cross-Contract Calls
 Demonstrates how one contract can call another contract.
 - **Purpose**: Show contract composability and interaction
 - **Features**: External contract calls, result handling
 - **Use cases**: DeFi protocols, modular contract systems
-
-### 9. **calculator_client.rs** - ABI Client Usage
-A client program that uses auto-generated ABI code to interact with the calculator contract.
-- **Purpose**: Demonstrate how to use the ABI code generation system
-- **Features**: Type-safe contract interactions, auto-generated client code
-- **Use cases**: Building contract frontends, integration testing
 
 ## Project Structure
 
@@ -112,9 +99,8 @@ If you're new to smart contract development, we recommend exploring the examples
 1. Start with `simple.rs` to understand basic contract structure
 2. Move to `multi_func.rs` to learn about function routing
 3. Explore `storage.rs` to understand state persistence
-4. Study `calculator.rs` and `calculator_client.rs` to learn about ABI-driven development
-5. Examine `call_program.rs` for cross-contract interactions
-6. Review `erc20.rs` for a complete real-world implementation
+4. Examine `call_program.rs` for cross-contract interactions
+5. Review `erc20.rs` for a complete real-world implementation
 7. Advanced: `allocator_demo.rs` and `lib_import.rs` for specialized features
 
 ## Additional Resources

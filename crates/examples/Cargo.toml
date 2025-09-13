@@ -62,16 +62,6 @@ path = "src/lib_import.rs"
 required-features = ["binaries"]
 
 [[bin]]
-name = "calculator"
-path = "src/calculator.rs"
-required-features = ["binaries"]
-
-[[bin]]
-name = "calculator_client"
-path = "src/calculator_client.rs"
-required-features = ["binaries"]
-
-[[bin]]
 name = "logging"
 path = "src/logging.rs"
 required-features = ["binaries"]
