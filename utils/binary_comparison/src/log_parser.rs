@@ -1,11 +1,22 @@
 use anyhow::{Context, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerboseLog {
     pub test_name: String,
     pub instructions: Vec<LogInstruction>,
+    pub address_mappings: HashMap<String, String>, // address -> binary name
+    pub execution_segments: Vec<ExecutionSegment>, // track which binary is executing
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionSegment {
+    pub address: String,
+    pub binary_name: String,
+    pub start_index: usize,
+    pub end_index: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,9 +38,19 @@ pub fn parse_verbose_log(content: &str) -> Result<Vec<VerboseLog>> {
     let mut logs = Vec::new();
     let mut current_test: Option<VerboseLog> = None;
     let mut current_instructions = Vec::new();
+    let mut current_address_mappings: HashMap<String, String> = HashMap::new();
+    let mut current_segments: Vec<ExecutionSegment> = Vec::new();
+    let mut current_executing_address = String::new();
+    let mut segment_start_index = 0;
     
     // Regex patterns for parsing
     let test_header_re = Regex::new(r"#### Running test case: (.+) ####")?;
+    
+    // Pattern for address mappings: "  d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1 -> calculator"
+    let address_mapping_re = Regex::new(r"^\s+([0-9a-fA-F]{40})\s+->\s+(.+)$")?;
+    
+    // Pattern for "Tx calling program at address"
+    let tx_calling_re = Regex::new(r"Tx calling program at address ([0-9a-fA-F]+)")?;
     
     // Pattern for the format: PC = 0x00000400, Bytes = [13 01 01 bd], Instr = addi x2, x2, -1072
     let instruction_line_re = Regex::new(r"PC = 0x([0-9a-fA-F]+), Bytes = \[([0-9a-fA-F ]+)\], Instr = (.+)")?;
@@ -48,9 +69,27 @@ pub fn parse_verbose_log(content: &str) -> Result<Vec<VerboseLog>> {
         if let Some(captures) = test_header_re.captures(line) {
             // Save previous test if any
             if let Some(mut test) = current_test.take() {
+                // Close the last segment if any
+                if !current_executing_address.is_empty() && segment_start_index < current_instructions.len() {
+                    current_segments.push(ExecutionSegment {
+                        address: current_executing_address.clone(),
+                        binary_name: current_address_mappings.get(&current_executing_address)
+                            .cloned()
+                            .unwrap_or_else(|| "unknown".to_string()),
+                        start_index: segment_start_index,
+                        end_index: current_instructions.len() - 1,
+                    });
+                }
+                
                 test.instructions = current_instructions.clone();
+                test.address_mappings = current_address_mappings.clone();
+                test.execution_segments = current_segments.clone();
                 logs.push(test);
                 current_instructions.clear();
+                current_address_mappings.clear();
+                current_segments.clear();
+                current_executing_address.clear();
+                segment_start_index = 0;
             }
             
             // Start new test
@@ -58,7 +97,35 @@ pub fn parse_verbose_log(content: &str) -> Result<Vec<VerboseLog>> {
             current_test = Some(VerboseLog {
                 test_name,
                 instructions: Vec::new(),
+                address_mappings: HashMap::new(),
+                execution_segments: Vec::new(),
             });
+        }
+        
+        // Parse address mappings
+        if let Some(captures) = address_mapping_re.captures(line) {
+            let address = captures[1].to_string();
+            let binary_name = captures[2].to_string();
+            current_address_mappings.insert(address, binary_name);
+        }
+        
+        // Check for "Tx calling program at address"
+        if let Some(captures) = tx_calling_re.captures(line) {
+            // Close previous segment if any
+            if !current_executing_address.is_empty() && segment_start_index < current_instructions.len() {
+                current_segments.push(ExecutionSegment {
+                    address: current_executing_address.clone(),
+                    binary_name: current_address_mappings.get(&current_executing_address)
+                        .cloned()
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    start_index: segment_start_index,
+                    end_index: current_instructions.len() - 1,
+                });
+            }
+            
+            // Start new segment
+            current_executing_address = captures[1].to_string();
+            segment_start_index = current_instructions.len();
         }
         
         // Parse instruction in the format: PC = 0x00000400, Bytes = [13 01 01 bd], Instr = addi x2, x2, -1072
@@ -141,7 +208,21 @@ pub fn parse_verbose_log(content: &str) -> Result<Vec<VerboseLog>> {
     
     // Save the last test
     if let Some(mut test) = current_test {
+        // Close the last segment if any
+        if !current_executing_address.is_empty() && segment_start_index < current_instructions.len() {
+            current_segments.push(ExecutionSegment {
+                address: current_executing_address.clone(),
+                binary_name: current_address_mappings.get(&current_executing_address)
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_string()),
+                start_index: segment_start_index,
+                end_index: current_instructions.len() - 1,
+            });
+        }
+        
         test.instructions = current_instructions;
+        test.address_mappings = current_address_mappings;
+        test.execution_segments = current_segments;
         logs.push(test);
     }
     

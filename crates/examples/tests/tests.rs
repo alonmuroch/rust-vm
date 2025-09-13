@@ -16,7 +16,8 @@ pub struct TestCase<'a> {
     pub expected_error_code: u32,
     pub expected_data: Option<Vec<u8>>,
     pub bundle: TransactionBundle,
-    pub abi: Option<Vec<EventAbi>>
+    pub abi: Option<Vec<EventAbi>>,
+    pub address_mappings: Vec<(&'a str, &'a str)>, // (address, binary_name)
 }
 
 pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
@@ -27,6 +28,9 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             expected_error_code: 0,
             expected_data: Some(vec![128, 240, 250, 2]), // Expected data: 50,000,000 in little-endian
             abi: load_abi_from_file("bin/erc20.abi.json"),
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1", "erc20"),
+            ],
             bundle: TransactionBundle::new(vec![
                  Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -109,6 +113,10 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             expected_error_code: 0,
             expected_data: Some(vec![100, 0, 0, 0]), // Expected data: 100 in little-endian
             abi: None,
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "call_program"),
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1", "simple"),
+            ],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -147,6 +155,9 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             expected_error_code: 0,
             expected_data: None,
             abi: None,
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "storage"),
+            ],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -173,6 +184,9 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             expected_error_code: 0,
             expected_data: Some(vec![100, 0, 0, 0]), // Expected data: 100 in little-endian
             abi: None,
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "simple"),
+            ],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -202,6 +216,9 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             expected_error_code: 0,
             expected_data: Some(vec![100, 0, 0, 0]), // Expected data: 100 in little-endian
             abi: None,
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "multi_func"),
+            ],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -236,6 +253,9 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             expected_error_code: 0,
             expected_data: None,//Some(b"VM allocator demo completed successfully!".to_vec()),
             abi: None,
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "allocator_demo"),
+            ],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -268,6 +288,9 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 0x90, 0x88, 0xf7, 0xac, 0xe2, 0xef, 0xcd, 0xe9
             ]),
             abi: None,
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "lib_import"),
+            ],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -293,6 +316,9 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             expected_error_code: 0,
             expected_data: None, // Logging doesn't return specific data
             abi: None,
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0e0", "logging"),
+            ],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -318,6 +344,10 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             expected_error_code: 0,
             expected_data: Some(vec![15, 0, 0, 0]), // Expected: 10 + 5 = 15
             abi: None,
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0c1", "calculator"),
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0c2", "calculator_client"),
+            ],
             bundle: TransactionBundle::new(vec![
                 // Deploy calculator contract
                 Transaction {

@@ -31,7 +31,7 @@ impl Write for FileWriter {
 
 pub const VM_MEMORY_SIZE: usize = 64 * 1024; // 64 KB - increased to support larger programs with external libraries
 pub const MAX_MEMORY_PAGES: usize = 20;  // Increased memory pages
-pub const VERBOSE_LOGGING: bool = false;
+pub const VERBOSE_LOGGING: bool = true;
 
 /// Console writer that wraps println!
 struct ConsoleWriter;
@@ -49,21 +49,21 @@ fn test_entrypoint_function() {
     // Choose your logging mode by uncommenting ONE of the lines below:
     
     // Option 1: Log to console with verbose output
-    let writer: Rc<RefCell<dyn Write>> = Rc::new(RefCell::new(ConsoleWriter));
+    // let writer: Rc<RefCell<dyn Write>> = Rc::new(RefCell::new(ConsoleWriter));
     
     // Option 2: Log to file with verbose output  
-    // let log_path = "/Users/alonmuroch/Desktop/logs.txt";
-    // let writer: Rc<RefCell<dyn Write>> = match FileWriter::new(log_path) {
-    //     Ok(file_writer) => {
-    //         eprintln!("📝 All output will be written to: {}", log_path);
-    //         Rc::new(RefCell::new(file_writer))
-    //     }
-    //     Err(e) => {
-    //         eprintln!("⚠️ Failed to create log file at {}: {}", log_path, e);
-    //         eprintln!("   Falling back to console output");
-    //         Rc::new(RefCell::new(ConsoleWriter))
-    //     }
-    // };
+    let log_path = "/Users/alonmuroch/Desktop/logs.txt";
+    let writer: Rc<RefCell<dyn Write>> = match FileWriter::new(log_path) {
+        Ok(file_writer) => {
+            eprintln!("📝 All output will be written to: {}", log_path);
+            Rc::new(RefCell::new(file_writer))
+        }
+        Err(e) => {
+            eprintln!("⚠️ Failed to create log file at {}: {}", log_path, e);
+            eprintln!("   Falling back to console output");
+            Rc::new(RefCell::new(ConsoleWriter))
+        }
+    };
     
     writeln!(writer.borrow_mut(), "=== Starting Test Run ===").unwrap();
     writeln!(writer.borrow_mut(), "Verbose logging: {}", if VERBOSE_LOGGING { "enabled" } else { "disabled" }).unwrap();
@@ -79,7 +79,16 @@ fn test_entrypoint_function() {
         // Write test case header using the configured writer
         writeln!(writer.borrow_mut(), "\n############################################").unwrap();
         writeln!(writer.borrow_mut(), "#### Running test case: {} ####", case.name).unwrap();
-        writeln!(writer.borrow_mut(), "############################################\n").unwrap();
+        writeln!(writer.borrow_mut(), "############################################").unwrap();
+        
+        // Print address to binary mappings
+        if !case.address_mappings.is_empty() {
+            writeln!(writer.borrow_mut(), "\n📍 Address -> Binary Mappings:").unwrap();
+            for (addr, binary) in &case.address_mappings {
+                writeln!(writer.borrow_mut(), "  {} -> {}", addr, binary).unwrap();
+            }
+        }
+        writeln!(writer.borrow_mut()).unwrap();
         
         let mut last_success: bool = false;
         let mut last_error_code: u32 = 0;

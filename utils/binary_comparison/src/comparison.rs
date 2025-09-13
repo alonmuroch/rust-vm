@@ -98,7 +98,8 @@ pub fn compare_instructions(
         }
     }
     
-    let total = log_instructions.len().max(elf_instructions.len());
+    // Use log instructions count as total since that's what was actually executed
+    let total = log_instructions.len();
     
     ComparisonResult {
         total_instructions: total,

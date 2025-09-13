@@ -72,28 +72,74 @@ fn run() -> Result<()> {
         println!();
         println!("{} Processing: {}", "🔍".bold(), log.test_name.yellow());
         
-        // Find corresponding ELF binary
-        let binary_path = find_binary_for_test(&args.binaries_folder, &log.test_name)?;
-        
-        if let Some(binary_path) = binary_path {
-            println!("  Binary: {}", binary_path.display());
-            
-            // Decode ELF instructions
-            let elf_instructions = elf_instructions::decode_elf(&binary_path)?;
-            println!("  ELF instructions: {}", elf_instructions.len());
-            
-            // Compare instructions
-            let comparison_result = comparison::compare_instructions(
-                &log.instructions,
-                &elf_instructions,
-            );
-            
-            // Print summary for this test
-            print_test_summary(&log.test_name, &comparison_result, args.diff_only);
-            
-            all_results.insert(log.test_name.clone(), comparison_result);
+        // Print address mappings if any
+        if !log.address_mappings.is_empty() {
+            println!("  📍 Address mappings found: {}", log.address_mappings.len());
+            for (addr, binary) in &log.address_mappings {
+                println!("    {} -> {}", addr, binary);
+            }
         } else {
-            println!("  ⚠️  No binary found for test: {}", log.test_name);
+            println!("  ⚠️  No address mappings found");
+        }
+        
+        // Process each execution segment
+        if !log.execution_segments.is_empty() {
+            println!("  📊 Found {} execution segments", log.execution_segments.len());
+            
+            for segment in &log.execution_segments {
+                println!();
+                println!("  Segment: {} ({})", segment.address, segment.binary_name);
+                println!("    Instructions: {} to {}", segment.start_index, segment.end_index);
+                
+                // Find the binary for this segment
+                let binary_path = args.binaries_folder.join(format!("{}.elf", segment.binary_name));
+                
+                if binary_path.exists() {
+                    // Decode ELF instructions for this binary
+                    let elf_instructions = elf_instructions::decode_elf(&binary_path)?;
+                    
+                    // Get the instructions for this segment
+                    let segment_instructions: Vec<_> = log.instructions[segment.start_index..=segment.end_index].to_vec();
+                    
+                    // Compare instructions
+                    let comparison_result = comparison::compare_instructions(
+                        &segment_instructions,
+                        &elf_instructions,
+                    );
+                    
+                    // Print summary for this segment
+                    let segment_name = format!("{} - {}", log.test_name, segment.binary_name);
+                    print_test_summary(&segment_name, &comparison_result, args.diff_only);
+                    
+                    all_results.insert(segment_name, comparison_result);
+                } else {
+                    println!("    ⚠️  Binary not found: {}", binary_path.display());
+                }
+            }
+        } else {
+            // Fallback to old behavior if no segments detected
+            let binary_path = find_binary_for_test(&args.binaries_folder, &log.test_name)?;
+            
+            if let Some(binary_path) = binary_path {
+                println!("  Binary: {}", binary_path.display());
+                
+                // Decode ELF instructions
+                let elf_instructions = elf_instructions::decode_elf(&binary_path)?;
+                println!("  ELF instructions: {}", elf_instructions.len());
+                
+                // Compare instructions
+                let comparison_result = comparison::compare_instructions(
+                    &log.instructions,
+                    &elf_instructions,
+                );
+                
+                // Print summary for this test
+                print_test_summary(&log.test_name, &comparison_result, args.diff_only);
+                
+                all_results.insert(log.test_name.clone(), comparison_result);
+            } else {
+                println!("  ⚠️  No binary found for test: {}", log.test_name);
+            }
         }
     }
 
