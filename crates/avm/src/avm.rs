@@ -349,6 +349,9 @@ impl AVM {
             to,
             hex::encode(&input_data)
         ), false);
+        
+        // Save address for later use in termination log
+        let to_addr_str = to.to_string();
 
         // SAFETY NOTE:
         // This line creates a HostShim containing a raw pointer (*mut AVM) to self.
@@ -418,15 +421,17 @@ impl AVM {
             eprintln!("💥 VM panicked: {:?}", e);
             panic!("VM panicked");
         }
-
+        
         // EDUCATIONAL: Copy storage back into account
         // This persists any changes the contract made to storage
         let updated_map = storage.borrow().map.borrow().clone();
         account.storage = updated_map;
 
-
         // EDUCATIONAL: set context execution done
         context.exe_done = true;
+        
+        // Log execution termination for binary comparison tracking (after all borrows are done)
+        self.log(&format!("Execution terminated for address {}", to_addr_str), false);
 
         (Config::RESULT_ADDR, context_index) // Fixed result address
     }

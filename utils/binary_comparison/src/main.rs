@@ -29,9 +29,9 @@ struct Args {
     #[arg(short, long, default_value = "text")]
     format: String,
 
-    /// Show only differences (skip matching instructions)
-    #[arg(short, long)]
-    diff_only: bool,
+    /// Show detailed instruction-by-instruction comparison
+    #[arg(long)]
+    detailed: bool,
 }
 
 fn main() {
@@ -109,7 +109,13 @@ fn run() -> Result<()> {
                     
                     // Print summary for this segment
                     let segment_name = format!("{} - {}", log.test_name, segment.binary_name);
-                    print_test_summary(&segment_name, &comparison_result, args.diff_only);
+                    
+                    if args.detailed {
+                        // Show detailed instruction-by-instruction comparison
+                        print_detailed_comparison(&segment_name, &segment_instructions, &elf_instructions);
+                    } else {
+                        print_test_summary(&segment_name, &comparison_result, args.detailed);
+                    }
                     
                     all_results.insert(segment_name, comparison_result);
                 } else {
@@ -134,7 +140,12 @@ fn run() -> Result<()> {
                 );
                 
                 // Print summary for this test
-                print_test_summary(&log.test_name, &comparison_result, args.diff_only);
+                if args.detailed {
+                    // Show detailed instruction-by-instruction comparison
+                    print_detailed_comparison(&log.test_name, &log.instructions, &elf_instructions);
+                } else {
+                    print_test_summary(&log.test_name, &comparison_result, args.detailed);
+                }
                 
                 all_results.insert(log.test_name.clone(), comparison_result);
             } else {
@@ -207,7 +218,81 @@ fn extract_binary_name(test_name: &str) -> String {
     }
 }
 
-fn print_test_summary(test_name: &str, result: &ComparisonResult, diff_only: bool) {
+fn print_detailed_comparison(test_name: &str, log_instructions: &[log_parser::LogInstruction], elf_instructions: &[elf_instructions::ElfInstruction]) {
+    println!();
+    println!("  {}: Detailed Instruction Comparison", test_name.bold());
+    println!("  {}", "=".repeat(60));
+    
+    // Create a map of ELF instructions by PC for quick lookup
+    let mut elf_map = std::collections::HashMap::new();
+    for elf_inst in elf_instructions {
+        elf_map.insert(elf_inst.pc, elf_inst);
+    }
+    
+    // Compare each log instruction
+    for (i, log_inst) in log_instructions.iter().enumerate() {
+        let pc = log_inst.pc;
+        
+        if let Some(elf_inst) = elf_map.get(&pc) {
+            // Check if instructions match
+            if log_inst.raw_instruction == elf_inst.raw {
+                // Matching instruction - show in green
+                println!("  {:4} [✓] PC: 0x{:08x} | {}", 
+                    i + 1, 
+                    pc, 
+                    log_inst.decoded.green()
+                );
+            } else {
+                // Different instruction at same PC - show in red
+                println!("  {:4} [✗] PC: 0x{:08x}", i + 1, pc);
+                println!("         Log: {} (0x{:08x})", 
+                    log_inst.decoded.red(), 
+                    log_inst.raw_instruction
+                );
+                println!("         ELF: {} (0x{:08x})", 
+                    elf_inst.decoded.yellow(), 
+                    elf_inst.raw
+                );
+            }
+        } else {
+            // Instruction only in log - show in yellow
+            println!("  {:4} [?] PC: 0x{:08x} | {} (log only)", 
+                i + 1, 
+                pc, 
+                log_inst.decoded.yellow()
+            );
+        }
+    }
+    
+    println!("  {}", "=".repeat(60));
+    
+    // Print summary stats
+    let mut matching = 0;
+    let mut different = 0;
+    let mut log_only = 0;
+    
+    for log_inst in log_instructions {
+        if let Some(elf_inst) = elf_map.get(&log_inst.pc) {
+            if log_inst.raw_instruction == elf_inst.raw {
+                matching += 1;
+            } else {
+                different += 1;
+            }
+        } else {
+            log_only += 1;
+        }
+    }
+    
+    println!("  Summary: {} matching, {} different, {} log-only (of {} total)",
+        matching.to_string().green(),
+        different.to_string().red(),
+        log_only.to_string().yellow(),
+        log_instructions.len()
+    );
+    println!();
+}
+
+fn print_test_summary(test_name: &str, result: &ComparisonResult, detailed: bool) {
     println!();
     println!("  {}", "Summary:".bold());
     println!("    Total instructions: {}", result.total_instructions);
@@ -222,14 +307,28 @@ fn print_test_summary(test_name: &str, result: &ComparisonResult, diff_only: boo
             ((result.differences.len() as f64 / result.total_instructions as f64) * 100.0) as u32
         );
         
-        if !diff_only {
-            println!();
-            println!("    {}", "First 5 differences:".yellow());
-            for (i, diff) in result.differences.iter().take(5).enumerate() {
-                println!("      {}. PC: 0x{:08x}", i + 1, diff.pc);
-                println!("         Log:  {}", diff.log_instruction);
-                println!("         ELF:  {}", diff.elf_instruction);
-            }
+        // Always show differences when they exist
+        println!();
+        println!("    {}", "First 5 differences:".yellow());
+        for (i, diff) in result.differences.iter().take(5).enumerate() {
+            println!("      {}. PC: 0x{:08x}", i + 1, diff.pc);
+            println!("         Log:  {}", diff.log_instruction);
+            println!("         ELF:  {}", diff.elf_instruction);
+        }
+    }
+    
+    // Show instructions that are only in the log (not in ELF)
+    if !result.log_only.is_empty() {
+        println!("    Instructions only in log: {} ({}%)", 
+            result.log_only.len().to_string().yellow(),
+            ((result.log_only.len() as f64 / result.total_instructions as f64) * 100.0) as u32
+        );
+        
+        // Show log-only instructions
+        println!();
+        println!("    {}", "First 10 log-only instructions:".yellow());
+        for (i, inst) in result.log_only.iter().take(10).enumerate() {
+            println!("      {}. PC: 0x{:08x} - {}", i + 1, inst.pc, inst.decoded);
         }
     }
 }

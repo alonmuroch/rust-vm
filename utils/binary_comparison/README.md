@@ -18,8 +18,8 @@ cargo run -- -b <binaries_folder> -l <log_file>
 # Example
 cargo run -- -b ../../crates/examples/bin -l /Users/alonmuroch/Desktop/logs.txt
 
-# Show only differences
-cargo run -- -b ../../crates/examples/bin -l logs.txt --diff-only
+# Show detailed instruction-by-instruction comparison
+cargo run -- -b ../../crates/examples/bin -l logs.txt --detailed
 
 # Export results as JSON
 cargo run -- -b ../../crates/examples/bin -l logs.txt --format json
@@ -30,7 +30,7 @@ cargo run -- -b ../../crates/examples/bin -l logs.txt --format json
 - `-b, --binaries-folder`: Path to folder containing ELF binaries
 - `-l, --log-file`: Path to verbose log file from program_exec test
 - `-f, --format`: Output format (text or json, default: text)
-- `-d, --diff-only`: Show only differences, skip matching instructions
+- `--detailed`: Show detailed instruction-by-instruction comparison with match status
 
 ## How It Works
 
@@ -55,6 +55,7 @@ The tool provides:
 
 ## Example Output
 
+### Standard Summary Mode
 ```
 Binary Comparison Tool v0.1.0
 =====================================
@@ -87,6 +88,26 @@ Overall Summary
     Matching: 8100 (98%)
     Differences: 92 (2%)
 ```
+
+### Detailed Mode (--detailed)
+```
+call program - simple: Detailed Instruction Comparison
+============================================================
+   1 [✓] PC: 0x00000400 | addi x10, x0, 7
+   2 [✓] PC: 0x00000402 | bgeu x10, x13, pc+166
+   3 [✓] PC: 0x00000406 | lbu   x10, 1(x12)
+   4 [✗] PC: 0x0000040a
+        Log: lbu   x11, 2(x12) (0x0260c583)
+        ELF: lbu   x11, 3(x12) (0x0360c583)
+   5 [?] PC: 0x0000040e | lbu   x13, 3(x12) (log only)
+============================================================
+Summary: 3 matching, 1 different, 1 log-only (of 5 total)
+```
+
+Legend:
+- `[✓]` - Instruction matches between log and ELF (green)
+- `[✗]` - Different instruction at same PC (red/yellow)
+- `[?]` - Instruction only in log, not in ELF (yellow)
 
 ## Integration with Tests
 

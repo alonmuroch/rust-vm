@@ -42,6 +42,7 @@ pub fn parse_verbose_log(content: &str) -> Result<Vec<VerboseLog>> {
     let mut current_segments: Vec<ExecutionSegment> = Vec::new();
     let mut current_executing_address = String::new();
     let mut segment_start_index = 0;
+    let mut call_stack: Vec<String> = Vec::new(); // Track nested calls
     
     // Regex patterns for parsing
     let test_header_re = Regex::new(r"#### Running test case: (.+) ####")?;
@@ -51,6 +52,9 @@ pub fn parse_verbose_log(content: &str) -> Result<Vec<VerboseLog>> {
     
     // Pattern for "Tx calling program at address"
     let tx_calling_re = Regex::new(r"Tx calling program at address ([0-9a-fA-F]+)")?;
+    
+    // Pattern for "Execution terminated for address"
+    let execution_terminated_re = Regex::new(r"Execution terminated for address ([0-9a-fA-F]+)")?;
     
     // Pattern for the format: PC = 0x00000400, Bytes = [13 01 01 bd], Instr = addi x2, x2, -1072
     let instruction_line_re = Regex::new(r"PC = 0x([0-9a-fA-F]+), Bytes = \[([0-9a-fA-F ]+)\], Instr = (.+)")?;
@@ -90,6 +94,7 @@ pub fn parse_verbose_log(content: &str) -> Result<Vec<VerboseLog>> {
                 current_segments.clear();
                 current_executing_address.clear();
                 segment_start_index = 0;
+                call_stack.clear();
             }
             
             // Start new test
@@ -123,9 +128,38 @@ pub fn parse_verbose_log(content: &str) -> Result<Vec<VerboseLog>> {
                 });
             }
             
-            // Start new segment
+            // Push current address to call stack (if any) and start new segment
+            if !current_executing_address.is_empty() {
+                call_stack.push(current_executing_address.clone());
+            }
             current_executing_address = captures[1].to_string();
             segment_start_index = current_instructions.len();
+        }
+        
+        // Check for "Execution terminated for address"
+        if let Some(captures) = execution_terminated_re.captures(line) {
+            let terminated_address = captures[1].to_string();
+            
+            // Close segment for the terminated address
+            if current_executing_address == terminated_address && segment_start_index < current_instructions.len() {
+                current_segments.push(ExecutionSegment {
+                    address: current_executing_address.clone(),
+                    binary_name: current_address_mappings.get(&current_executing_address)
+                        .cloned()
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    start_index: segment_start_index,
+                    end_index: current_instructions.len() - 1,
+                });
+            }
+            
+            // Pop from call stack and resume previous execution
+            if let Some(caller_address) = call_stack.pop() {
+                current_executing_address = caller_address;
+                segment_start_index = current_instructions.len();
+            } else {
+                // No more callers, clear executing address
+                current_executing_address.clear();
+            }
         }
         
         // Parse instruction in the format: PC = 0x00000400, Bytes = [13 01 01 bd], Instr = addi x2, x2, -1072
