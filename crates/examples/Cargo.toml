@@ -65,3 +65,8 @@ required-features = ["binaries"]
 name = "logging"
 path = "src/logging.rs"
 required-features = ["binaries"]
+
+[[bin]]
+name = "ecdsa_verify"
+path = "src/ecdsa_verify.rs"
+required-features = ["binaries"]
