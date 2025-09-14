@@ -24,6 +24,10 @@ impl Result {
         }
     }
 
+    pub fn ok() -> Self {
+        Self::new(true, 0)
+    }
+    
     /// Creates a new Result with data
     pub fn new_with_data(success: bool, error_code: u32, data: &[u8]) -> Self {
         let mut result = Self::new(success, error_code);

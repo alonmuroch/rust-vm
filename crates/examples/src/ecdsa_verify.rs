@@ -27,11 +27,11 @@ fn ecdsa_verify_entry(_self_address: Address, _caller: Address, data: &[u8]) -> 
     match ecdsa::verify_signature(pubkey, signature, message_hash) {
         Ok(()) => {
             // Signature is valid - return 1
-            Result::with_u32(1)
+            Result::ok()
         }
         Err(_) => {
             // Signature is invalid - return 0
-            Result::with_u32(0)
+            Result::new(false, 1)
         }
     }
 }
