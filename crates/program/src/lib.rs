@@ -46,6 +46,9 @@ pub use storage::PERSISTENT_DOMAIN; // Allow `$crate::PERSISTENT_DOMAIN` in macr
 pub mod router;
 pub use router::{decode_calls, route, FuncCall};
 
+// ECDSA signature verification
+pub mod ecdsa;
+
 // Panic handling
 mod panic;
 pub use panic::vm_panic;
