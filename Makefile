@@ -1,4 +1,4 @@
-.PHONY: all
+.PHONY: all clean program example_programs test generate_abis utils summary
 
 all: clean program example_programs test utils summary
 
