@@ -41,7 +41,7 @@ impl Write for ConsoleWriter {
 }
 
 /// Test runner that encapsulates test execution with configurable output
-struct TestRunner {
+pub struct TestRunner {
     writer: Rc<RefCell<dyn Write>>,
     verbose: bool,
     vm_memory_size: usize,
@@ -50,30 +50,36 @@ struct TestRunner {
 
 impl TestRunner {
     /// Create a new test runner with console output (default)
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self::with_writer(Rc::new(RefCell::new(ConsoleWriter)))
     }
 
     /// Set VM memory size
-    fn with_memory_size(mut self, size: usize) -> Self {
+    pub fn with_memory_size(mut self, size: usize) -> Self {
         self.vm_memory_size = size;
         self
     }
 
     /// Set max memory pages
-    fn with_max_pages(mut self, pages: usize) -> Self {
+    pub fn with_max_pages(mut self, pages: usize) -> Self {
         self.max_memory_pages = pages;
         self
     }
 
+    /// Enable or disable verbose mode
+    pub fn with_verbose(mut self, verbose: bool) -> Self {
+        self.verbose = verbose;
+        self
+    }
+
     /// Create a test runner with file output
-    fn with_file<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
+    pub fn with_file<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let file_writer = FileWriter::new(path.as_ref().to_str().unwrap())?;
         Ok(Self::with_writer(Rc::new(RefCell::new(file_writer))))
     }
 
     /// Create a test runner with a custom writer
-    fn with_writer(writer: Rc<RefCell<dyn Write>>) -> Self {
+    pub fn with_writer(writer: Rc<RefCell<dyn Write>>) -> Self {
         TestRunner {
             writer,
             verbose: false,
@@ -83,7 +89,7 @@ impl TestRunner {
     }
 
     /// Execute all test cases
-    fn execute(&self) -> Result<(), String> {
+    pub fn execute(&self) -> Result<(), String> {
         writeln!(self.writer.borrow_mut(), "=== Starting Test Run ===").unwrap();
         writeln!(self.writer.borrow_mut(), "Verbose logging: {}", if self.verbose { "enabled" } else { "disabled" }).unwrap();
 
