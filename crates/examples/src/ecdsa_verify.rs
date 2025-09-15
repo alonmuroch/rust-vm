@@ -1,10 +1,7 @@
 #![no_std]
 #![no_main]
 
-extern crate alloc;
-use alloc::vec::Vec;
-
-use program::{entrypoint, require, ecdsa, types};
+use program::{ecdsa, entrypoint, log, logf, require, types};
 use types::address::Address;
 use types::result::Result;
 
@@ -29,8 +26,9 @@ fn ecdsa_verify_entry(_self_address: Address, _caller: Address, data: &[u8]) -> 
             // Signature is valid - return 1
             Result::ok()
         }
-        Err(_) => {
-            // Signature is invalid - return 0
+        Err(e) => {
+            // Signature is invalid - log the error with string formatting
+            log!(b"ECDSA Error: %s", e.as_bytes());
             Result::new(false, 1)
         }
     }
