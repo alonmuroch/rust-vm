@@ -1,7 +1,6 @@
-mod tests;
+#![allow(dead_code)]
 
 use avm::avm::AVM;
-use crate::tests::TEST_CASES;
 use std::rc::Rc;
 use core::cell::RefCell;
 use core::fmt::Write;
@@ -90,6 +89,8 @@ impl TestRunner {
 
     /// Execute all test cases
     pub fn execute(&self) -> Result<(), String> {
+        use super::TEST_CASES;
+
         writeln!(self.writer.borrow_mut(), "=== Starting Test Run ===").unwrap();
         writeln!(self.writer.borrow_mut(), "Verbose logging: {}", if self.verbose { "enabled" } else { "disabled" }).unwrap();
 
@@ -105,7 +106,7 @@ impl TestRunner {
     }
 
     /// Run a single test case
-    fn run_test_case(&self, case: &crate::tests::TestCase) -> Result<(), String> {
+    fn run_test_case(&self, case: &super::TestCase) -> Result<(), String> {
         let transactions = case.bundle.transactions.clone();
         let mut avm = AVM::new(self.max_memory_pages, self.vm_memory_size);
 
@@ -199,18 +200,3 @@ impl Default for TestRunner {
         Self::with_writer(Rc::new(RefCell::new(ConsoleWriter)))
     }
 }
-
-#[test]
-fn test_entrypoint_function() {
-    TestRunner::default().execute().unwrap()
-}
-
-#[test]
-fn test_with_file_output() {
-    // Example test that always writes to a file
-    let runner = TestRunner::with_file("/tmp/test_output.txt")
-        .expect("Failed to create file writer");
-    runner.execute().unwrap();
-}
-
-

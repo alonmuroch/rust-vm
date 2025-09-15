@@ -5,13 +5,13 @@ use core::cell::RefCell;
 use core::fmt::Write;
 
 // Import the test runner and related modules
-#[path = "program_exec.rs"]
-mod program_exec;
+#[path = "examples_test.rs"]
+mod examples_test;
 
-#[path = "tests.rs"]
-mod tests;
+#[path = "common/utils.rs"]
+mod utils;
 
-use program_exec::TestRunner;
+use examples_test::TestRunner;
 
 #[test]
 fn test_vm_binary_comparison() -> Result<(), String> {
