@@ -30,7 +30,12 @@
       "Bash(timeout 5 cargo test -p examples test_entrypoint_function -- --nocapture)",
       "Bash(git commit:*)",
       "Bash(utils/binary_comparison/target/release/binary_comparison:*)",
-      "Bash(RUST_LOG=debug ./target/debug/deps/program_exec-7efd2a542591705b --nocapture)"
+      "Bash(RUST_LOG=debug ./target/debug/deps/program_exec-7efd2a542591705b --nocapture)",
+      "Bash(./target/release/binary_comparison:*)",
+      "Read(//private/tmp/**)",
+      "Read(//Users/alonmuroch/**)",
+      "Bash(timeout 10 make all)",
+      "Read(//tmp/**)"
     ],
     "deny": []
   }
