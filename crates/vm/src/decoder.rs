@@ -74,10 +74,10 @@ pub fn decode(bytes: &[u8]) -> Option<(Instruction, u8)> {
 /// for different instruction components.
 ///
 /// RISC-V INSTRUCTION FORMAT:
-/// ```
+/// ```text
 /// 31:25  funct7  (7 bits) - function code for register-register ops
 /// 24:20  rs2     (5 bits) - second source register
-/// 19:15  rs1     (5 bits) - first source register  
+/// 19:15  rs1     (5 bits) - first source register
 /// 14:12  funct3  (3 bits) - function code for immediate ops
 /// 11:7   rd      (5 bits) - destination register
 /// 6:0    opcode  (7 bits) - operation code

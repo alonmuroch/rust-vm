@@ -35,7 +35,8 @@
       "Read(//private/tmp/**)",
       "Read(//Users/alonmuroch/**)",
       "Bash(timeout 10 make all)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(git checkout:*)"
     ],
     "deny": []
   }

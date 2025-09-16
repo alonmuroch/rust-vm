@@ -1,6 +1,6 @@
 .PHONY: all clean program example_programs test generate_abis utils summary
 
-all: clean program utils example_programs test  summary
+all: clean program utils  example_programs test summary
 
 clean:
 	@echo "=== Cleaning project ==="
@@ -23,9 +23,9 @@ example_programs: clean
 test: generate_abis
 	@echo "=== Running tests ==="
 	cargo test -p types -p storage -p state
-	cargo test -p program --lib
-	cargo test -p vm --lib
-	cargo test -p compiler --lib
+	cargo test -p program -- --nocapture
+	cargo test -p vm -- --nocapture
+	cargo test -p compiler -- --nocapture
 	cd crates/examples && cargo test -- --nocapture
 	@echo "=== Tests complete ==="
 
