@@ -1,6 +1,15 @@
-use k256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
+use k256::ecdsa::{signature::hazmat::PrehashVerifier, Signature, VerifyingKey};
 
-pub fn verify_signature(
+/// Verifies an ECDSA signature against a pre-hashed message (32-byte hash).
+///
+/// This function expects the message to already be hashed (e.g., SHA256).
+/// It does NOT hash the message again.
+///
+/// # Arguments
+/// * `pubkey` - The public key in SEC1 format (33 bytes compressed or 65 bytes uncompressed)
+/// * `sig` - The signature as r||s (64 bytes)
+/// * `message_hash` - The pre-computed hash of the message (must be exactly 32 bytes)
+pub fn verify_signature_hash(
     pubkey: &[u8],
     sig: &[u8],
     message_hash: &[u8],
@@ -16,6 +25,6 @@ pub fn verify_signature(
         .map_err(|_| "Invalid signature")?;
 
     verifying_key
-        .verify(message_hash, &signature)
+        .verify_prehash(message_hash, &signature)
         .map_err(|_| "Signature verification failed")
 }

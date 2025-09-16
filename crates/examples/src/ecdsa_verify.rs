@@ -21,7 +21,7 @@ fn ecdsa_verify_entry(_self_address: Address, _caller: Address, data: &[u8]) -> 
     let message_hash = &data[pubkey_len + 64..pubkey_len + 64 + 32];
 
     // Verify the signature
-    match ecdsa::verify_signature(pubkey, signature, message_hash) {
+    match ecdsa::verify_signature_hash(pubkey, signature, message_hash) {
         Ok(()) => {
             // Signature is valid - return 1
             Result::ok()

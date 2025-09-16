@@ -48,6 +48,7 @@ pub use router::{decode_calls, route, FuncCall};
 
 // ECDSA signature verification
 pub mod ecdsa;
+pub use ecdsa::verify_signature_hash;
 
 // Panic handling
 mod panic;
