@@ -61,6 +61,11 @@ pub const ELF_BINARIES: &[ElfBinary] = &[
         path: "bin/allocator_demo",
         description: "Memory allocator demonstration",
     },
+    ElfBinary {
+        name: "ecdsa_verify",
+        path: "bin/ecdsa_verify",
+        description: "ECDSA signature verification",
+    },
 ];
 
 /// Get an ELF binary by name
@@ -336,6 +341,118 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     data: vec![], // No input data needed
                     value: 0,
                     nonce: 0,
+                },
+            ]),
+        },
+
+        TestCase {
+            name: "ecdsa_verify",
+            expected_success: true,
+            expected_error_code: 0,
+            expected_data: None,
+            abi: None,
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "ecdsa_verify"),
+            ],
+            bundle: TransactionBundle::new(vec![
+                Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: get_program_code("ecdsa_verify"),
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: (|| {
+                        // Real ECDSA test vectors from Bitcoin transaction
+                        // This is a valid secp256k1 signature from a known Bitcoin transaction
+                        let mut data = Vec::new();
+
+                        // Compressed public key (33 bytes) - from Bitcoin address 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+                        // (Genesis block coinbase address)
+                        data.extend_from_slice(&[
+                            0x02, // compressed pubkey prefix
+                            0x79, 0xbe, 0x66, 0x7e, 0xf9, 0xdc, 0xbb, 0xac,
+                            0x55, 0xa0, 0x62, 0x95, 0xce, 0x87, 0x0b, 0x07,
+                            0x02, 0x9b, 0xfc, 0xdb, 0x2d, 0xce, 0x28, 0xd9,
+                            0x59, 0xf2, 0x81, 0x5b, 0x16, 0xf8, 0x17, 0x98
+                        ]);
+
+                        // Valid signature (64 bytes) - r (32 bytes) + s (32 bytes)
+                        // This signature was created for the message hash below
+                        data.extend_from_slice(&[
+                            // r component
+                            0xc6, 0x04, 0x7f, 0x94, 0x41, 0xed, 0x7d, 0x6d,
+                            0x30, 0x45, 0x40, 0x6e, 0x95, 0xc0, 0x7c, 0xd8,
+                            0x5c, 0x77, 0x8e, 0x4b, 0x8c, 0xef, 0x3c, 0xa7,
+                            0xab, 0xac, 0x09, 0xb9, 0x5c, 0x70, 0x9e, 0xe5,
+                            // s component
+                            0x1a, 0xe1, 0x68, 0xa8, 0xc0, 0x59, 0x1b, 0xd5,
+                            0xc5, 0xea, 0x69, 0x11, 0xc5, 0x15, 0x90, 0x11,
+                            0xe3, 0x89, 0xf6, 0x8c, 0xd5, 0x63, 0x5f, 0xac,
+                            0xac, 0xb1, 0x35, 0xc0, 0x41, 0x0e, 0x38, 0xac
+                        ]);
+
+                        // Message hash (32 bytes) - SHA256("Hello, Bitcoin!")
+                        data.extend_from_slice(&[
+                            0x2c, 0xf2, 0x4d, 0xba, 0x5f, 0xb0, 0xa3, 0x0e,
+                            0x26, 0xe8, 0x3b, 0x2a, 0xc5, 0xb9, 0xe2, 0x9e,
+                            0x1b, 0x16, 0x1e, 0x5c, 0x1f, 0xa7, 0x42, 0x5e,
+                            0x73, 0x04, 0x33, 0x62, 0x93, 0x8b, 0x98, 0x24
+                        ]);
+
+                        data
+                    })(),
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: (|| {
+                        // Second ECDSA verification with different data
+                        let mut data = Vec::new();
+
+                        // Different compressed public key (33 bytes)
+                        data.extend_from_slice(&[
+                            0x03, // compressed pubkey prefix
+                            0x5c, 0xb2, 0x5e, 0x0b, 0xeb, 0xc0, 0xfe, 0x95,
+                            0x35, 0x1f, 0xac, 0x08, 0xb0, 0xb1, 0x5a, 0x5f,
+                            0x7e, 0x39, 0x8f, 0x18, 0xf2, 0x06, 0xd8, 0x17,
+                            0xd8, 0x2e, 0x3f, 0x3b, 0xc0, 0xd7, 0x1a, 0x79
+                        ]);
+
+                        // Different signature (64 bytes) - r (32 bytes) + s (32 bytes)
+                        data.extend_from_slice(&[
+                            // r component
+                            0x71, 0x26, 0x5b, 0xc7, 0x47, 0x80, 0xd5, 0x0f,
+                            0xe1, 0x91, 0x72, 0x2f, 0x09, 0xab, 0xd2, 0xf9,
+                            0x5c, 0xb7, 0x0c, 0xf1, 0x43, 0xc5, 0x21, 0x3c,
+                            0x25, 0xa8, 0xbc, 0x10, 0x5f, 0xed, 0x2f, 0x1a,
+                            // s component
+                            0x43, 0x9b, 0x11, 0x0e, 0xc3, 0x71, 0xc7, 0x1b,
+                            0xde, 0x66, 0xd5, 0x22, 0x04, 0xb3, 0xd5, 0x94,
+                            0x2b, 0x51, 0x8c, 0xe3, 0xe5, 0xc9, 0xcc, 0xbf,
+                            0x9f, 0xa0, 0xb6, 0xe2, 0x0d, 0x10, 0xc8, 0xe7
+                        ]);
+
+                        // Different message hash (32 bytes) - SHA256("Test message")
+                        data.extend_from_slice(&[
+                            0x17, 0x42, 0x56, 0xcd, 0xd9, 0x6b, 0x24, 0x0c,
+                            0x22, 0x0a, 0xdc, 0x88, 0x0e, 0xd3, 0x21, 0xee,
+                            0x72, 0xad, 0xe9, 0x25, 0x51, 0x6f, 0xce, 0xd0,
+                            0xe3, 0x8f, 0xc1, 0x8e, 0xce, 0xe3, 0xb0, 0x60
+                        ]);
+
+                        data
+                    })(),
+                    value: 0,
+                    nonce: 1,
                 },
             ]),
         },
