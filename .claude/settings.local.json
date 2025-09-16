@@ -36,7 +36,8 @@
       "Read(//Users/alonmuroch/**)",
       "Bash(timeout 10 make all)",
       "Read(//tmp/**)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(timeout 60 make all)"
     ],
     "deny": []
   }
