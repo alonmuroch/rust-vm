@@ -26,7 +26,7 @@ test: generate_abis
 	cargo test -p program -- --nocapture
 	cargo test -p vm -- --nocapture
 	cargo test -p compiler -- --nocapture
-	cd crates/examples && cargo test -- --nocapture
+	cargo test -p examples -- --nocapture
 	@echo "=== Tests complete ==="
 
 generate_abis:

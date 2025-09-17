@@ -37,7 +37,10 @@
       "Bash(timeout 10 make all)",
       "Read(//tmp/**)",
       "Bash(git checkout:*)",
-      "Bash(timeout 60 make all)"
+      "Bash(timeout 60 make all)",
+      "Bash(timeout 5 cargo test test_vm_binary_comparison --package examples -- --nocapture)",
+      "Bash(cat:*)",
+      "Bash(test:*)"
     ],
     "deny": []
   }

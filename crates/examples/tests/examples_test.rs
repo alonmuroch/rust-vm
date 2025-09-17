@@ -419,5 +419,6 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
 
 #[test]
 fn test_examples() {
+    println!("\n=== Examples Test ===\n");
     TestRunner::default().execute().unwrap()
 }
