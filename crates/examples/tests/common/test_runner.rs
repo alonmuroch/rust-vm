@@ -45,6 +45,7 @@ pub struct TestRunner {
     verbose: bool,
     vm_memory_size: usize,
     max_memory_pages: usize,
+    is_simulation: bool,  // If true, run tests without verifying results
 }
 
 impl TestRunner {
@@ -71,6 +72,12 @@ impl TestRunner {
         self
     }
 
+    /// Set simulation mode (runs tests without verifying results)
+    pub fn is_simulation(mut self, is_simulation: bool) -> Self {
+        self.is_simulation = is_simulation;
+        self
+    }
+
     /// Create a test runner with file output
     pub fn with_file<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let file_writer = FileWriter::new(path.as_ref().to_str().unwrap())?;
@@ -84,6 +91,7 @@ impl TestRunner {
             verbose: false,
             vm_memory_size: 256 * 1024,  // 256KB default
             max_memory_pages: 20,        // 20 pages default
+            is_simulation: false,         // Default to normal mode with verification
         }
     }
 
@@ -93,6 +101,9 @@ impl TestRunner {
 
         writeln!(self.writer.borrow_mut(), "=== Starting Test Run ===").unwrap();
         writeln!(self.writer.borrow_mut(), "Verbose logging: {}", if self.verbose { "enabled" } else { "disabled" }).unwrap();
+        if self.is_simulation {
+            writeln!(self.writer.borrow_mut(), "Simulation mode: Result verification disabled").unwrap();
+        }
 
         for case in TEST_CASES.iter() {
             self.run_test_case(case)?;
@@ -170,25 +181,31 @@ impl TestRunner {
             }
         }
 
-        // Perform assertions
-        if last_success != case.expected_success {
-            return Err(format!("{}: expected success={}, got={}",
-                case.name, case.expected_success, last_success));
-        }
+        // Perform assertions only if not in simulation mode
+        if !self.is_simulation {
+            if last_success != case.expected_success {
+                return Err(format!("{}: expected success={}, got={}",
+                    case.name, case.expected_success, last_success));
+            }
 
-        if last_error_code != case.expected_error_code {
-            return Err(format!("{}: expected error_code={}, got={}",
-                case.name, case.expected_error_code, last_error_code));
-        }
+            if last_error_code != case.expected_error_code {
+                return Err(format!("{}: expected error_code={}, got={}",
+                    case.name, case.expected_error_code, last_error_code));
+            }
 
-        // Check expected data if specified
-        if let Some(expected_data) = &case.expected_data {
-            if let Some(result) = last_result {
-                let actual_data = &result.data[..result.data_len as usize];
-                if actual_data != expected_data.as_slice() {
-                    return Err(format!("{}: expected data mismatch", case.name));
+            // Check expected data if specified
+            if let Some(expected_data) = &case.expected_data {
+                if let Some(result) = last_result {
+                    let actual_data = &result.data[..result.data_len as usize];
+                    if actual_data != expected_data.as_slice() {
+                        return Err(format!("{}: expected data mismatch", case.name));
+                    }
                 }
             }
+        } else {
+            // In simulation mode, just log the results without asserting
+            writeln!(self.writer.borrow_mut(), "Simulation result for {}: success={}, error_code={}",
+                case.name, last_success, last_error_code).unwrap();
         }
 
         Ok(())

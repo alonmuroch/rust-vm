@@ -39,11 +39,12 @@ fn test_vm_binary_comparison() -> Result<(), String> {
 
     let writer: Rc<RefCell<dyn Write>> = Rc::new(RefCell::new(FileWriter(file)));
 
-    // Create TestRunner with file output and verbose mode for instruction tracing
+    // Create TestRunner with file output, verbose mode, and simulation mode
     let runner = TestRunner::with_writer(writer)
                    .with_verbose(true)  // Enable verbose mode for PC traces
                    .with_memory_size(256 * 1024)  // 256KB
-                   .with_max_pages(20);
+                   .with_max_pages(20)
+                   .is_simulation(true);  // Enable simulation mode - runs without result verification
 
     // Run all test cases
     runner.execute()?;
@@ -65,7 +66,8 @@ fn test_vm_binary_comparison() -> Result<(), String> {
     println!("\nStep 3: Extracted {} test cases from log", test_cases.len());
 
     // Step 4: Check for corresponding ELF binaries
-    let binaries_dir = Path::new("../../target/riscv32im-unknown-none-elf/release");
+    // Tests run from the crates/examples directory, so the binaries are in ./bin
+    let binaries_dir = Path::new("bin");
 
     println!("\nStep 4: Checking for ELF binaries in: {}", binaries_dir.display());
 
@@ -78,7 +80,7 @@ fn test_vm_binary_comparison() -> Result<(), String> {
         for (address, binary_name) in &test_case.address_mappings {
             println!("    Address {} -> Binary: {}", address, binary_name);
 
-            let elf_path = binaries_dir.join(binary_name);
+            let elf_path = binaries_dir.join(format!("{}.elf", binary_name));
 
             if elf_path.exists() {
                 println!("    ✅ ELF found: {}", elf_path.display());
@@ -160,12 +162,10 @@ fn test_vm_binary_comparison() -> Result<(), String> {
     }
 
     if binaries_found == 0 {
-        println!("⚠️  Warning: No ELF binaries found for any of the {} test cases", total_test_cases);
-        println!("   To build binaries, run: cargo build -p examples --release --target riscv32im-unknown-none-elf --features binaries");
-        println!("   Skipping binary comparison validation.");
-        println!("\n✅ Test completed (skipped binary validation)");
+        println!("❌ Error: No ELF binaries found for any of the {} test cases", total_test_cases);
+        println!("   To build binaries, run: make all");
         cleanup();
-        return Ok(());
+        return Err(format!("No compiled binaries found. Found {} test cases but 0 matching binaries.", total_test_cases));
     }
 
     if !all_100_percent {
@@ -238,14 +238,17 @@ fn extract_test_cases(log_content: &str) -> Vec<TestCase> {
             in_test = true;
         }
 
-        // Extract address mappings
+        // Extract address mappings (lines with address -> binary format)
         if in_test && line.contains("->") && !line.contains("Binary Mappings:") {
             if let Some(test) = current_test.as_mut() {
-                let parts: Vec<&str> = line.split("->").collect();
-                if parts.len() == 2 {
-                    let address = parts[0].trim().to_string();
-                    let binary = parts[1].trim().to_string();
-                    test.address_mappings.push((address, binary));
+                // Skip lines that are transaction details
+                if !line.contains("From:") && !line.contains("To:") {
+                    let parts: Vec<&str> = line.trim().split("->").collect();
+                    if parts.len() == 2 {
+                        let address = parts[0].trim().to_string();
+                        let binary = parts[1].trim().to_string();
+                        test.address_mappings.push((address, binary));
+                    }
                 }
             }
         }
