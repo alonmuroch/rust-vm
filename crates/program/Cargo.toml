@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 types = { path = "../types" }
-k256 = { version = "0.13", default-features = false, features = ["ecdsa", "ecdsa-core"] } 
+k256 = { version = "0.13", default-features = false, features = ["alloc", "ecdsa"] } 

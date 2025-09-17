@@ -40,7 +40,15 @@
       "Bash(timeout 60 make all)",
       "Bash(timeout 5 cargo test test_vm_binary_comparison --package examples -- --nocapture)",
       "Bash(cat:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(awk:*)",
+      "Bash(while read hex)",
+      "Bash(do printf \"%d\\n\" 0x$hex)",
+      "Bash(done)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)"
     ],
     "deny": []
   }
