@@ -4,6 +4,9 @@ mod utils;
 #[path = "common/test_runner.rs"]
 mod test_runner;
 
+#[path = "common/ecdsa_test_data.rs"]
+mod ecdsa_test_data;
+
 use avm::transaction::{TransactionType, TransactionBundle, Transaction};
 use avm::router::{encode_router_calls, HostFuncCall};
 use once_cell::sync::Lazy;
@@ -11,6 +14,7 @@ use compiler::EventAbi;
 
 pub use test_runner::TestRunner;
 use utils::{to_address, load_abi_from_file, get_program_code};
+use ecdsa_test_data::{ECDSA_PUBKEY, ECDSA_SIGNATURE, ECDSA_MESSAGE_HASH};
 
 /// Centralized ELF binary paths for testing
 pub struct ElfBinary {
@@ -367,48 +371,14 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::ProgramCall,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: (|| {
-                        // Test data from program/tests/ecdsa_test.rs
-                        // Message: "Hello, AVM!"
+                    data: {
+                        // Use static test data from ecdsa_test_data
                         let mut data = Vec::new();
-
-                        // Uncompressed public key (65 bytes)
-                        data.extend_from_slice(&[
-                            0x04, // uncompressed prefix
-                            // x coordinate (32 bytes)
-                            0x46, 0x46, 0xae, 0x50, 0x47, 0x31, 0x6b, 0x42,
-                            0x30, 0xd0, 0x08, 0x6c, 0x8a, 0xce, 0xc6, 0x87,
-                            0xf0, 0x0b, 0x1c, 0xd9, 0xd1, 0xdc, 0x63, 0x4f,
-                            0x6c, 0xb3, 0x58, 0xac, 0x0a, 0x9a, 0x8f, 0xff,
-                            // y coordinate (32 bytes)
-                            0xfe, 0x77, 0xb4, 0xdd, 0x0a, 0x4b, 0xfb, 0x95,
-                            0x85, 0x1f, 0x3b, 0x73, 0x55, 0xc7, 0x81, 0xdd,
-                            0x60, 0xf8, 0x41, 0x8f, 0xc8, 0xa6, 0x5d, 0x14,
-                            0x90, 0x7a, 0xff, 0x47, 0xc9, 0x03, 0xa5, 0x59
-                        ]);
-
-                        // Valid signature (64 bytes) - r (32 bytes) + s (32 bytes)
-                        data.extend_from_slice(&[
-                            0xfb, 0x00, 0x99, 0xfc, 0x73, 0xf3, 0xff, 0xf0,
-                            0x63, 0xe3, 0x55, 0xd4, 0x3f, 0x7b, 0xa8, 0xea,
-                            0xed, 0x26, 0x8d, 0x07, 0x5d, 0xcb, 0x37, 0x87,
-                            0x2c, 0xf3, 0x60, 0x66, 0x4e, 0x66, 0x17, 0x56,
-                            0x08, 0xaf, 0xf6, 0xa8, 0x71, 0x85, 0x09, 0x10,
-                            0xc1, 0x8c, 0xc2, 0x1c, 0x61, 0x36, 0xda, 0xad,
-                            0x47, 0x0e, 0xc9, 0x24, 0x0b, 0x11, 0x79, 0xe8,
-                            0xc5, 0x38, 0x79, 0xa9, 0x60, 0x80, 0xbd, 0xa2
-                        ]);
-
-                        // Message hash (32 bytes) - SHA256("Hello, AVM!")
-                        data.extend_from_slice(&[
-                            0xd3, 0xb6, 0xe5, 0x0f, 0x20, 0x34, 0x37, 0xd2,
-                            0x5d, 0x14, 0x02, 0x4d, 0xa4, 0x90, 0x9f, 0x89,
-                            0x82, 0x4f, 0x1f, 0x33, 0x73, 0xa1, 0x21, 0x37,
-                            0x05, 0xd1, 0xa1, 0xd4, 0x22, 0x24, 0x85, 0x31
-                        ]);
-
+                        data.extend_from_slice(ECDSA_PUBKEY);
+                        data.extend_from_slice(ECDSA_SIGNATURE);
+                        data.extend_from_slice(ECDSA_MESSAGE_HASH);
                         data
-                    })(),
+                    },
                     value: 0,
                     nonce: 0,
                 },

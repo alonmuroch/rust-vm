@@ -1,4 +1,8 @@
-use k256::ecdsa::{signature::hazmat::PrehashVerifier, Signature, VerifyingKey};
+use k256::ecdsa::{signature::hazmat::PrehashVerifier, Signature, VerifyingKey, Error};
+use core::fmt::{Write, Display};
+extern crate alloc;
+use alloc::string::String;
+use alloc::boxed::Box;
 
 /// Verifies an ECDSA signature against a pre-hashed message (32-byte hash).
 ///
@@ -26,5 +30,14 @@ pub fn verify_signature_hash(
 
     verifying_key
         .verify_prehash(message_hash, &signature)
-        .map_err(|_| "Signature verification failed")
+        .map_err(|e: Error| -> &'static str {
+            // Try Display first, fall back to Debug if Display is not available
+            let mut error_msg = String::new();
+            // Use Display trait for more informative error message
+            let _ = write!(&mut error_msg, "{}", e);
+
+            // Since we need to return a &'static str, we can't return the String directly
+            // We need to leak it to get a 'static lifetime
+            Box::leak(error_msg.into_boxed_str()) as &'static str
+        })
 }

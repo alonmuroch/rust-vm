@@ -48,7 +48,8 @@
       "Bash(python3:*)",
       "Bash(pip3 install:*)",
       "Bash(source:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(timeout 10 cargo test test_vm_binary_comparison --package examples -- --nocapture)"
     ],
     "deny": []
   }
