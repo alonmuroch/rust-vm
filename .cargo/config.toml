@@ -1,10 +1,9 @@
-[target.riscv32imc-unknown-none-elf]
+[target.avm32]
 linker = "rust-lld"
 rustflags = [
     "-Cforce-frame-pointers=yes",
     "-Crelocation-model=static",
     "-Ccodegen-units=1",
-    "-Ctarget-feature=+m,+c",
     "-Clink-arg=--no-relax",
     "-Clink-arg=--nmagic"
 ]

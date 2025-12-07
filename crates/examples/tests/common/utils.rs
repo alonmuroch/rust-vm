@@ -86,7 +86,7 @@ pub fn get_program_code(name: &str) -> Vec<u8> {
     let bytes = fs::read(&bin_path)
         .or_else(|_| {
             // Fallback to target directory for development
-            let target_path = format!("../../target/riscv32imc-unknown-none-elf/release/{}", name);
+            let target_path = format!("../../target/avm32/release/{}", name);
             fs::read(&target_path)
         })
         .unwrap_or_else(|_| panic!("❌ Failed to read ELF file: {}", name));

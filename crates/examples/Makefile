@@ -1,6 +1,10 @@
 # Rust VM Examples - Build System
 PROJECT_NAME := Rust VM Examples
 VERSION := 1.0.0
+CARGO ?= cargo
+CARGO_NIGHTLY ?= cargo +nightly-aarch64-apple-darwin
+CARGO_BUILD_STD ?= -Zbuild-std=core,alloc
+CARGO_BUILD_STD_FEATURES ?= -Zbuild-std-features=compiler-builtins-mem
 
 BIN_DIR := bin
 SRC := $(notdir $(wildcard src/*.rs))
@@ -9,7 +13,8 @@ ABI := $(SRC:.rs=.abi.json)
 # Generate client code for each ABI
 CLIENTS := $(ABI:.abi.json=_abi.rs)
 
-TARGET := riscv32imc-unknown-none-elf
+TARGET ?= $(abspath ../compiler/targets/avm32.json)
+TARGET_NAME := $(notdir $(basename $(TARGET)))
 LINKER_SCRIPT := linker.ld
 
 .PRECIOUS: $(addprefix $(BIN_DIR)/, $(ELF))
@@ -41,12 +46,12 @@ $(BIN_DIR)/%.elf: src/%.rs
 	@mkdir -p $(BIN_DIR)
 	@echo "🎯 Compiling $< to ELF..."
 	RUSTFLAGS="-C link-arg=-T$(LINKER_SCRIPT)" \
-	cargo build --release \
+	$(CARGO_NIGHTLY) $(CARGO_BUILD_STD) $(CARGO_BUILD_STD_FEATURES) build --release \
 		--target $(TARGET) \
 		--manifest-path Cargo.toml \
 		--bin $* \
 		--features binaries
-	@cp ../../target/$(TARGET)/release/$* $(BIN_DIR)/$*.elf
+	@cp ../../target/$(TARGET_NAME)/release/$* $(BIN_DIR)/$*.elf
 
 $(BIN_DIR)/%.abi.json: src/%.rs
 	@mkdir -p $(BIN_DIR)
