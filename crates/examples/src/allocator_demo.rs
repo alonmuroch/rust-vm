@@ -3,8 +3,7 @@
 
 extern crate alloc;
 
-use program::{entrypoint, types::result::Result, types::address::Address, require, vm_panic};
-use core::convert::TryInto;
+use program::{entrypoint, types::result::Result, types::address::Address, require, vm_panic, DataParser};
 
 /// Guest program that demonstrates heap allocation using VM syscalls
 entrypoint!(main);
@@ -16,24 +15,18 @@ fn main(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
     // Expect at least 6 u32 values in little-endian form:
     // - first 3 populate the Vec
     // - next 3 populate the BTreeMap values for alice/bob/charlie
-    const WORDS: usize = 6;
-    if data.len() < WORDS * 4 {
+    let mut parser = DataParser::new(data);
+    if parser.remaining() < 6 * 4 {
         vm_panic(b"insufficient data for allocator demo");
     }
 
-    let read_word = |i: usize| -> u32 {
-        let start = i * 4;
-        let bytes: [u8; 4] = data[start..start + 4].try_into().unwrap();
-        u32::from_le_bytes(bytes)
-    };
+    let n0 = parser.read_u32();
+    let n1 = parser.read_u32();
+    let n2 = parser.read_u32();
 
-    let n0 = read_word(0);
-    let n1 = read_word(1);
-    let n2 = read_word(2);
-
-    let alice_score = read_word(3);
-    let bob_score = read_word(4);
-    let charlie_score = read_word(5);
+    let alice_score = parser.read_u32();
+    let bob_score = parser.read_u32();
+    let charlie_score = parser.read_u32();
 
     // Test Vec operations
     let mut numbers = Vec::new();

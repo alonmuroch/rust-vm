@@ -2,7 +2,7 @@
 #![no_main]
 
 extern crate program;
-use program::{entrypoint, types::result::Result, require};
+use program::{entrypoint, types::result::Result, require, DataParser};
 use program::types::address::Address;    
 
 /// Simple smart contract that compares two 32-bit integers.
@@ -44,15 +44,9 @@ fn my_vm_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result 
 
     // EDUCATIONAL: Extract two 32-bit integers from the input data
     // This demonstrates how to parse binary data in smart contracts
-    let mut first_bytes = [0u8; 4];
-    let mut second_bytes = [0u8; 4];
-    first_bytes.copy_from_slice(&data[0..4]);  // First 4 bytes
-    second_bytes.copy_from_slice(&data[4..8]); // Second 4 bytes
-
-    // EDUCATIONAL: Convert bytes to integers using little-endian format
-    // This matches the VM's memory layout and is common in embedded systems
-    let first = u32::from_le_bytes(first_bytes);
-    let second = u32::from_le_bytes(second_bytes);
+    let mut parser = DataParser::new(data);
+    let first = parser.read_u32();
+    let second = parser.read_u32();
 
     // EDUCATIONAL: Perform the comparison and return appropriate result
     // This demonstrates conditional logic in smart contracts

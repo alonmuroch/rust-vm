@@ -4,7 +4,7 @@
 extern crate program;
 use program::{entrypoint, event, 
     fire_event, log, logf, persist_struct, 
-    read_u32, require, router::route, 
+    require, router::route, DataParser,
     types::{address::Address, o::O, result::Result}, vm_panic, Map};
 
 
@@ -55,8 +55,9 @@ fn init(caller: Address, args: &[u8]) {
     
     logf!("initializing");
 
-    let total_supply = read_u32(&args[0..4]);
-    let decimals = args[4];
+    let mut parser = DataParser::new(args);
+    let total_supply = parser.read_u32();
+    let decimals = parser.read_bytes(1)[0];
 
     logf!("total supply: %d", total_supply);
     logf!("decimals: %d", decimals);
@@ -76,8 +77,9 @@ fn mint(caller: Address, val: u32) {
 }
 
 fn transfer(caller: Address, args: &[u8]) {
-    let to = Address::from_ptr(&args[..20]).expect("Invalid address format");
-    let amount = read_u32(&args[20..24]);
+    let mut parser = DataParser::new(args);
+    let to = parser.read_address();
+    let amount = parser.read_u32();
 
     let from_bal = match Balances::get(caller) {
         O::Some(bal) => bal,
@@ -100,7 +102,8 @@ fn transfer(caller: Address, args: &[u8]) {
 }
 
 fn balance_of(args: &[u8]) -> u32 {
-    let owner = Address::from_ptr(&args[..20]).expect("Invalid address format");
+    let mut parser = DataParser::new(args);
+    let owner = parser.read_address();
     match Balances::get(owner) {
         O::Some(bal) => bal,
         O::None => 0,

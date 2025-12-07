@@ -3,7 +3,7 @@
 
 extern crate program;
 
-use program::{entrypoint, types::result::Result, require, vm_panic};
+use program::{entrypoint, types::result::Result, require, vm_panic, DataParser};
 use program::call::call;
 use program::types::address::Address;
 
@@ -21,19 +21,15 @@ fn my_vm_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result 
     require(data.len() == 28, b"input data must be 28 bytes");
 
     // Parse the simple contract address from the first 20 bytes
-    let simple_addr = Address::from_ptr(&data[..20]).expect("Invalid address format");
+    let mut parser = DataParser::new(data);
+    let simple_addr = parser.read_address();
 
     // Create the client using generated code
     let simple_client = SimpleContract::new(simple_addr);
 
     // Extract the two numbers to compare
-    let mut first_bytes = [0u8; 4];
-    let mut second_bytes = [0u8; 4];
-    first_bytes.copy_from_slice(&data[20..24]);
-    second_bytes.copy_from_slice(&data[24..28]);
-    
-    let first = u32::from_le_bytes(first_bytes);
-    let second = u32::from_le_bytes(second_bytes);
+    let first = parser.read_u32();
+    let second = parser.read_u32();
     
     // Prepare the data for the simple contract (8 bytes: two u32 values)
     let mut call_data = [0u8; 8];

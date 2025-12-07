@@ -29,6 +29,10 @@ pub use event::*;
 pub mod log;
 pub use log::BufferWriter;
 
+// Data parser
+pub mod parser;
+pub use parser::DataParser;
+
 // Contract call func
 pub mod call;
 

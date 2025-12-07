@@ -2,7 +2,7 @@
 #![no_main]
 
 extern crate program;
-use program::{entrypoint, types::result::Result, logf, log, concat_str};
+use program::{entrypoint, types::result::Result, logf, log, concat_str, DataParser};
 use program::types::address::Address;
 use core::fmt;
 
@@ -53,15 +53,14 @@ unsafe fn logging(_self_address: Address, _caller: Address, data: &[u8]) -> Resu
     log!("Bytes (decimal): %A", bytes_decimal);
     
     // Process input data
-    if data.len() >= 4 {
-        let mut val_bytes = [0u8; 4];
-        val_bytes.copy_from_slice(&data[0..4]);
-        let value = u32::from_le_bytes(val_bytes);
+    let mut parser = DataParser::new(data);
+    if parser.remaining() >= 4 {
+        let value = parser.read_u32();
         logf!("Input value: %d (0x%x)", value, value);
         
         // Log remaining bytes if any
-        if data.len() > 4 {
-            let remaining = &data[4..];
+        if parser.remaining() > 0 {
+            let remaining = parser.read_bytes(parser.remaining());
             logf!("Remaining %d bytes: ", remaining.len() as u32);
             log!("%b", remaining);
         }

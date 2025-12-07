@@ -3,7 +3,7 @@
 
 extern crate program;
 
-use program::{entrypoint, types::result::Result, vm_panic, require};
+use program::{entrypoint, types::result::Result, vm_panic, require, DataParser};
 use program::types::address::Address;
 use program::router::{route};
 
@@ -56,16 +56,9 @@ fn compare(data: &[u8]) -> Result {
     require(data.len() == 8, b"compare expects 8 bytes");
 
     // EDUCATIONAL: Extract the two 32-bit integers from the input data
-    let mut a = [0u8; 4];  // Buffer for first integer
-    let mut b = [0u8; 4];  // Buffer for second integer
-    
-    // EDUCATIONAL: Copy bytes from input data to our buffers
-    a.copy_from_slice(&data[0..4]);  // First 4 bytes = first integer
-    b.copy_from_slice(&data[4..8]);  // Last 4 bytes = second integer
-
-    // EDUCATIONAL: Convert bytes to integers (little-endian format)
-    let a = u32::from_le_bytes(a);
-    let b = u32::from_le_bytes(b);
+    let mut parser = DataParser::new(data);
+    let a = parser.read_u32();
+    let b = parser.read_u32();
 
     // EDUCATIONAL: Compare the integers and return appropriate result
     if a > b {
