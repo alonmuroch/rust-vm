@@ -9,7 +9,7 @@ ABI := $(SRC:.rs=.abi.json)
 # Generate client code for each ABI
 CLIENTS := $(ABI:.abi.json=_abi.rs)
 
-TARGET := riscv32imac-unknown-none-elf
+TARGET := riscv32imc-unknown-none-elf
 LINKER_SCRIPT := linker.ld
 
 .PRECIOUS: $(addprefix $(BIN_DIR)/, $(ELF))

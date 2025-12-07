@@ -12,7 +12,7 @@ clean:
 program: 
 	@echo "=== Building program ==="
 	cargo clean -p program
-	cargo build -p program --target riscv32imac-unknown-none-elf
+	cargo build -p program --target riscv32imc-unknown-none-elf
 	@echo "=== Program build complete ==="
 
 example_programs: clean

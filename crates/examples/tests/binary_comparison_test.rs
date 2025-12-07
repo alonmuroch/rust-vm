@@ -65,7 +65,7 @@ fn test_vm_binary_comparison() -> Result<(), String> {
     println!("\nStep 3: Extracted {} test cases from log", test_cases.len());
 
     // Step 4: Check for corresponding ELF binaries
-    let binaries_dir = Path::new("../../target/riscv32im-unknown-none-elf/release");
+    let binaries_dir = Path::new("../../target/riscv32imc-unknown-none-elf/release");
 
     println!("\nStep 4: Checking for ELF binaries in: {}", binaries_dir.display());
 
@@ -161,7 +161,7 @@ fn test_vm_binary_comparison() -> Result<(), String> {
 
     if binaries_found == 0 {
         println!("⚠️  Warning: No ELF binaries found for any of the {} test cases", total_test_cases);
-        println!("   To build binaries, run: cargo build -p examples --release --target riscv32im-unknown-none-elf --features binaries");
+        println!("   To build binaries, run: cargo build -p examples --release --target riscv32imc-unknown-none-elf --features binaries");
         println!("   Skipping binary comparison validation.");
         println!("\n✅ Test completed (skipped binary validation)");
         cleanup();
