@@ -1,10 +1,8 @@
 # Rust VM Examples - Build System
 PROJECT_NAME := Rust VM Examples
 VERSION := 1.0.0
-CARGO ?= cargo
 CARGO_NIGHTLY ?= cargo +nightly-aarch64-apple-darwin
-CARGO_BUILD_STD ?= -Zbuild-std=core,alloc
-CARGO_BUILD_STD_FEATURES ?= -Zbuild-std-features=compiler-builtins-mem
+AVM32 := $(CARGO_NIGHTLY) run -p compiler --bin avm32 --
 
 BIN_DIR := bin
 SRC := $(notdir $(wildcard src/*.rs))
@@ -12,10 +10,6 @@ ELF := $(SRC:.rs=.elf)
 ABI := $(SRC:.rs=.abi.json)
 # Generate client code for each ABI
 CLIENTS := $(ABI:.abi.json=_abi.rs)
-
-TARGET ?= $(abspath ../compiler/targets/avm32.json)
-TARGET_NAME := $(notdir $(basename $(TARGET)))
-LINKER_SCRIPT := linker.ld
 
 .PRECIOUS: $(addprefix $(BIN_DIR)/, $(ELF))
 
@@ -39,24 +33,16 @@ clean-abi:
 	@echo "🧹 Cleaning existing ABI files..."
 	@rm -f $(addprefix $(BIN_DIR)/, $(ABI))
 
-LINKER_SCRIPT := $(abspath linker.ld)
-
 # General rule for all ELF files
 $(BIN_DIR)/%.elf: src/%.rs
 	@mkdir -p $(BIN_DIR)
 	@echo "🎯 Compiling $< to ELF..."
-	RUSTFLAGS="-C link-arg=-T$(LINKER_SCRIPT)" \
-	$(CARGO_NIGHTLY) $(CARGO_BUILD_STD) $(CARGO_BUILD_STD_FEATURES) build --release \
-		--target $(TARGET) \
-		--manifest-path Cargo.toml \
-		--bin $* \
-		--features binaries
-	@cp ../../target/$(TARGET_NAME)/release/$* $(BIN_DIR)/$*.elf
+	@$(AVM32) all --bin $* --out-dir $(BIN_DIR)
 
 $(BIN_DIR)/%.abi.json: src/%.rs
 	@mkdir -p $(BIN_DIR)
 	@echo "📋 Generating ABI for $<..."
-	@cd ../compiler && cargo run --bin abi_generator -- ../examples/$< ../examples/$@
+	@$(AVM32) abi --bin $* --src $< --out $(BIN_DIR)/$*.abi.json
 
 generate_clients: $(addprefix $(BIN_DIR)/, $(CLIENTS))
 	@echo "🔧 Generated client code for all ABIs"
@@ -65,8 +51,7 @@ generate_clients: $(addprefix $(BIN_DIR)/, $(CLIENTS))
 $(BIN_DIR)/%_abi.rs: $(BIN_DIR)/%.abi.json
 	@mkdir -p $(BIN_DIR)
 	@echo "🔧 Generating ABI client code for $*..."
-	@CONTRACT_NAME=$$(echo $* | awk '{print toupper(substr($$0,1,1)) substr($$0,2)}')Contract; \
-	cd ../compiler && cargo run -q --bin abi_codegen -- ../examples/bin/$*.abi.json ../examples/bin/$*_abi.rs $$CONTRACT_NAME 2>/dev/null || true
+	@$(AVM32) client --abi $(BIN_DIR)/$*.abi.json --out $(BIN_DIR)/$*_abi.rs
 
 clean:
 	@echo "🧹 Cleaning $(PROJECT_NAME) build artifacts..."
