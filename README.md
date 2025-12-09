@@ -79,10 +79,7 @@ Blockchain technology is revolutionizing how we think about trust, decentralizat
 ## ✨ Key Features
 
 ### 🧠 **RISC-V Instruction Set**
-- **RV32I Base**: Integer arithmetic, memory operations, control flow
-- **RV32M Extension**: Multiplication and division operations  
-- **RV32A Extension**: Atomic memory operations for concurrency
-- **RV32C Extension**: Compressed instructions for code size optimization
+- **RV32IM**: Integer + multiply/divide (M). Atomics (A) are implemented; compressed (C) decoding is present but experimental—core target is RV32IM.
 
 ### 🦀 **Rust Smart Contracts**
 - Write contracts in pure Rust (no WebAssembly needed)
@@ -292,4 +289,3 @@ This project was created to help students and developers understand the fascinat
 **Ready to dive deep into the world of virtual machines? Start exploring the code! 🚀**
 
 > *"The only way to learn a new programming language is by writing programs in it."* - Dennis Ritchie
-

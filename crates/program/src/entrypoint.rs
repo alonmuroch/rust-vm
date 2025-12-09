@@ -10,7 +10,8 @@
 /// Rust types inside our contract.
 /// 
 /// USAGE: Call this macro with the name of your main contract function:
-/// ```rust
+/// ```ignore
+/// use program::entrypoint;
 /// entrypoint!(my_contract_function);
 /// ```
 /// 
