@@ -161,10 +161,14 @@ impl TestRunner {
             writeln!(self.writer.borrow_mut(), "--------------------").unwrap();
 
             // Write receipt
-            if let Some(_abi) = &case.abi {
-                // TODO: Update print_events_pretty to use the writer
-                // For now, just write the receipt
-                writeln!(self.writer.borrow_mut(), "{}", receipt).unwrap();
+            if let Some(abi) = &case.abi {
+                let mut writer = self.writer.borrow_mut();
+                writeln!(writer, "=== Transaction Receipt ===").unwrap();
+                writeln!(writer, "From: {:?}", receipt.tx.from).unwrap();
+                writeln!(writer, "To: {:?}", receipt.tx.to).unwrap();
+                writeln!(writer, "Result: {:?}", receipt.result).unwrap();
+                writeln!(writer, "Events:").unwrap();
+                receipt.print_events_pretty(abi, &mut *writer);
             } else {
                 writeln!(self.writer.borrow_mut(), "{}", receipt).unwrap();
             }

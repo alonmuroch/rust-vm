@@ -6,9 +6,9 @@ all: clean program examples test utils summary
 
 run_examples:
 	@echo "=== Building example programs ==="
-	$(MAKE) -C crates/examples
+	RUSTFLAGS="-Awarnings" $(MAKE) -C crates/examples
 	@echo "=== Running example crate tests ==="
-	cd crates/examples && cargo test -- --nocapture
+	cd crates/examples && RUSTFLAGS="-Awarnings" cargo test -- --nocapture
 	@echo "=== Example programs build and tests complete ==="
 
 clean:

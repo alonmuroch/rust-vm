@@ -66,23 +66,20 @@ impl fmt::Display for TransactionReceipt {
 use compiler::{EventAbi, ParamType};
 
 impl TransactionReceipt {
-    pub fn print_events_pretty(&self, abi_registry: &Vec<EventAbi>) {
+    pub fn print_events_pretty(&self, abi_registry: &Vec<EventAbi>, writer: &mut dyn fmt::Write) {
         if self.events.is_empty() {
-            println!("No events in receipt.");
+            let _ = writeln!(writer, "No events in receipt.");
             return;
         }
 
         for event in &self.events {
-            Self::pretty_print_event(event, abi_registry);
+            Self::pretty_print_event(event, abi_registry, writer);
         }
     }
 
-    pub fn pretty_print_event(
-        event: &[u8],
-        abi_registry: &Vec<EventAbi>, // now using Vec
-    ) {
+    pub fn pretty_print_event(event: &[u8], abi_registry: &Vec<EventAbi>, writer: &mut dyn fmt::Write) {
         if event.len() < 32 {
-            println!("Invalid event: too short");
+            let _ = writeln!(writer, "Invalid event: too short");
             return;
         }
 
@@ -91,19 +88,18 @@ impl TransactionReceipt {
         let data = &event[32..];
 
         if let Some(abi) = abi_registry.iter().find(|abi| abi.id() == id) {
-            println!("Event {}: (", abi.name);
+            let _ = writeln!(writer, "  {}: (", abi.name);
             let mut offset = 0;
 
-            println!("        ID: 0x{}", hex::encode(id));
+            let _ = writeln!(writer, "        ID: 0x{}", hex::encode(id));
             for (i, param) in abi.inputs.iter().enumerate() {
                 let val = if param.indexed {
                     "<indexed>".to_string()
                 } else {
                     match param.kind {
                         ParamType::Address => {
-                            // Address is 20 bytes, not padded to 32
                             if offset + 20 > data.len() {
-                                println!("  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
                                 break;
                             }
                             let bytes: &[u8] = &data[offset..offset + 20];
@@ -111,29 +107,18 @@ impl TransactionReceipt {
                             format!("0x{}", hex::encode(bytes))
                         }
                         ParamType::Uint(256) | ParamType::Uint(32) => {
-                            // u32 is 4 bytes, not padded to 32
                             if offset + 4 > data.len() {
-                                println!("  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
                                 break;
                             }
                             let bytes = &data[offset..offset + 4];
                             offset += 4;
-                            match param.kind {
-                                ParamType::Uint(32) => {
-                                    let raw = u32::from_le_bytes(bytes.try_into().unwrap());
-                                    format!("{}", raw)
-                                }
-                                ParamType::Uint(256) => {
-                                    // For u256, we'd need more bytes, but let's handle u32 for now
-                                    let raw = u32::from_le_bytes(bytes.try_into().unwrap());
-                                    format!("{}", raw)
-                                }
-                                _ => unreachable!()
-                            }
+                            let raw = u32::from_le_bytes(bytes.try_into().unwrap());
+                            format!("{}", raw)
                         }
                         ParamType::Bool => {
                             if offset + 1 > data.len() {
-                                println!("  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
                                 break;
                             }
                             let b = data[offset];
@@ -142,13 +127,13 @@ impl TransactionReceipt {
                         }
                         ParamType::Bytes => {
                             if offset + 1 > data.len() {
-                                println!("  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
                                 break;
                             }
                             let len = data[offset] as usize;
                             offset += 1;
                             if offset + len > data.len() {
-                                println!("  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
                                 break;
                             }
                             let bytes = &data[offset..offset + len];
@@ -156,19 +141,19 @@ impl TransactionReceipt {
                             format!("0x{}", hex::encode(bytes))
                         }
                         _ => {
-                            println!("  {}: <unimplemented type>", param.name);
+                            let _ = writeln!(writer, "  {}: <unimplemented type>", param.name);
                             break;
                         }
                     }
                 };
 
                 let comma = if i + 1 < abi.inputs.len() { "," } else { "" };
-                println!("\t{}: {}{}", param.name, val, comma);
+                let _ = writeln!(writer, "\t{}: {}{}", param.name, val, comma);
             }
 
-            println!(")");
+            let _ = writeln!(writer, "  )");
         } else {
-            println!("Unknown event: 0x{}", hex::encode(id));
+            let _ = writeln!(writer, "Unknown event: 0x{}", hex::encode(id));
         }
     }
 }
