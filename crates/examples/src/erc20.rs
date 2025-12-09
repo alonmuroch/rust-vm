@@ -35,11 +35,16 @@ unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
             Result::new(true, 0)
         },
         0x02 => {
-            transfer(caller, call.args);
+            let mut parser = DataParser::new(call.args);
+            let to = parser.read_address();
+            let amount = parser.read_u32();
+            transfer(caller, to, amount);
             Result::new(true, 0)
         },
         0x05 => {
-            let b = balance_of(call.args);
+            let mut parser = DataParser::new(call.args);
+            let owner = parser.read_address();
+            let b = balance_of(owner);
             Result::with_u32(b)
         },
         _ => vm_panic(b"unknown selector"),
@@ -76,11 +81,7 @@ fn mint(caller: Address, val: u32) {
     Balances::set(caller, val);
 }
 
-fn transfer(caller: Address, args: &[u8]) {
-    let mut parser = DataParser::new(args);
-    let to = parser.read_address();
-    let amount = parser.read_u32();
-
+fn transfer(caller: Address, to: Address, amount: u32) {
     let from_bal = match Balances::get(caller) {
         O::Some(bal) => bal,
         O::None => 0,
@@ -101,9 +102,7 @@ fn transfer(caller: Address, args: &[u8]) {
     fire_event!(Transfer::new(caller, to, amount));
 }
 
-fn balance_of(args: &[u8]) -> u32 {
-    let mut parser = DataParser::new(args);
-    let owner = parser.read_address();
+fn balance_of(owner: Address) -> u32 {
     match Balances::get(owner) {
         O::Some(bal) => bal,
         O::None => 0,

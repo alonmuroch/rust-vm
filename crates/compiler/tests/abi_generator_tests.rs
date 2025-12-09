@@ -15,10 +15,10 @@ fn test_abi_generation() {
             value => u32,
         });
     "#;
-    
+
     let mut generator = AbiGenerator::new(source_code.to_string());
     let abi = generator.generate();
-    
+
     assert_eq!(abi.events.len(), 2);
     assert_eq!(abi.events[0].name, "Minted");
     assert_eq!(abi.events[1].name, "Transfer");
@@ -38,11 +38,16 @@ fn test_function_extraction() {
                     Result::new(true, 0)
                 },
                 0x02 => {
-                    transfer(caller, call.args);
+                    let mut parser = DataParser::new(call.args);
+                    let to = parser.read_address();
+                    let amount = parser.read_u32();
+                    transfer(caller, to, amount);
                     Result::new(true, 0)
                 },
                 0x05 => {
-                    let b = balance_of(call.args);
+                    let mut parser = DataParser::new(call.args);
+                    let owner = parser.read_address();
+                    let b = balance_of(owner);
                     Result::with_u32(b)
                 },
                 _ => vm_panic(b"unknown selector"),
@@ -53,11 +58,11 @@ fn test_function_extraction() {
             // function body
         }
 
-        fn transfer(caller: Address, args: &[u8]) {
+        fn transfer(caller: Address, to: Address, amount: u32) {
             // function body
         }
 
-        fn balance_of(args: &[u8]) -> u32 {
+        fn balance_of(owner: Address) -> u32 {
             0
         }
     "#;
@@ -200,11 +205,16 @@ fn test_real_erc20_like_program() {
                     Result::new(true, 0)
                 },
                 0x02 => {
-                    transfer(caller, call.args);
+                    let mut parser = DataParser::new(call.args);
+                    let to = parser.read_address();
+                    let amount = parser.read_u32();
+                    transfer(caller, to, amount);
                     Result::new(true, 0)
                 },
                 0x05 => {
-                    let b = balance_of(call.args);
+                    let mut parser = DataParser::new(call.args);
+                    let owner = parser.read_address();
+                    let b = balance_of(owner);
                     Result::with_u32(b)
                 },
                 _ => vm_panic(b"unknown selector"),
@@ -215,12 +225,12 @@ fn test_real_erc20_like_program() {
             // Initialize contract
         }
 
-        fn transfer(caller: Address, args: &[u8]) {
+        fn transfer(caller: Address, to: Address, amount: u32) {
             // Transfer tokens
             fire_event!(Transfer::new(caller, caller, 0));
         }
 
-        fn balance_of(args: &[u8]) -> u32 {
+        fn balance_of(owner: Address) -> u32 {
             0
         }
     "#;
@@ -271,11 +281,11 @@ fn test_function_input_extraction() {
             // function body
         }
 
-        fn transfer(caller: Address, args: &[u8]) {
+        fn transfer(caller: Address, to: Address, amount: u32) {
             // function body
         }
 
-        fn balance_of(args: &[u8]) -> u32 {
+        fn balance_of(owner: Address) -> u32 {
             0
         }
 
@@ -287,11 +297,16 @@ fn test_function_input_extraction() {
                     Result::new(true, 0)
                 },
                 0x02 => {
-                    transfer(caller, call.args);
+                    let mut parser = DataParser::new(call.args);
+                    let to = parser.read_address();
+                    let amount = parser.read_u32();
+                    transfer(caller, to, amount);
                     Result::new(true, 0)
                 },
                 0x05 => {
-                    let b = balance_of(call.args);
+                    let mut parser = DataParser::new(call.args);
+                    let owner = parser.read_address();
+                    let b = balance_of(owner);
                     Result::with_u32(b)
                 },
                 _ => vm_panic(b"unknown selector"),
@@ -314,15 +329,17 @@ fn test_function_input_extraction() {
     
     // Check transfer function
     let transfer_func = abi.functions.iter().find(|f| f.name == "transfer").unwrap();
-    assert_eq!(transfer_func.inputs.len(), 1);
-    assert_eq!(transfer_func.inputs[0].name, "args");
-    assert!(matches!(transfer_func.inputs[0].kind, ParamType::Bytes));
+    assert_eq!(transfer_func.inputs.len(), 2);
+    assert_eq!(transfer_func.inputs[0].name, "to");
+    assert!(matches!(transfer_func.inputs[0].kind, ParamType::Address));
+    assert_eq!(transfer_func.inputs[1].name, "amount");
+    assert!(matches!(transfer_func.inputs[1].kind, ParamType::Uint(32)));
     
     // Check balance_of function
     let balance_func = abi.functions.iter().find(|f| f.name == "balance_of").unwrap();
     assert_eq!(balance_func.inputs.len(), 1);
-    assert_eq!(balance_func.inputs[0].name, "args");
-    assert!(matches!(balance_func.inputs[0].kind, ParamType::Bytes));
+    assert_eq!(balance_func.inputs[0].name, "owner");
+    assert!(matches!(balance_func.inputs[0].kind, ParamType::Address));
     assert_eq!(balance_func.outputs.len(), 1);
     assert!(matches!(balance_func.outputs[0], ParamType::Uint(32)));
 }
@@ -357,7 +374,7 @@ fn test_function_signature_parsing() {
     "#;
     
     let mut generator = AbiGenerator::new(source_code.to_string());
-    let abi = generator.generate();
+    let _abi = generator.generate();
     
     // Since these functions aren't called in the router, they won't be included
     // But we can test the signature parsing directly
@@ -793,4 +810,82 @@ fn test_event_edge_cases() {
     
     let message_field = multiple_event.inputs.iter().find(|f| f.name == "message").unwrap();
     assert!(matches!(message_field.kind, ParamType::String));
+}
+
+#[test]
+fn test_erc20_example_file_generates_typed_abi() {
+    // Ensure the real ERC20 example stays in sync with the typed ABI we expect
+    let source_code = include_str!("../../examples/src/erc20.rs");
+    let mut generator = AbiGenerator::new(source_code.to_string());
+    let abi = generator.generate();
+
+    let function_names: Vec<&str> = abi.functions.iter().map(|f| f.name.as_str()).collect();
+    assert!(function_names.contains(&"init"));
+    assert!(function_names.contains(&"transfer"));
+    assert!(function_names.contains(&"balance_of"));
+
+    let init_func = abi.functions.iter().find(|f| f.name == "init").unwrap();
+    assert_eq!(init_func.selector, 1);
+    // The routed payload stays raw bytes for init.
+    assert_eq!(init_func.inputs.len(), 1);
+    assert_eq!(init_func.inputs[0].name, "args");
+    assert!(matches!(init_func.inputs[0].kind, ParamType::Bytes));
+
+    let transfer_func = abi.functions.iter().find(|f| f.name == "transfer").unwrap();
+    assert_eq!(transfer_func.selector, 2);
+    assert_eq!(transfer_func.inputs.len(), 2);
+    assert_eq!(transfer_func.inputs[0].name, "to");
+    assert!(matches!(transfer_func.inputs[0].kind, ParamType::Address));
+    assert_eq!(transfer_func.inputs[1].name, "amount");
+    assert!(matches!(transfer_func.inputs[1].kind, ParamType::Uint(32)));
+
+    let balance_func = abi.functions.iter().find(|f| f.name == "balance_of").unwrap();
+    assert_eq!(balance_func.selector, 5);
+    assert_eq!(balance_func.inputs.len(), 1);
+    assert_eq!(balance_func.inputs[0].name, "owner");
+    assert!(matches!(balance_func.inputs[0].kind, ParamType::Address));
+    assert_eq!(balance_func.outputs.len(), 1);
+    assert!(matches!(balance_func.outputs[0], ParamType::Uint(32)));
+}
+
+#[test]
+fn test_router_preparsed_args_keep_typed_signature() {
+    // When call.args is parsed into typed vars before dispatch, the ABI should still reflect
+    // the callee's typed signature (and drop the implicit caller).
+    let source_code = r#"
+        fn routed_transfer(caller: Address, to: Address, amount: u64, flag: bool) -> Result {
+            Result::new(true, if flag { 1 } else { 0 })
+        }
+
+        unsafe fn main_entry(program: Address, caller: Address, data: &[u8]) -> Result {
+            route(data, program, caller, |to_addr, from_addr, call| match call.selector {
+                0x0a => {
+                    let mut parser = DataParser::new(call.args);
+                    let to = parser.read_address();
+                    let amount = parser.read_u64();
+                    let flag = parser.read_bytes(1)[0] == 1;
+                    routed_transfer(caller, to, amount, flag);
+                    Result::new(true, 0)
+                }
+                _ => vm_panic(b\"unknown selector\"),
+            })
+        }
+    "#;
+
+    let mut generator = AbiGenerator::new(source_code.to_string());
+    let abi = generator.generate();
+
+    assert_eq!(abi.functions.len(), 1);
+    let func = &abi.functions[0];
+    assert_eq!(func.name, "routed_transfer");
+    assert_eq!(func.selector, 0x0a);
+    // Caller is implicit; only the routed args appear.
+    assert_eq!(func.inputs.len(), 3);
+    assert_eq!(func.inputs[0].name, "to");
+    assert!(matches!(func.inputs[0].kind, ParamType::Address));
+    assert_eq!(func.inputs[1].name, "amount");
+    assert!(matches!(func.inputs[1].kind, ParamType::Uint(64)));
+    assert_eq!(func.inputs[2].name, "flag");
+    assert!(matches!(func.inputs[2].kind, ParamType::Bool));
+    assert!(func.outputs.is_empty());
 }

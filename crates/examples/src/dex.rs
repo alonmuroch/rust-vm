@@ -85,10 +85,10 @@ fn add_liquidity(self_addr: Address, caller: Address, mut parser: DataParser) ->
     require(transfer!(&self_addr, am_in), b"add: am transfer failed");
 
     // Pull ERC20 from caller into the pool address.
-    let mut args = [0u8; 24];
-    args[..20].copy_from_slice(&self_addr.0);
-    args[20..].copy_from_slice(&(token_in as u32).to_le_bytes());
-    let ok = erc20.transfer(&caller, &args).map(|r| r.success).unwrap_or(false);
+    let ok = erc20
+        .transfer(&caller, self_addr, token_in as u32)
+        .map(|r| r.success)
+        .unwrap_or(false);
     require(ok, b"add: token transfer failed");
 
     let mut pool = load_pool();
@@ -147,10 +147,10 @@ fn remove_liquidity(self_addr: Address, caller: Address, mut parser: DataParser)
 
     // Pay out ERC20 tokens from pool balance.
     require(token_out <= u32::MAX as u128, b"remove: token overflow");
-    let mut args = [0u8; 24];
-    args[..20].copy_from_slice(&caller.0);
-    args[20..].copy_from_slice(&(token_out as u32).to_le_bytes());
-    let ok = erc20.transfer(&self_addr, &args).map(|r| r.success).unwrap_or(false);
+    let ok = erc20
+        .transfer(&self_addr, caller, token_out as u32)
+        .map(|r| r.success)
+        .unwrap_or(false);
     require(ok, b"remove: token transfer failed");
 
     // Pay native AM out to the provider. Note: with the current host interface,
@@ -194,10 +194,10 @@ fn swap(self_addr: Address, caller: Address, mut parser: DataParser) -> Result {
         pool.reserve_token = pool.reserve_token.saturating_sub(token_out);
         pool.store();
 
-        let mut args = [0u8; 24];
-        args[..20].copy_from_slice(&caller.0);
-        args[20..].copy_from_slice(&(token_out as u32).to_le_bytes());
-        let ok = erc20.transfer(&self_addr, &args).map(|r| r.success).unwrap_or(false);
+        let ok = erc20
+            .transfer(&self_addr, caller, token_out as u32)
+            .map(|r| r.success)
+            .unwrap_or(false);
         require(ok, b"swap: token transfer failed");
 
         fire_event!(SwapExecuted::new(caller, am_in, token_out as u64));
@@ -211,10 +211,10 @@ fn swap(self_addr: Address, caller: Address, mut parser: DataParser) -> Result {
         require(token_in <= u32::MAX as u128, b"swap: token overflow");
 
         // Pull ERC20 into the pool.
-        let mut args = [0u8; 24];
-        args[..20].copy_from_slice(&self_addr.0);
-        args[20..].copy_from_slice(&(token_in as u32).to_le_bytes());
-        let ok = erc20.transfer(&caller, &args).map(|r| r.success).unwrap_or(false);
+        let ok = erc20
+            .transfer(&caller, self_addr, token_in as u32)
+            .map(|r| r.success)
+            .unwrap_or(false);
         require(ok, b"swap: token transfer failed");
 
         let am_out = (token_in * pool.reserve_am) / (pool.reserve_token + token_in);

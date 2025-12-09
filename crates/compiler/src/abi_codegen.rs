@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use crate::abi::{ContractAbi, FunctionAbi, ParamType};
+use crate::abi::{ContractAbi, FunctionAbi, FunctionParam, ParamType};
 
 /// ABI Code Generator that creates Rust client code from ABI definitions
 pub struct AbiCodeGenerator {
@@ -94,20 +94,19 @@ impl AbiCodeGenerator {
         if function.selector > 0 {
             // Use manual router encoding for functions with selectors
             method.push_str("        // Encode router call manually\n");
-            
-            // For simple byte slice inputs
-            if function.inputs.len() == 1 && matches!(function.inputs[0].kind, ParamType::Bytes) {
-                method.push_str(&format!("        let arg_len = {}.len() as u8;\n", function.inputs[0].name));
-                method.push_str("        let mut encoded = [0u8; 256]; // Fixed buffer\n");
-                method.push_str(&format!("        encoded[0] = 0x{:02x}; // selector\n", function.selector));
-                method.push_str("        encoded[1] = arg_len; // arg length\n");
-                method.push_str(&format!("        encoded[2..2 + arg_len as usize].copy_from_slice({});\n", function.inputs[0].name));
-                method.push_str("        let data = &encoded[..2 + arg_len as usize];\n");
-            } else {
-                // For other types, we'd need custom encoding
-                method.push_str(&format!("        let data = &[0x{:02x}, 0]; // selector + empty args\n", function.selector));
+            method.push_str("        let mut encoded = [0u8; 256]; // Fixed buffer\n");
+            method.push_str(&format!("        encoded[0] = 0x{:02x}; // selector\n", function.selector));
+            method.push_str("        let mut offset: usize = 2;\n");
+
+            for input in &function.inputs {
+                method.push_str(&self.encode_argument("encoded", "offset", input));
             }
-            
+
+            method.push_str("        if offset - 2 > u8::MAX as usize {\n");
+            method.push_str("            return None;\n");
+            method.push_str("        }\n");
+            method.push_str("        encoded[1] = (offset - 2) as u8; // arg length\n");
+            method.push_str("        let data = &encoded[..offset];\n");
             method.push_str("        \n");
             method.push_str("        // Make the call\n");
             method.push_str("        call(caller, &self.address, data)\n");
@@ -142,6 +141,117 @@ impl AbiCodeGenerator {
             ParamType::Bytes => "&[u8]".to_string(),
             ParamType::Result => "Result".to_string(),
             _ => "Vec<u8>".to_string(),
+        }
+    }
+
+    fn encode_argument(&self, buffer: &str, offset_var: &str, input: &FunctionParam) -> String {
+        let name = &input.name;
+        match input.kind {
+            ParamType::Address => {
+                format!(
+                    "        if {offset} + 20 > {buf}.len() {{ return None; }}\n\
+         {buf}[{offset}..{offset} + 20].copy_from_slice(&{name}.0);\n\
+         {offset} += 20;\n",
+                    buf = buffer,
+                    offset = offset_var,
+                    name = name,
+                )
+            }
+            ParamType::Uint(8) => {
+                format!(
+                    "        if {offset} >= {buf}.len() {{ return None; }}\n\
+         {buf}[{offset}] = {name};\n\
+         {offset} += 1;\n",
+                    buf = buffer,
+                    offset = offset_var,
+                    name = name,
+                )
+            }
+            ParamType::Uint(16) => {
+                format!(
+                    "        if {offset} + 2 > {buf}.len() {{ return None; }}\n\
+         {buf}[{offset}..{offset} + 2].copy_from_slice(&{name}.to_le_bytes());\n\
+         {offset} += 2;\n",
+                    buf = buffer,
+                    offset = offset_var,
+                    name = name,
+                )
+            }
+            ParamType::Uint(32) => {
+                format!(
+                    "        if {offset} + 4 > {buf}.len() {{ return None; }}\n\
+         {buf}[{offset}..{offset} + 4].copy_from_slice(&{name}.to_le_bytes());\n\
+         {offset} += 4;\n",
+                    buf = buffer,
+                    offset = offset_var,
+                    name = name,
+                )
+            }
+            ParamType::Uint(64) => {
+                format!(
+                    "        if {offset} + 8 > {buf}.len() {{ return None; }}\n\
+         {buf}[{offset}..{offset} + 8].copy_from_slice(&{name}.to_le_bytes());\n\
+         {offset} += 8;\n",
+                    buf = buffer,
+                    offset = offset_var,
+                    name = name,
+                )
+            }
+            ParamType::Uint(128) => {
+                format!(
+                    "        if {offset} + 16 > {buf}.len() {{ return None; }}\n\
+         {buf}[{offset}..{offset} + 16].copy_from_slice(&{name}.to_le_bytes());\n\
+         {offset} += 16;\n",
+                    buf = buffer,
+                    offset = offset_var,
+                    name = name,
+                )
+            }
+            ParamType::Uint(256) => {
+                format!(
+                    "        if {offset} + 32 > {buf}.len() {{ return None; }}\n\
+         {buf}[{offset}..{offset} + 32].copy_from_slice(&{name});\n\
+         {offset} += 32;\n",
+                    buf = buffer,
+                    offset = offset_var,
+                    name = name,
+                )
+            }
+            ParamType::Bool => {
+                format!(
+                    "        if {offset} >= {buf}.len() {{ return None; }}\n\
+         {buf}[{offset}] = if {name} {{ 1 }} else {{ 0 }};\n\
+         {offset} += 1;\n",
+                    buf = buffer,
+                    offset = offset_var,
+                    name = name,
+                )
+            }
+            ParamType::String => {
+                format!(
+                    "        let arg_{name} = {name}.as_bytes();\n\
+         if {offset} + arg_{name}.len() > {buf}.len() {{ return None; }}\n\
+         {buf}[{offset}..{offset} + arg_{name}.len()].copy_from_slice(arg_{name});\n\
+         {offset} += arg_{name}.len();\n",
+                    buf = buffer,
+                    offset = offset_var,
+                    name = name,
+                )
+            }
+            ParamType::Bytes => {
+                format!(
+                    "        let arg_{name} = {name};\n\
+         if {offset} + arg_{name}.len() > {buf}.len() {{ return None; }}\n\
+         {buf}[{offset}..{offset} + arg_{name}.len()].copy_from_slice(arg_{name});\n\
+         {offset} += arg_{name}.len();\n",
+                    buf = buffer,
+                    offset = offset_var,
+                    name = name,
+                )
+            }
+            _ => {
+                format!("        // TODO: encode argument `{}`\n", name)
+            }
         }
     }
     
