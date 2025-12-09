@@ -12,7 +12,6 @@ struct Paths {
     target_json: PathBuf,
     linker_script: PathBuf,
     manifest_path: PathBuf,
-    out_dir: PathBuf,
 }
 
 impl Paths {
@@ -26,16 +25,21 @@ impl Paths {
             .to_path_buf();
 
         let target_json = repo_root.join("crates/compiler/targets/avm32.json");
-        let linker_script = repo_root.join("crates/examples/linker.ld");
-        let manifest_path = repo_root.join("crates/examples/Cargo.toml");
-        let out_dir = repo_root.join("crates/examples/bin");
+        let linker_script = repo_root.join("crates/compiler/linker.ld");
+
+        // Prefer a manifest in the current working directory; fall back to the workspace root.
+        let cwd = env::current_dir().unwrap_or_else(|_| repo_root.clone());
+        let mut manifest_path = cwd.join("Cargo.toml");
+        if !manifest_path.exists() {
+            let fallback_workspace = repo_root.join("Cargo.toml");
+            manifest_path = fallback_workspace;
+        }
 
         Self {
             repo_root,
             target_json,
             linker_script,
             manifest_path,
-            out_dir,
         }
     }
 }
@@ -72,6 +76,8 @@ fn cmd_build(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
     let mut release = true;
     let mut out_dir: Option<PathBuf> = None;
     let mut cargo_cmd: Option<String> = None;
+    let mut manifest_path: Option<PathBuf> = None;
+    let mut linker_script: Option<PathBuf> = None;
 
     let mut i = 0;
     while i < args.len() {
@@ -100,13 +106,34 @@ fn cmd_build(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
                 cargo_cmd =
                     Some(args.get(i).cloned().ok_or("missing value for --cargo")?);
             }
+            "--manifest-path" => {
+                i += 1;
+                let val = args.get(i).cloned().ok_or("missing value for --manifest-path")?;
+                manifest_path = Some(PathBuf::from(val));
+            }
+            "--linker-script" => {
+                i += 1;
+                let val = args.get(i).cloned().ok_or("missing value for --linker-script")?;
+                linker_script = Some(PathBuf::from(val));
+            }
             other => return Err(format!("unknown flag {}", other)),
         }
         i += 1;
     }
 
     let bin = bin.ok_or("missing --bin <name>")?;
-    let out_dir = out_dir.unwrap_or_else(|| paths.out_dir.clone());
+    let manifest_path = manifest_path.unwrap_or_else(|| paths.manifest_path.clone());
+    let manifest_dir = manifest_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .ok_or("invalid manifest path")?;
+    if !manifest_path.exists() {
+        return Err(format!(
+            "manifest path {} does not exist",
+            manifest_path.display()
+        ));
+    }
+    let out_dir = out_dir.unwrap_or_else(|| manifest_dir.join("bin"));
     fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
 
     let cargo = cargo_cmd
@@ -118,9 +145,15 @@ fn cmd_build(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
         rustflags.push(' ');
     }
     rustflags.push_str("-Clink-arg=-T");
+    let linker = linker_script.unwrap_or_else(|| paths.linker_script.clone());
+    if !linker.exists() {
+        return Err(format!(
+            "linker script {} does not exist",
+            linker.display()
+        ));
+    }
     rustflags.push_str(
-        &paths
-            .linker_script
+        &linker
             .to_str()
             .ok_or("invalid linker script path")?,
     );
@@ -134,7 +167,7 @@ fn cmd_build(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
     let mut cargo_args: Vec<String> = parts.map(|s| s.to_string()).collect();
     cargo_args.push("build".to_string());
     cargo_args.push("--manifest-path".to_string());
-    cargo_args.push(paths.manifest_path.display().to_string());
+    cargo_args.push(manifest_path.display().to_string());
     cargo_args.push("--target".to_string());
     cargo_args.push(paths.target_json.display().to_string());
     if release {
@@ -182,6 +215,7 @@ fn cmd_abi(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
     let mut bin: Option<String> = None;
     let mut src: Option<PathBuf> = None;
     let mut out: Option<PathBuf> = None;
+    let mut manifest_path: Option<PathBuf> = None;
 
     let mut i = 0;
     while i < args.len() {
@@ -200,10 +234,21 @@ fn cmd_abi(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
                 let val = args.get(i).cloned().ok_or("missing value for --out")?;
                 out = Some(PathBuf::from(val));
             }
+            "--manifest-path" => {
+                i += 1;
+                let val = args.get(i).cloned().ok_or("missing value for --manifest-path")?;
+                manifest_path = Some(PathBuf::from(val));
+            }
             other => return Err(format!("unknown flag {}", other)),
         }
         i += 1;
     }
+
+    let manifest_path = manifest_path.unwrap_or_else(|| paths.manifest_path.clone());
+    let manifest_dir = manifest_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| paths.repo_root.clone());
 
     let (bin_name, src_path) = if let Some(s) = src {
         let name = bin
@@ -216,14 +261,11 @@ fn cmd_abi(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
         (name, s)
     } else {
         let name = bin.ok_or("missing --bin <name> or --src <path>")?;
-        let inferred = paths
-            .repo_root
-            .join("crates/examples/src")
-            .join(format!("{}.rs", name));
+        let inferred = manifest_dir.join("src").join(format!("{}.rs", name));
         (name, inferred)
     };
 
-    let output = out.unwrap_or_else(|| paths.out_dir.join(format!("{}.abi.json", bin_name)));
+    let output = out.unwrap_or_else(|| manifest_dir.join("bin").join(format!("{}.abi.json", bin_name)));
     let source =
         fs::read_to_string(&src_path).map_err(|e| format!("failed to read {}: {}", src_path.display(), e))?;
 
@@ -305,6 +347,9 @@ fn cmd_all(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
     let mut out_dir: Option<PathBuf> = None;
     let mut cargo_cmd: Option<String> = None;
     let mut features: Option<String> = None;
+    let mut manifest_path: Option<PathBuf> = None;
+    let mut src_override: Option<PathBuf> = None;
+    let mut linker_script: Option<PathBuf> = None;
 
     let mut i = 0;
     while i < args.len() {
@@ -331,19 +376,36 @@ fn cmd_all(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
                         .ok_or("missing value for --features")?,
                 );
             }
+            "--manifest-path" => {
+                i += 1;
+                let val = args.get(i).cloned().ok_or("missing value for --manifest-path")?;
+                manifest_path = Some(PathBuf::from(val));
+            }
+            "--src" => {
+                i += 1;
+                let val = args.get(i).cloned().ok_or("missing value for --src")?;
+                src_override = Some(PathBuf::from(val));
+            }
+            "--linker-script" => {
+                i += 1;
+                let val = args.get(i).cloned().ok_or("missing value for --linker-script")?;
+                linker_script = Some(PathBuf::from(val));
+            }
             other => return Err(format!("unknown flag {}", other)),
         }
         i += 1;
     }
 
     let bin = bin.ok_or("missing --bin <name>")?;
-    let out_dir = out_dir.unwrap_or_else(|| paths.out_dir.clone());
+    let manifest_path = manifest_path.unwrap_or_else(|| paths.manifest_path.clone());
+    let manifest_dir = manifest_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| paths.repo_root.clone());
+    let out_dir = out_dir.unwrap_or_else(|| manifest_dir.join("bin"));
     let abi_out = out_dir.join(format!("{}.abi.json", bin));
     let client_out = out_dir.join(format!("{}_abi.rs", bin));
-    let src = paths
-        .repo_root
-        .join("crates/examples/src")
-        .join(format!("{}.rs", bin));
+    let src = src_override.unwrap_or_else(|| manifest_dir.join("src").join(format!("{}.rs", bin)));
 
     cmd_build(
         vec![
@@ -358,6 +420,13 @@ fn cmd_all(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
             cargo_cmd.unwrap_or_else(|| {
                 env::var("CARGO_NIGHTLY").unwrap_or_else(|_| "cargo".to_string())
             }),
+            "--manifest-path".into(),
+            manifest_path.display().to_string(),
+            "--linker-script".into(),
+            linker_script
+                .unwrap_or_else(|| paths.linker_script.clone())
+                .display()
+                .to_string(),
         ],
         paths,
     )?;
@@ -370,6 +439,8 @@ fn cmd_all(mut args: Vec<String>, paths: &Paths) -> Result<(), String> {
             src.display().to_string(),
             "--out".into(),
             abi_out.display().to_string(),
+            "--manifest-path".into(),
+            manifest_path.display().to_string(),
         ],
         paths,
     )?;
@@ -413,9 +484,9 @@ fn capitalize_first(s: &str) -> String {
 fn print_usage() {
     eprintln!(
         "Usage:
-  avm32 build --bin <name> [--out-dir <dir>] [--cargo <cmd>] [--features <feat>] [--debug|--release]
-  avm32 abi --bin <name> [--src <path>] [--out <file>]
+  avm32 build --bin <name> [--manifest-path <cargo_toml>] [--out-dir <dir>] [--linker-script <file>] [--cargo <cmd>] [--features <feat>] [--debug|--release]
+  avm32 abi --bin <name> [--src <path>] [--out <file>] [--manifest-path <cargo_toml>]
   avm32 client --abi <file> [--out <file>] [--contract <name>]
-  avm32 all --bin <name> [--out-dir <dir>] [--cargo <cmd>] [--features <feat>]"
+  avm32 all --bin <name> [--manifest-path <cargo_toml>] [--src <path>] [--out-dir <dir>] [--linker-script <file>] [--cargo <cmd>] [--features <feat>]"
     );
 }

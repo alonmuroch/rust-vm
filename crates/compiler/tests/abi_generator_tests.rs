@@ -887,5 +887,6 @@ fn test_router_preparsed_args_keep_typed_signature() {
     assert!(matches!(func.inputs[1].kind, ParamType::Uint(64)));
     assert_eq!(func.inputs[2].name, "flag");
     assert!(matches!(func.inputs[2].kind, ParamType::Bool));
-    assert!(func.outputs.is_empty());
+    assert_eq!(func.outputs.len(), 1);
+    assert!(matches!(func.outputs[0], ParamType::Result));
 }

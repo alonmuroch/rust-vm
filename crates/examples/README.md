@@ -70,7 +70,6 @@ examples/
 ├── tests/              # Integration tests
 ├── Makefile            # Build system
 ├── Cargo.toml          # Rust dependencies
-├── linker.ld           # RISC-V linker script
 └── generate_abis.sh    # ABI generation script
 ```
 
