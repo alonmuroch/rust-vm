@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 
 use avm::avm::AVM;
+use state::State;
+use super::utils::to_address;
+use super::state_helper::test_state;
 use std::rc::Rc;
 use core::cell::RefCell;
 use core::fmt::Write;
@@ -108,7 +111,8 @@ impl TestRunner {
     /// Run a single test case
     fn run_test_case(&self, case: &super::TestCase) -> Result<(), String> {
         let transactions = case.bundle.transactions.clone();
-        let mut avm = AVM::new(self.max_memory_pages, self.vm_memory_size);
+        let test_state = super::state_helper::test_state();
+        let mut avm = AVM::new(self.max_memory_pages, self.vm_memory_size, test_state);
 
         // Set up AVM with the chosen writer and verbosity
         avm.set_verbosity(self.verbose);

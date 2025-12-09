@@ -135,11 +135,11 @@ impl AVM {
     /// 
     /// INITIALIZATION: All components start in a clean state, ready to
     /// process transactions and execute contracts.
-    pub fn new(max_pages: usize, page_size: usize) -> Self {
+    pub fn new(max_pages: usize, page_size: usize, state: State) -> Self {
         Self {
             context_stack: ContextStack::new(),
             memory_manager: MemoryPageManager::new(max_pages, page_size),
-            state: State::new(),
+            state,
             verbose: false, // Default to no verbose logging
             verbose_writer: None, // Default to console output
         }
@@ -178,9 +178,9 @@ impl AVM {
     pub fn run_tx(&mut self, tx: Transaction) -> TransactionReceipt {
         match tx.tx_type {
             TransactionType::Transfer => {
-                // EDUCATIONAL: Value transfers between accounts
-                // This would involve updating account balances and checking sufficient funds
-                panic!("regular call not implemented");
+                // EDUCATIONAL: Value transfer between accounts
+                let ok = self.apply_transfer(tx.from, tx.to, tx.value);
+                return TransactionReceipt::new(tx, Result::new(ok, if ok { 0 } else { 1 }));
             }
 
             TransactionType::CreateAccount => {
@@ -217,6 +217,20 @@ impl AVM {
                     .set_events(self.context_stack.get(context_index).expect("missing execution context").events.clone())
             }
         }
+    }
+
+    /// Moves native tokens between two accounts. Returns true on success.
+    pub fn apply_transfer(&mut self, from: Address, to: Address, amount: u64) -> bool {
+        let amount = amount as u128;
+        let from_account = self.state.get_account_mut(&from);
+        if from_account.balance < amount {
+            return false;
+        }
+        from_account.balance -= amount;
+
+        let to_account = self.state.get_account_mut(&to);
+        to_account.balance = to_account.balance.saturating_add(amount);
+        true
     }
 
     /// Extracts the result of a contract execution from memory.

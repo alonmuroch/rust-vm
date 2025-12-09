@@ -4,6 +4,9 @@ mod utils;
 #[path = "common/test_runner.rs"]
 mod test_runner;
 
+#[path = "common/state.rs"]
+mod state_helper;
+
 #[path = "common/ecdsa.rs"]
 mod ecdsa;
 
@@ -63,6 +66,11 @@ pub const ELF_BINARIES: &[ElfBinary] = &[
         name: "allocator_demo",
         path: "bin/allocator_demo",
         description: "Memory allocator demonstration",
+    },
+    ElfBinary {
+        name: "native_transfer",
+        path: "bin/native_transfer",
+        description: "Native token transfer via syscall",
     },
 ];
 
@@ -349,6 +357,61 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     ],
                     value: 0,
                     nonce: 0,
+                },
+            ]),
+        },
+
+        TestCase {
+            name: "native transfer",
+            expected_success: true,
+            expected_error_code: 0,
+            expected_data: None,
+            abi: None,
+            address_mappings: vec![],
+            bundle: TransactionBundle::new(vec![
+                Transaction {
+                    tx_type: TransactionType::Transfer,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
+                    data: vec![],
+                    value: 10,
+                    nonce: 0,
+                },
+            ]),
+        },
+
+        TestCase {
+            name: "guest transfer syscall",
+            expected_success: true,
+            expected_error_code: 0,
+            expected_data: Some({
+                let mut v = 42u128.to_le_bytes().to_vec();
+                v
+            }),
+            abi: None,
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d4", "native_transfer"),
+            ],
+            bundle: TransactionBundle::new(vec![
+                Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d4"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
+                    data: get_program_code("native_transfer"),
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d4"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
+                    data: (|| {
+                        let mut data = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0").0.to_vec();
+                        data.extend_from_slice(&42u64.to_le_bytes());
+                        data
+                    })(),
+                    value: 0,
+                    nonce: 1,
                 },
             ]),
         },

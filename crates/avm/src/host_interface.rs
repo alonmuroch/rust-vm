@@ -77,4 +77,26 @@ impl<'a> HostInterface for HostShim {
             Some(mem[start..end].to_vec())
         }
     }
+
+    fn transfer(&mut self, to: [u8; 20], value: u64) -> bool {
+        unsafe {
+            let avm = &mut *self.avm_ptr;
+            let to_addr = Address(to);
+
+            // Use the active execution context to determine the sender.
+            let ctx = match avm.context_stack.current() {
+                Some(c) => c,
+                None => return false,
+            };
+            avm.apply_transfer(ctx.from, to_addr, value)
+        }
+    }
+
+    fn balance(&mut self, addr: [u8; 20]) -> u128 {
+        unsafe {
+            let avm = &mut *self.avm_ptr;
+            let account = avm.state.get_account(&Address(addr));
+            account.map(|a| a.balance).unwrap_or(0)
+        }
+    }
 }

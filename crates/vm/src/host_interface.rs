@@ -5,6 +5,8 @@ pub trait HostInterface: Debug {
     fn call_program(&mut self, from: [u8; 20], to: [u8; 20], input_data: Vec<u8>) -> (u32, usize);
     fn read_memory_page(&mut self, page_index: usize, guest_ptr: u32, len: usize) -> Option<Vec<u8>>;
     fn fire_event(&mut self, event: Vec<u8>);
+    fn transfer(&mut self, to: [u8; 20], value: u64) -> bool;
+    fn balance(&mut self, addr: [u8; 20]) -> u128;
 }
 
 #[derive(Debug)]
@@ -20,4 +22,10 @@ impl HostInterface for NoopHost {
     fn fire_event(&mut self, _event: Vec<u8>) {
         // No operation
     }
-} 
+    fn transfer(&mut self, _to: [u8; 20], _value: u64) -> bool {
+        false
+    }
+    fn balance(&mut self, _addr: [u8; 20]) -> u128 {
+        0
+    }
+}

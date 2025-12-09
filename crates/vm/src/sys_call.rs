@@ -17,6 +17,8 @@ pub const SYSCALL_CALL_PROGRAM: u32 = 5;
 pub const SYSCALL_FIRE_EVENT: u32 = 6;
 pub const SYSCALL_ALLOC: u32 = 7;
 pub const SYSCALL_DEALLOC: u32 = 8;
+pub const SYSCALL_TRANSFER: u32 = 9;
+pub const SYSCALL_BALANCE: u32 = 10;
 /// Represents different types of arguments that can be passed to system calls.
 /// 
 /// EDUCATIONAL: This enum demonstrates how to handle different data types
@@ -88,6 +90,8 @@ impl SyscallHandler for DefaultSyscallHandler {
             SYSCALL_FIRE_EVENT => self.sys_fire_event(args, memory, host),
             SYSCALL_ALLOC => self.sys_alloc(args, memory),
             SYSCALL_DEALLOC => self.sys_dealloc(args, memory),
+            SYSCALL_TRANSFER => self.sys_transfer(args, memory, host),
+            SYSCALL_BALANCE => self.sys_balance(args, memory, host),
             _ => {
                 panic!("Unknown syscall: {}", call_id);
             }
@@ -539,6 +543,35 @@ impl DefaultSyscallHandler {
         // For now, this is a no-op since the memory will be reclaimed when the VM exits
         0
     }
+
+    fn sys_transfer(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>) -> u32 {
+        // args: a2=to ptr, a3=value_lo, a4=value_hi
+        let to_ptr = args[1] as usize;
+        let value_lo = args[2] as u64;
+        let value_hi = args[3] as u64;
+        let value = value_lo | (value_hi << 32);
+
+        let borrowed = memory.borrow();
+        let to_slice = borrowed.mem_slice(to_ptr, to_ptr + 20).expect("invalid to ptr");
+
+        let mut to = [0u8; 20];
+        to.copy_from_slice(to_slice.as_ref());
+
+        if host.transfer(to, value) { 0 } else { 1 }
+    }
+
+    fn sys_balance(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>) -> u32 {
+        // args: a1 = address pointer (20 bytes)
+        let addr_ptr = args[0] as usize;
+        let addr = {
+            let borrowed = memory.borrow();
+            let addr_slice = borrowed.mem_slice(addr_ptr, addr_ptr + 20).expect("invalid addr ptr");
+            let mut addr = [0u8; 20];
+            addr.copy_from_slice(addr_slice.as_ref());
+            addr
+        };
+
+        let bal = host.balance(addr);
+        memory.borrow().alloc_on_heap(&bal.to_le_bytes())
+    }
 }
-
-

@@ -16,6 +16,10 @@ pub extern crate types;
 pub mod integers;
 pub use integers::*;
 
+pub mod transfer;
+pub use transfer::transfer;
+pub use transfer::balance;
+
 // StorageMap
 pub mod storage_map;
 pub use storage_map::StorageMap;
