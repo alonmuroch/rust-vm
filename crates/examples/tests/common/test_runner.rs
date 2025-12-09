@@ -82,8 +82,8 @@ impl TestRunner {
         TestRunner {
             writer,
             verbose: false,
-            vm_memory_size: 64 * 1024,  // 64KB default
-            max_memory_pages: 20,        // 20 pages default
+            vm_memory_size: 256 * 1024,  // larger default to accommodate bigger binaries
+            max_memory_pages: 128,        // allow more pages for larger programs
         }
     }
 

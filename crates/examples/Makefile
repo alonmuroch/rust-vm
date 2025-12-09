@@ -13,7 +13,7 @@ CLIENTS := $(ABI:.abi.json=_abi.rs)
 
 .PRECIOUS: $(addprefix $(BIN_DIR)/, $(ELF))
 
-all: header list abi generate_clients $(addprefix $(BIN_DIR)/, $(ELF))
+all: clean header list abi generate_clients $(addprefix $(BIN_DIR)/, $(ELF))
 
 header:
 	@echo "═══════════════════════════════════════════════════════════════"
@@ -53,7 +53,7 @@ $(BIN_DIR)/%_abi.rs: $(BIN_DIR)/%.abi.json
 	@echo "🔧 Generating ABI client code for $*..."
 	@$(AVM32) client --abi $(BIN_DIR)/$*.abi.json --out $(BIN_DIR)/$*_abi.rs
 
-clean:
+clean: clean-abi
 	@echo "🧹 Cleaning $(PROJECT_NAME) build artifacts..."
 	@rm -rf $(BIN_DIR)
 	@rm -rf src/generated

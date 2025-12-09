@@ -31,7 +31,7 @@ pub use log::BufferWriter;
 
 // Data parser
 pub mod parser;
-pub use parser::DataParser;
+pub use parser::{DataParser, HexCodec};
 
 // Contract call func
 pub mod call;

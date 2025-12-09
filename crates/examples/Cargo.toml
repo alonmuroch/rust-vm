@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 program = { path = "../program" }
 sha2 = { version = "0.10", default-features = false }
+k256 = { version = "0.13", default-features = false, features = ["arithmetic", "ecdsa", "alloc"] }
 
 [dev-dependencies]
 types = { path = "../types" }  # adjust path as needed
@@ -64,4 +65,14 @@ required-features = ["binaries"]
 [[bin]]
 name = "logging"
 path = "src/logging.rs"
+required-features = ["binaries"]
+
+[[bin]]
+name = "ecdsa_verify"
+path = "src/ecdsa_verify.rs"
+required-features = ["binaries"]
+
+[[bin]]
+name = "ec_mul_test"
+path = "src/ec_mul_test.rs"
 required-features = ["binaries"]

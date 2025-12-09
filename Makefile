@@ -1,6 +1,6 @@
 .PHONY: all
 
-all: clean program example_programs test utils summary
+all: clean program examples test utils summary
 
 clean:
 	@echo "=== Cleaning project ==="
@@ -15,7 +15,7 @@ program:
 	cargo build -p program --target riscv32imc-unknown-none-elf
 	@echo "=== Program build complete ==="
 
-example_programs: clean
+examples:
 	@echo "=== Building example programs ==="
 	$(MAKE) -C crates/examples
 	@echo "=== Example programs build complete ==="

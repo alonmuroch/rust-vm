@@ -4,11 +4,14 @@ mod utils;
 #[path = "common/test_runner.rs"]
 mod test_runner;
 
+#[path = "common/ecdsa.rs"]
+mod ecdsa;
+
 use avm::transaction::{TransactionType, TransactionBundle, Transaction};
 use avm::router::{encode_router_calls, HostFuncCall};
 use once_cell::sync::Lazy;
 use compiler::EventAbi;
-
+pub use ecdsa::{build_ecdsa_payload, ECDSA_HASH, ECDSA_SK_BYTES};
 pub use test_runner::TestRunner;
 use utils::{to_address, load_abi_from_file, get_program_code};
 
@@ -72,6 +75,7 @@ pub fn get_elf_by_name(name: &str) -> Option<&'static ElfBinary> {
 pub fn get_elf_path(name: &str) -> Option<String> {
     get_elf_by_name(name).map(|elf| format!("crates/examples/{}", elf.path))
 }
+
 
 #[derive(Debug)]
 pub struct TestCase<'a> {
@@ -348,6 +352,36 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 },
             ]),
         },
+
+        TestCase {
+            name: "ecdsa verify",
+            expected_success: true,
+            expected_error_code: 0,
+            expected_data: None,
+            abi: None,
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "ecdsa_verify"),
+            ],
+            bundle: TransactionBundle::new(vec![
+                Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: get_program_code("ecdsa_verify"),
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                    data: build_ecdsa_payload(),
+                    value: 0,
+                    nonce: 1,
+                },
+            ]),
+        },
+
     ]
 });
 
