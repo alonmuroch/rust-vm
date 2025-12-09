@@ -214,7 +214,8 @@ impl AVM {
                 // extract result 
                 let res = self.extract_result(result_ptr, context_index);
                 TransactionReceipt::new(tx, res)
-                    .set_events(self.context_stack.get(context_index).expect("missing execution context").events.clone())
+                    // Include events from this context and any nested calls.
+                    .set_events(self.context_stack.collect_events_from(context_index))
             }
         }
     }
@@ -271,8 +272,6 @@ impl AVM {
         // EDUCATIONAL: Extract the data array
         let mut data = [0u8; 256];
         data.copy_from_slice(&mem[start+9..start + 265]);
-
-        self.log(&format!("DEBUG: Extracted result - success: {}, error_code: {}, data_len: {}", success, error_code, data_len), false);
 
         return Result { success, error_code, data_len, data };
     }

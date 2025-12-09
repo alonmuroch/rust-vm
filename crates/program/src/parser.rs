@@ -21,6 +21,22 @@ impl HexCodec {
         }
     }
 
+    /// Decode a 40-byte hex string into an Address.
+    pub fn decode_address(hex: &[u8]) -> Address {
+        if hex.len() != 40 {
+            vm_panic(b"hex address must be 40 bytes");
+        }
+        let mut buf = [0u8; 20];
+        Self::decode_into(hex, &mut buf);
+        Address(buf)
+    }
+
+    /// Macro-friendly helper to parse a hex string literal into an Address.
+    /// Prefer using the `hex_address!` macro for call-sites.
+    pub fn decode_address_literal(hex: &'static [u8]) -> Address {
+        Self::decode_address(hex)
+    }
+
     pub fn encode<'a>(bytes: &[u8], out: &'a mut [u8]) -> &'a [u8] {
         const HEX: &[u8; 16] = b"0123456789abcdef";
         let needed = bytes.len() * 2;
@@ -44,6 +60,14 @@ impl HexCodec {
             _ => vm_panic(b"invalid hex"),
         }
     }
+}
+
+/// Convenience macro to parse a 40-hex-char string literal into an `Address`.
+#[macro_export]
+macro_rules! hex_address {
+    ($hex:literal) => {{
+        $crate::parser::HexCodec::decode_address_literal($hex.as_bytes())
+    }};
 }
 
 impl<'a> DataParser<'a> {
@@ -84,6 +108,13 @@ impl<'a> DataParser<'a> {
         HexCodec::decode_into(hex_bytes, out);
 
         &out[..out.len()]
+    }
+
+    /// Read a 40-byte hex-encoded address into an Address.
+    pub fn read_hex_address(&mut self) -> Address {
+        let mut buf = [0u8; 20];
+        self.read_hex_into(&mut buf);
+        Address(buf)
     }
 
     pub fn read_u32(&mut self) -> u32 {

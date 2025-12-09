@@ -75,6 +75,7 @@ impl TransactionReceipt {
         for event in &self.events {
             Self::pretty_print_event(event, abi_registry, writer);
         }
+        let _ = writeln!(writer);
     }
 
     pub fn pretty_print_event(event: &[u8], abi_registry: &Vec<EventAbi>, writer: &mut dyn fmt::Write) {
@@ -106,7 +107,36 @@ impl TransactionReceipt {
                             offset += 20;
                             format!("0x{}", hex::encode(bytes))
                         }
-                        ParamType::Uint(256) | ParamType::Uint(32) => {
+                        ParamType::Uint(256) => {
+                            if offset + 32 > data.len() {
+                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
+                                break;
+                            }
+                            let bytes = &data[offset..offset + 32];
+                            offset += 32;
+                            format!("0x{}", hex::encode(bytes))
+                        }
+                        ParamType::Uint(128) => {
+                            if offset + 16 > data.len() {
+                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
+                                break;
+                            }
+                            let bytes = &data[offset..offset + 16];
+                            offset += 16;
+                            let raw = u128::from_le_bytes(bytes.try_into().unwrap());
+                            format!("{}", raw)
+                        }
+                        ParamType::Uint(64) => {
+                            if offset + 8 > data.len() {
+                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
+                                break;
+                            }
+                            let bytes = &data[offset..offset + 8];
+                            offset += 8;
+                            let raw = u64::from_le_bytes(bytes.try_into().unwrap());
+                            format!("{}", raw)
+                        }
+                        ParamType::Uint(32) => {
                             if offset + 4 > data.len() {
                                 let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
                                 break;

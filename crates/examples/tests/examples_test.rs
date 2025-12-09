@@ -16,7 +16,7 @@ use once_cell::sync::Lazy;
 use compiler::EventAbi;
 pub use ecdsa::{build_ecdsa_payload, ECDSA_HASH, ECDSA_SK_BYTES};
 pub use test_runner::TestRunner;
-use utils::{to_address, load_abi_from_file, get_program_code};
+use utils::{to_address, load_abi_from_file, load_abis_from_files, get_program_code};
 
 /// Centralized ELF binary paths for testing
 pub struct ElfBinary {
@@ -71,6 +71,11 @@ pub const ELF_BINARIES: &[ElfBinary] = &[
         name: "native_transfer",
         path: "bin/native_transfer",
         description: "Native token transfer via syscall",
+    },
+    ElfBinary {
+        name: "dex",
+        path: "bin/dex",
+        description: "Simple AMM between AM and ERC20",
     },
 ];
 
@@ -412,6 +417,119 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     })(),
                     value: 0,
                     nonce: 1,
+                },
+            ]),
+        },
+
+        TestCase {
+            name: "dex amm",
+            expected_success: true,
+            expected_error_code: 0,
+            expected_data: Some({
+                let mut buf = Vec::new();
+                buf.extend_from_slice(&101000u128.to_le_bytes());
+                buf.extend_from_slice(&495050u128.to_le_bytes());
+                buf
+            }),
+            abi: load_abis_from_files(&["bin/erc20.abi.json", "bin/dex.abi.json"]),
+            address_mappings: vec![
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1", "erc20"),
+                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d5", "dex"),
+            ],
+            bundle: TransactionBundle::new(vec![
+                Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
+                    data: get_program_code("erc20"),
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
+                    data: encode_router_calls(&[
+                        HostFuncCall {
+                            selector: 0x01, // init
+                            args: (|| {
+                                let mut args = Vec::new();
+                                let supply: u32 = 1_000_000;
+                                args.extend_from_slice(&supply.to_le_bytes());
+                                args.push(0); // decimals
+                                args
+                            })(),
+                        }
+                    ]),
+                    value: 0,
+                    nonce: 1,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
+                    data: encode_router_calls(&[
+                        HostFuncCall {
+                            selector: 0x02, // transfer
+                            args: (|| {
+                                let mut args = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d5").0.to_vec();
+                                let amount: u32 = 500_000;
+                                args.extend_from_slice(&amount.to_le_bytes());
+                                args
+                            })(),
+                        }
+                    ]),
+                    value: 0,
+                    nonce: 2,
+                },
+                Transaction {
+                    tx_type: TransactionType::CreateAccount,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d5"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
+                    data: get_program_code("dex"),
+                    value: 0,
+                    nonce: 3,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d5"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
+                    data: {
+                        let mut data = Vec::new();
+                        data.push(0x01); // add liquidity
+                        data.extend_from_slice(&100_000u64.to_le_bytes()); // AM in
+                        data.extend_from_slice(&500_000u64.to_le_bytes()); // token target
+                        data
+                    },
+                    value: 0,
+                    nonce: 4,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d5"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d2"),
+                    data: {
+                        let mut data = Vec::new();
+                        data.push(0x03); // swap
+                        data.push(0x00); // am -> token
+                        data.extend_from_slice(&1_000u64.to_le_bytes());
+                        data
+                    },
+                    value: 0,
+                    nonce: 0,
+                },
+                Transaction {
+                    tx_type: TransactionType::ProgramCall,
+                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d5"),
+                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
+                    data: {
+                        let mut data = Vec::new();
+                        data.push(0x02); // remove liquidity
+                        data.extend_from_slice(&100_000u64.to_le_bytes());
+                        data
+                    },
+                    value: 0,
+                    nonce: 5,
                 },
             ]),
         },

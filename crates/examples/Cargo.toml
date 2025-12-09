@@ -82,3 +82,8 @@ required-features = ["binaries"]
 name = "native_transfer"
 path = "src/native_transfer.rs"
 required-features = ["binaries"]
+
+[[bin]]
+name = "dex"
+path = "src/dex.rs"
+required-features = ["binaries"]

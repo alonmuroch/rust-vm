@@ -307,19 +307,16 @@ fn test_function_input_extraction() {
     
     // Check init function
     let init_func = abi.functions.iter().find(|f| f.name == "init").unwrap();
-    assert_eq!(init_func.inputs.len(), 2);
-    assert_eq!(init_func.inputs[0].name, "caller");
-    assert!(matches!(init_func.inputs[0].kind, ParamType::Address));
-    assert_eq!(init_func.inputs[1].name, "args");
-    assert!(matches!(init_func.inputs[1].kind, ParamType::Bytes));
+    // The generator drops the implicit `caller` argument; only routed args remain.
+    assert_eq!(init_func.inputs.len(), 1);
+    assert_eq!(init_func.inputs[0].name, "args");
+    assert!(matches!(init_func.inputs[0].kind, ParamType::Bytes));
     
     // Check transfer function
     let transfer_func = abi.functions.iter().find(|f| f.name == "transfer").unwrap();
-    assert_eq!(transfer_func.inputs.len(), 2);
-    assert_eq!(transfer_func.inputs[0].name, "caller");
-    assert!(matches!(transfer_func.inputs[0].kind, ParamType::Address));
-    assert_eq!(transfer_func.inputs[1].name, "args");
-    assert!(matches!(transfer_func.inputs[1].kind, ParamType::Bytes));
+    assert_eq!(transfer_func.inputs.len(), 1);
+    assert_eq!(transfer_func.inputs[0].name, "args");
+    assert!(matches!(transfer_func.inputs[0].kind, ParamType::Bytes));
     
     // Check balance_of function
     let balance_func = abi.functions.iter().find(|f| f.name == "balance_of").unwrap();
@@ -539,15 +536,14 @@ fn test_multiline_function_signatures() {
     assert_eq!(abi.functions.len(), 2);
     
     let complex_func = abi.functions.iter().find(|f| f.name == "complex_function").unwrap();
-    assert_eq!(complex_func.inputs.len(), 4);
-    assert_eq!(complex_func.inputs[0].name, "caller");
-    assert!(matches!(complex_func.inputs[0].kind, ParamType::Address));
-    assert_eq!(complex_func.inputs[1].name, "args");
-    assert!(matches!(complex_func.inputs[1].kind, ParamType::Bytes));
-    assert_eq!(complex_func.inputs[2].name, "flag");
-    assert!(matches!(complex_func.inputs[2].kind, ParamType::Bool));
-    assert_eq!(complex_func.inputs[3].name, "count");
-    assert!(matches!(complex_func.inputs[3].kind, ParamType::Uint(64)));
+    // Caller is implicit; ABI includes routed args only.
+    assert_eq!(complex_func.inputs.len(), 3);
+    assert_eq!(complex_func.inputs[0].name, "args");
+    assert!(matches!(complex_func.inputs[0].kind, ParamType::Bytes));
+    assert_eq!(complex_func.inputs[1].name, "flag");
+    assert!(matches!(complex_func.inputs[1].kind, ParamType::Bool));
+    assert_eq!(complex_func.inputs[2].name, "count");
+    assert!(matches!(complex_func.inputs[2].kind, ParamType::Uint(64)));
     assert_eq!(complex_func.outputs.len(), 1);
     assert!(matches!(complex_func.outputs[0], ParamType::Result));
     

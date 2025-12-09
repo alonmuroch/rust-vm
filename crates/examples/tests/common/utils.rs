@@ -78,6 +78,21 @@ pub fn load_abi_from_file<P: AsRef<Path>>(path: P) -> Option<Vec<EventAbi>> {
     Some(event_abis)
 }
 
+/// Load and merge multiple ABI files (events only). Returns None if no events found.
+pub fn load_abis_from_files(paths: &[&str]) -> Option<Vec<EventAbi>> {
+    let mut merged = Vec::new();
+    for path in paths {
+        if let Some(mut events) = load_abi_from_file(path) {
+            merged.append(&mut events);
+        }
+    }
+    if merged.is_empty() {
+        None
+    } else {
+        Some(merged)
+    }
+}
+
 pub fn get_program_code(name: &str) -> Vec<u8> {
     // Build the full path
     let bin_path = format!("bin/{}", name);

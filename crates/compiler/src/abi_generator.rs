@@ -358,6 +358,11 @@ impl AbiGenerator {
                     let param = param.trim();
                     if !param.is_empty() {
                         if let Some((name, param_type)) = self.parse_parameter(param) {
+                            // The VM passes `caller: Address` implicitly; keep it out of the ABI so generated
+                            // clients encode only the real, routed arguments.
+                            if name == "caller" && param_type == ParamType::Address {
+                                continue;
+                            }
                             inputs.push(FunctionParam {
                                 name: name.to_string(),
                                 kind: param_type,

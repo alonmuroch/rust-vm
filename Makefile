@@ -58,7 +58,7 @@ summary:
 	@echo "✅ Built example programs:"
 	@echo "   - allocator_demo: Memory allocation demonstration"
 	@echo "   - call_program: Cross-contract call demonstration"
-	@echo "   - ec_mul_test: Elliptic curve multiply demo"
+	@echo "   - dex: Simple AMM (native AM + ERC20 pool)"
 	@echo "   - ecdsa_verify: ECDSA verification example"
 	@echo "   - erc20: Token contract implementation"
 	@echo "   - lib_import: External library usage (SHA256)"

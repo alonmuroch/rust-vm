@@ -101,4 +101,14 @@ impl ContextStack {
     pub fn is_empty(&self) -> bool {
         self.stack.is_empty()
     }
+
+    /// Collect all events from a starting context index through the top of the stack.
+    pub fn collect_events_from(&self, start: usize) -> Vec<Vec<u8>> {
+        self.stack
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| *idx >= start)
+            .flat_map(|(_, ctx)| ctx.events.clone())
+            .collect()
+    }
 }
