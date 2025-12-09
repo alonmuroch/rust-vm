@@ -2,6 +2,15 @@
 
 all: clean program examples test utils summary
 
+.PHONY: run_examples
+
+run_examples:
+	@echo "=== Building example programs ==="
+	$(MAKE) -C crates/examples
+	@echo "=== Running example crate tests ==="
+	cd crates/examples && cargo test -- --nocapture
+	@echo "=== Example programs build and tests complete ==="
+
 clean:
 	@echo "=== Cleaning project ==="
 	cargo clean
@@ -12,7 +21,7 @@ clean:
 program: 
 	@echo "=== Building program ==="
 	cargo clean -p program
-	cargo build -p program --target riscv32imc-unknown-none-elf
+	cargo build -p program --target riscv32im-unknown-none-elf
 	@echo "=== Program build complete ==="
 
 examples:
@@ -24,7 +33,7 @@ test: generate_abis
 	@echo "=== Running tests ==="
 	cargo test -p types -p storage -p state
 	cargo test -p program --lib
-	cargo test -p vm --lib
+	cargo test -p vm -- --nocapture
 	cargo test -p compiler --lib
 	cd crates/examples && cargo test -- --nocapture
 	@echo "=== Tests complete ==="

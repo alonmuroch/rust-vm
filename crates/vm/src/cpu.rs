@@ -8,6 +8,8 @@ use crate::host_interface::HostInterface;
 use crate::sys_call::SyscallHandler;
 use crate::registers::Register;
 use core::fmt::Write;
+use std::collections::HashMap;
+use crate::instruction::CsrOp;
 
 /// Represents the Central Processing Unit (CPU) of our RISC-V virtual machine.
 /// 
@@ -70,6 +72,9 @@ pub struct CPU {
     /// Optional writer for verbose output
     /// If None, uses println! to console
     pub verbose_writer: Option<Rc<RefCell<dyn Write>>>,
+
+    /// Minimal CSR storage for CSR instructions
+    pub csrs: HashMap<u16, u32>,
 }
 
 impl std::fmt::Debug for CPU {
@@ -102,6 +107,7 @@ impl CPU {
             syscall_handler,
             reservation_addr: None,
             verbose_writer: None,
+            csrs: HashMap::new(),
         }
     }
     
@@ -126,6 +132,21 @@ impl CPU {
                 println!("{}", message);
             }
         }
+    }
+
+    fn read_csr(&self, csr: u16) -> u32 {
+        // Provide simple defaults for common CSRs; fall back to stored values or zero.
+        match csr {
+            0xF14 => *self.csrs.get(&csr).unwrap_or(&0), // mhartid
+            0xF11 | 0xF12 | 0xF13 => *self.csrs.get(&csr).unwrap_or(&0), // mvendorid/marchid/mimpid
+            0x301 => *self.csrs.get(&csr).unwrap_or(&0), // misa
+            0x300 => *self.csrs.get(&csr).unwrap_or(&0), // mstatus
+            _ => *self.csrs.get(&csr).unwrap_or(&0),
+        }
+    }
+
+    fn write_csr(&mut self, csr: u16, value: u32) {
+        self.csrs.insert(csr, value);
     }
 
     /// Executes a single instruction cycle (fetch, decode, execute).
@@ -626,10 +647,46 @@ impl CPU {
                 self.regs[Register::A0 as usize] = result;
                 return cont;
             }
+            Instruction::Csr { rd, rs1, csr, op, imm } => {
+                let src = if imm { rs1 as u32 } else { self.regs[rs1] };
+                let old = self.read_csr(csr);
+
+                // Apply CSR op semantics
+                let mut new_val = old;
+                match op {
+                    CsrOp::Csrrw => {
+                        if !(imm == false && rs1 == 0) {
+                            new_val = src;
+                        }
+                    }
+                    CsrOp::Csrrs => {
+                        if src != 0 {
+                            new_val = old | src;
+                        }
+                    }
+                    CsrOp::Csrrc => {
+                        if src != 0 {
+                            new_val = old & !src;
+                        }
+                    }
+                }
+
+                if src != 0 || matches!(op, CsrOp::Csrrw) {
+                    self.write_csr(csr, new_val);
+                }
+
+                if rd != 0 {
+                    self.write_reg(rd, old);
+                }
+            }
             Instruction::Ebreak => {
                 // EDUCATIONAL: EBREAK - Environment Break - for debugging
                 // In real systems, this would trigger a debugger breakpoint
                 return false
+            }
+            Instruction::Mret => {
+                // Treat MRET as a simple return/halt in this VM
+                return false;
             }
             
             // EDUCATIONAL: Compressed instruction set (RV32C) - space-saving instructions

@@ -1,4 +1,4 @@
-use crate::instruction::{Instruction, MiscAluOp};
+use crate::instruction::{Instruction, MiscAluOp, CsrOp};
 use crate::isa::Opcode;
 use crate::isa_compressed::CompressedOpcode;
 
@@ -74,7 +74,7 @@ pub fn decode(bytes: &[u8]) -> Option<(Instruction, u8)> {
 /// for different instruction components.
 ///
 /// RISC-V INSTRUCTION FORMAT:
-/// ```
+/// ```text
 /// 31:25  funct7  (7 bits) - function code for register-register ops
 /// 24:20  rs2     (5 bits) - second source register
 /// 19:15  rs1     (5 bits) - first source register  
@@ -399,9 +399,31 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
             Some(Instruction::Auipc { rd, imm })
         },
         
-        // EDUCATIONAL: System instructions
-        // Special operations like system calls
-        Opcode::System => Some(Instruction::Ecall),
+        // EDUCATIONAL: System instructions (ecall/ebreak and CSRs)
+        Opcode::System => {
+            let funct3 = (word >> 12) & 0x7;
+            let csr = (word >> 20) & 0xfff;
+            let rs1 = ((word >> 15) & 0x1f) as usize;
+
+            match funct3 {
+                0 => {
+                    let funct12 = word >> 20;
+                    match funct12 {
+                        0 => Some(Instruction::Ecall),
+                        1 => Some(Instruction::Ebreak),
+                        0x302 => Some(Instruction::Mret),
+                        _ => None,
+                    }
+                }
+                1 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrw, imm: false }),
+                2 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrs, imm: false }),
+                3 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrc, imm: false }),
+                5 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrw, imm: true }),
+                6 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrs, imm: true }),
+                7 => Some(Instruction::Csr { rd, rs1, csr: csr as u16, op: CsrOp::Csrrc, imm: true }),
+                _ => None,
+            }
+        }
     }
 }
 

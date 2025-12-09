@@ -9,7 +9,7 @@
   "target-pointer-width": 32,
   "data-layout": "e-m:e-p:32:32-i64:64-n32-S128",
   "cpu": "generic-rv32",
-  "features": "+m,+c",
+  "features": "+m",
   "max-atomic-width": 0,
   "atomic-cas": false,
   "singlethread": true,
@@ -29,7 +29,7 @@
     ]
   },
   "metadata": {
-    "description": "AVM single-threaded RV32IMC (no atomics)",
+    "description": "AVM single-threaded RV32IM (no atomics, no compressed instructions)",
     "host_tools": false,
     "std": false,
     "tier": 3

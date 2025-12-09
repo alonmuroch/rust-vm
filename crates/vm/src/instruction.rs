@@ -444,6 +444,9 @@ pub enum Instruction {
     /// This is a 16-bit version of EBREAK. Triggers a debugger breakpoint in real systems.
     Ebreak,
 
+    /// MRET: Machine-mode return (treated as a halt in this VM)
+    Mret,
+
     /// C.MISC-ALU: compressed miscellaneous ALU operations
     /// EDUCATIONAL: Compressed miscellaneous ALU operations including C.SUB, C.XOR, C.OR, C.AND.
     /// These are 16-bit versions of common logical and arithmetic operations.
@@ -455,12 +458,29 @@ pub enum Instruction {
     /// In real hardware, this prevents instruction reordering across the fence.
     /// In this VM, it's implemented as a no-op since we don't have instruction reordering.
     Fence,
+
+    /// CSR: Control and Status Register operations (CSRRW/CSRRS/CSRRC and immediate variants)
+    /// EDUCATIONAL: Allows reading/writing CSRs like mhartid, misa, etc.
+    Csr {
+        rd: usize,
+        rs1: usize,
+        csr: u16,
+        op: CsrOp,
+        imm: bool,
+    },
     
     /// UNIMP: Unimplemented instruction
     /// EDUCATIONAL: Unimplemented instruction marker. Used for instructions that aren't
     /// supported by this VM but may be present in compiled code.
     /// In this VM, it's treated as a no-op for compatibility.
     Unimp,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum CsrOp {
+    Csrrw,
+    Csrrs,
+    Csrrc,
 }
 
 /// EDUCATIONAL: Miscellaneous ALU operations for compressed instructions.
@@ -648,6 +668,17 @@ impl Instruction {
                 format!("bnez {}, pc+{}", reg(*rs1), offset),
             Instruction::Ebreak =>
                 "ebreak".to_string(),
+            Instruction::Mret =>
+                "mret".to_string(),
+            Instruction::Csr { rd, rs1, csr, op, imm } => {
+                let op_str = match op {
+                    CsrOp::Csrrw => if *imm { "csrrwi" } else { "csrrw" },
+                    CsrOp::Csrrs => if *imm { "csrrsi" } else { "csrrs" },
+                    CsrOp::Csrrc => if *imm { "csrrci" } else { "csrrc" },
+                };
+                let src = if *imm { format!("{}", rs1) } else { reg(*rs1) };
+                format!("{} {}, {}, 0x{:03x}", op_str, reg(*rd), src, csr)
+            }
 
             Instruction::MiscAlu { rd, rs2, op } => {
                 let op_str = match op {

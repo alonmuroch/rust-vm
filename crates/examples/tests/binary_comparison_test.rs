@@ -44,7 +44,7 @@ fn test_vm_binary_comparison() -> Result<(), String> {
     // Create TestRunner with file output and verbose mode for instruction tracing
     let runner = TestRunner::with_writer(writer)
                    .with_verbose(true)  // Enable verbose mode for PC traces
-                   .with_memory_size(256 * 1024)  // Larger memory for crypto-heavy binaries
+                   .with_memory_size(512 * 1024)  // Larger memory for crypto-heavy binaries
                    .with_max_pages(128);
 
     // Run all test cases
