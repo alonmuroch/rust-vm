@@ -148,6 +148,8 @@ impl TestRunner {
             last_error_code = receipt.result.error_code;
             last_result = Some(receipt.result.clone());
 
+            writeln!(self.writer.borrow_mut(), "⛽ Gas used so far: {}", avm.gas_used()).unwrap();
+
             // Write state dump
             writeln!(self.writer.borrow_mut(), "--- State Dump ---").unwrap();
             for (address, account) in &avm.state.accounts {

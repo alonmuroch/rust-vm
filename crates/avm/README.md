@@ -65,7 +65,7 @@ All memory access is **local to the context**, preventing accidental overwrites 
 - [x] RISC-V instruction decoding (32-bit and compressed)
 - [x] Memory-mapped syscall interface
 - [x] Per-context execution model
-- [ ] Gas accounting and metering
+- [x] Gas accounting and metering
 - [ ] Persistent storage via key-based syscalls
 - [ ] Support for `vm_panic` and return codes
 - [ ] Debug output and tracing

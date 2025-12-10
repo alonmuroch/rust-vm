@@ -1,5 +1,6 @@
 use crate::memory_page_manager::MemoryPageManager;
 use crate::receipt::TransactionReceipt;
+use crate::metering::{GasMeter, SharedGasMeter};
 use storage::Storage;
 use vm::vm::VM;
 use vm::registers::Register;
@@ -74,6 +75,11 @@ pub struct AVM {
     /// can potentially modify this state.
     pub state: State,
 
+    /// Shared gas meter that all contract calls within a transaction use.
+    /// Nested calls borrow the same counter so they cannot mint gas by
+    /// re-entering other contracts.
+    pub gas_meter: Rc<RefCell<GasMeter>>,
+
     pub verbose: bool, // Enable verbose logging for debugging
     
     /// Optional writer for verbose output. If None, outputs to console.
@@ -86,6 +92,7 @@ impl std::fmt::Debug for AVM {
             .field("context_stack", &self.context_stack)
             .field("memory_manager", &self.memory_manager)
             .field("state", &self.state)
+            .field("gas_used", &self.gas_meter.borrow().used())
             .field("verbose", &self.verbose)
             .field("verbose_writer", &self.verbose_writer.as_ref().map(|_| "Some(<writer>)"))
             .finish()
@@ -102,7 +109,12 @@ impl AVM {
     pub fn set_verbose_writer(&mut self, writer: Rc<RefCell<dyn Write>>) {
         self.verbose_writer = Some(writer);
     }
-    
+
+    /// Total gas consumed so far in the current AVM instance.
+    pub fn gas_used(&self) -> u64 {
+        self.gas_meter.borrow().used()
+    }
+
     /// Helper method to log output to either console or the configured writer
     /// Only logs if verbose is true and self.verbose is enabled
     fn log(&self, message: &str, verbose: bool) {
@@ -140,6 +152,7 @@ impl AVM {
             context_stack: ContextStack::new(),
             memory_manager: MemoryPageManager::new(max_pages, page_size),
             state,
+            gas_meter: Rc::new(RefCell::new(GasMeter::new())),
             verbose: false, // Default to no verbose logging
             verbose_writer: None, // Default to console output
         }
@@ -170,9 +183,8 @@ impl AVM {
     /// system. This is crucial in blockchain systems where one bad transaction
     /// shouldn't affect others.
     /// 
-    /// GAS ACCOUNTING: In real blockchains, each operation costs gas, and
-    /// transactions have gas limits. This implementation is simplified and
-    /// doesn't include gas accounting.
+    /// GAS ACCOUNTING: A shared gas meter (EVM-inspired schedule) is shared
+    /// across nested calls to prevent gas creation.
     /// 
     /// RETURN VALUE: Returns a Result indicating success/failure and any error codes
     pub fn run_tx(&mut self, tx: Transaction) -> TransactionReceipt {
@@ -362,6 +374,13 @@ impl AVM {
             to,
             hex::encode(&input_data)
         ), false);
+
+        // Charge the entry call once at the transaction root. Nested contract
+        // calls initiated via SYSCALL_CALL_PROGRAM are already metered through
+        // the VM's on_call hook.
+        if self.context_stack.is_empty() {
+            let _ = self.gas_meter.borrow_mut().charge_call(input_data.len());
+        }
         
         // Save address for later use in termination log
         let to_addr_str = to.to_string();
@@ -393,6 +412,8 @@ impl AVM {
         // - Enables recursive call_contract logic, since the Box owns the host and doesn't borrow `self`
         // Without Box, we would need to track lifetimes manually and would hit borrow checker issues.
         let mut vm: VM = VM::new_with_writer(memory_page, storage.clone(), Box::new(shim), self.verbose_writer.clone());
+        let shared_meter = SharedGasMeter::new(Rc::clone(&self.gas_meter));
+        vm.set_metering(Box::new(shared_meter));
         vm.set_code(0, Config::PROGRAM_START_ADDR, &account.code);
         vm.cpu.verbose = self.verbose;
         
