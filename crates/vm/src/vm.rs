@@ -6,6 +6,7 @@ use crate::memory_page::{MemoryPage};
 use storage::{Storage};
 use crate::host_interface::HostInterface;
 use crate::sys_call::{SyscallHandler, DefaultSyscallHandler};
+use crate::metering::Metering;
 
 /// Represents a complete RISC-V virtual machine.
 /// 
@@ -67,6 +68,11 @@ impl VM {
         let mut cpu = CPU::new(syscall_handler);
         cpu.regs[Register::Sp as usize] = memory.borrow().stack_top();
         Self { cpu, memory, storage, host }
+    }
+
+    /// Installs a metering implementation on the underlying CPU.
+    pub fn set_metering(&mut self, metering: Box<dyn Metering>) {
+        self.cpu.set_metering(metering);
     }
 
     /// Loads program code into memory and sets the starting address.

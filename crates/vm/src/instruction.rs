@@ -34,7 +34,7 @@
 /// PERFORMANCE IMPLICATIONS: Different instruction types have different
 /// execution costs. Memory operations are typically slower than register
 /// operations, and branches can cause pipeline stalls in real CPUs.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Instruction {
     // ===== RV32I =====
 
@@ -486,7 +486,7 @@ pub enum CsrOp {
 /// EDUCATIONAL: Miscellaneous ALU operations for compressed instructions.
 /// These represent the different operations that can be performed by the C.MISC-ALU instruction.
 /// Each operation is a 16-bit compressed version of a corresponding 32-bit instruction.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum MiscAluOp {
     /// C.SUB: rd = rd - rs2 (compressed subtract)
     /// EDUCATIONAL: Compressed subtract operation. Subtracts rs2 from rd and stores result in rd.

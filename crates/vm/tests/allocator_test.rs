@@ -1,5 +1,6 @@
 use vm::sys_call::{SyscallHandler, DefaultSyscallHandler, SYSCALL_ALLOC, SYSCALL_DEALLOC};
 use vm::{memory_page, host_interface};
+use vm::metering::NoopMeter;
 use storage::Storage;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -10,6 +11,7 @@ fn test_allocator_syscalls() {
     let storage = Rc::new(RefCell::new(Storage::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new();
+    let mut meter = NoopMeter::default();
 
     // Test SYSCALL_ALLOC
     let args = [
@@ -25,6 +27,7 @@ fn test_allocator_syscalls() {
         storage.clone(),
         &mut host,
         &mut regs,
+        &mut meter,
     );
 
     println!("✅ SYSCALL_ALLOC returned pointer: 0x{:08x}", result);
@@ -43,6 +46,7 @@ fn test_allocator_syscalls() {
         storage.clone(),
         &mut host,
         &mut regs,
+        &mut meter,
     );
 
     println!("✅ SYSCALL_DEALLOC returned: {}", dealloc_result);
@@ -56,6 +60,7 @@ fn test_multiple_allocations() {
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new();
     let mut regs = [0u32; 32];
+    let mut meter = NoopMeter::default();
 
     let mut pointers = Vec::new();
 
@@ -71,6 +76,7 @@ fn test_multiple_allocations() {
             storage.clone(),
             &mut host,
             &mut regs,
+            &mut meter,
         );
         
         println!("✅ Allocation {}: size={}, ptr=0x{:08x}", i, size, ptr);
@@ -98,6 +104,7 @@ fn test_alignment_requirements() {
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new();
     let mut regs = [0u32; 32];
+    let mut meter = NoopMeter::default();
 
     // Test various alignments
     let alignments = [1, 2, 4, 8, 16];
@@ -111,6 +118,7 @@ fn test_alignment_requirements() {
             storage.clone(),
             &mut host,
             &mut regs,
+            &mut meter,
         );
         
         println!("✅ Alignment test: align={}, ptr=0x{:08x}", align, ptr);
@@ -127,6 +135,7 @@ fn test_invalid_alignment() {
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new();
     let mut regs = [0u32; 32];
+    let mut meter = NoopMeter::default();
 
     // Test invalid alignments (not powers of 2)
     let invalid_alignments = [0, 3, 5, 6, 7, 9];
@@ -140,6 +149,7 @@ fn test_invalid_alignment() {
             storage.clone(),
             &mut host,
             &mut regs,
+            &mut meter,
         );
         
         println!("✅ Invalid alignment test: align={}, ptr=0x{:08x}", align, ptr);

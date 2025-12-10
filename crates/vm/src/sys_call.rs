@@ -7,6 +7,7 @@ use crate::host_interface::HostInterface;
 use std::any::Any;
 use types::result::RESULT_SIZE;
 use core::fmt::Write;
+use crate::metering::{Metering, MeterResult};
 
 /// System call IDs for the VM.
 pub const SYSCALL_STORAGE_GET: u32 = 1;
@@ -41,6 +42,7 @@ pub trait SyscallHandler: std::fmt::Debug {
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
+        metering: &mut dyn Metering,
     ) -> (u32, bool);
     fn as_any(&self) -> &dyn Any;
 }
@@ -80,18 +82,22 @@ impl SyscallHandler for DefaultSyscallHandler {
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
+        metering: &mut dyn Metering,
     ) -> (u32, bool) {
+        if matches!(metering.on_syscall(call_id, &args), MeterResult::Halt) {
+            panic!("Metering halted syscall {}", call_id);
+        }
         let result = match call_id {
-            SYSCALL_STORAGE_GET => self.sys_storage_get(args, memory, storage),
-            SYSCALL_STORAGE_SET => self.sys_storage_set(args, memory, storage),
+            SYSCALL_STORAGE_GET => self.sys_storage_get(args, memory, storage, metering),
+            SYSCALL_STORAGE_SET => self.sys_storage_set(args, memory, storage, metering),
             SYSCALL_PANIC => self.sys_panic_with_message(regs, memory),
-            SYSCALL_LOG => self.sys_log(args, memory),
-            SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, host),
-            SYSCALL_FIRE_EVENT => self.sys_fire_event(args, memory, host),
-            SYSCALL_ALLOC => self.sys_alloc(args, memory),
-            SYSCALL_DEALLOC => self.sys_dealloc(args, memory),
-            SYSCALL_TRANSFER => self.sys_transfer(args, memory, host),
-            SYSCALL_BALANCE => self.sys_balance(args, memory, host),
+            SYSCALL_LOG => self.sys_log(args, memory, metering),
+            SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, host, metering),
+            SYSCALL_FIRE_EVENT => self.sys_fire_event(args, memory, host, metering),
+            SYSCALL_ALLOC => self.sys_alloc(args, memory, metering),
+            SYSCALL_DEALLOC => self.sys_dealloc(args, memory, metering),
+            SYSCALL_TRANSFER => self.sys_transfer(args, memory, host, metering),
+            SYSCALL_BALANCE => self.sys_balance(args, memory, host, metering),
             _ => {
                 panic!("Unknown syscall: {}", call_id);
             }
@@ -104,10 +110,18 @@ impl SyscallHandler for DefaultSyscallHandler {
 }
 
 impl DefaultSyscallHandler {
-	pub fn sys_fire_event(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>,) -> u32 {
+	pub fn sys_fire_event(
+        &mut self, args: [u32; 6], 
+        memory: Rc<RefCell<MemoryPage>>, 
+        host: &mut Box<dyn HostInterface>, 
+        metering: &mut dyn Metering) -> u32 {
         // EDUCATIONAL: Extract key pointer and length from arguments
         let ptr = args[0] as usize;
         let len = args[1] as usize;
+
+        if matches!(metering.on_syscall_data(SYSCALL_FIRE_EVENT, len), MeterResult::Halt) {
+            panic!("Metering halted SYSCALL_FIRE_EVENT");
+        }
 
         let borrowed_memory = memory.borrow();
 
@@ -122,11 +136,21 @@ impl DefaultSyscallHandler {
         0
     }
 
-    fn sys_storage_get(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
+    fn sys_storage_get(
+        &mut self, 
+        args: [u32; 6], 
+        memory: Rc<RefCell<MemoryPage>>, 
+        storage: Rc<RefCell<Storage>>, 
+        metering: &mut dyn Metering) -> u32 {
         let domain_ptr = args[0] as usize;
         let domain_len = args[1] as usize;
         let key_ptr = args[2] as usize;
         let key_len = args[3] as usize;
+
+        let total_len = domain_len.saturating_add(key_len);
+        if matches!(metering.on_syscall_data(SYSCALL_STORAGE_GET, total_len), MeterResult::Halt) {
+            panic!("Metering halted SYSCALL_STORAGE_GET");
+        }
         
         let borrowed_memory = memory.borrow();
         
@@ -178,6 +202,9 @@ impl DefaultSyscallHandler {
         if let Some(value) = storage.borrow().get(domain, &key) {
             let mut buf = (value.len() as u32).to_le_bytes().to_vec();
             buf.extend_from_slice(value.as_slice());
+            if matches!(metering.on_alloc(buf.len()), MeterResult::Halt) {
+                panic!("Metering halted alloc during storage_get");
+            }
             let addr = borrowed_memory.alloc_on_heap(&buf);
             println!("✅ Found value for domain: '{}', Key: '{}'", domain, display_key);
             return addr;
@@ -187,13 +214,25 @@ impl DefaultSyscallHandler {
         }
     }
 
-    fn sys_storage_set(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, storage: Rc<RefCell<Storage>>) -> u32 {
+    fn sys_storage_set(
+        &mut self, 
+        args: [u32; 6], 
+        memory: Rc<RefCell<MemoryPage>>, 
+        storage: Rc<RefCell<Storage>>, 
+        metering: &mut dyn Metering) -> u32 {
         let domain_ptr = args[0] as usize;
         let domain_len = args[1] as usize;
         let key_ptr = args[2] as usize;
         let key_len = args[3] as usize;
         let val_ptr = args[4] as usize;
         let val_len = args[5] as usize;
+
+        let total_len = domain_len
+            .saturating_add(key_len)
+            .saturating_add(val_len);
+        if matches!(metering.on_syscall_data(SYSCALL_STORAGE_SET, total_len), MeterResult::Halt) {
+            panic!("Metering halted SYSCALL_STORAGE_SET");
+        }
         
         let borrowed_memory = memory.borrow();
         
@@ -255,7 +294,10 @@ impl DefaultSyscallHandler {
         0
     }
 
-    fn sys_panic_with_message(&mut self, regs: &mut [u32; 32], memory: Rc<RefCell<MemoryPage>>) -> u32 {
+    fn sys_panic_with_message(
+        &mut self, 
+        regs: &mut [u32; 32], 
+        memory: Rc<RefCell<MemoryPage>>) -> u32 {
         let msg_ptr = regs[Register::A0 as usize] as usize;
         let msg_len = regs[Register::A1 as usize] as usize;
         let msg = memory
@@ -268,8 +310,12 @@ impl DefaultSyscallHandler {
         panic!("🔥 Guest panic: {}", msg);
     }
 
-    fn sys_log(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>) -> u32 {
+    fn sys_log(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, metering: &mut dyn Metering) -> u32 {
         let [fmt_ptr, fmt_len, arg_ptr, arg_len, ..] = args;
+        let payload_len = fmt_len.saturating_add(arg_len) as usize;
+        if matches!(metering.on_syscall_data(SYSCALL_LOG, payload_len), MeterResult::Halt) {
+            panic!("Metering halted SYSCALL_LOG");
+        }
         let borrowed_memory = memory.borrow();
         let fmt_slice = match borrowed_memory.mem_slice(fmt_ptr as usize, (fmt_ptr + fmt_len) as usize) {
             Some(s) => s,
@@ -450,13 +496,16 @@ impl DefaultSyscallHandler {
         0
     }
 
-    fn sys_call_program(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>) -> u32 {
+    fn sys_call_program(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>, metering: &mut dyn Metering) -> u32 {
         let to_ptr = args[0] as usize;
         let from_ptr = args[1] as usize;
         let input_ptr = args[2] as usize;
         let input_len = args[3] as usize;
         let result_ptr: u32;
         let page_index: usize;
+        if matches!(metering.on_call(input_len), MeterResult::Halt) {
+            panic!("Metering halted SYSCALL_CALL_PROGRAM");
+        }
         {
             let borrowed_memory = memory.borrow();
             let to_slice = match borrowed_memory.mem_slice(to_ptr, to_ptr + 20) {
@@ -484,13 +533,20 @@ impl DefaultSyscallHandler {
                 Some(b) => b,
                 None => return 0,
             };
+            if matches!(metering.on_alloc(result_bytes.len()), MeterResult::Halt) {
+                panic!("Metering halted alloc for call_program result");
+            }
             borrowed_memory.alloc_on_heap(&result_bytes)
         }
     }
 
-    fn sys_alloc(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>) -> u32 {
+    fn sys_alloc(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, metering: &mut dyn Metering) -> u32 {
         let size = args[0] as usize;  // A0 register
         let align = args[1] as usize; // A1 register
+
+        if matches!(metering.on_alloc(size), MeterResult::Halt) {
+            panic!("Metering halted SYSCALL_ALLOC");
+        }
         
         if size == 0 {
             println!("VM Alloc: Invalid size 0");
@@ -537,19 +593,27 @@ impl DefaultSyscallHandler {
         ptr
     }
     
-    fn sys_dealloc(&mut self, _args: [u32; 6], _memory: Rc<RefCell<MemoryPage>>) -> u32 {
+    fn sys_dealloc(&mut self, args: [u32; 6], _memory: Rc<RefCell<MemoryPage>>, metering: &mut dyn Metering) -> u32 {
+        let size = args[1] as usize;
+        if matches!(metering.on_alloc(size), MeterResult::Halt) {
+            panic!("Metering halted SYSCALL_DEALLOC");
+        }
         // Note: This VM uses a simple bump allocator, so we can't actually free memory
         // In a real VM, you'd implement a proper allocator with free lists
         // For now, this is a no-op since the memory will be reclaimed when the VM exits
         0
     }
 
-    fn sys_transfer(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>) -> u32 {
+    fn sys_transfer(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>, metering: &mut dyn Metering) -> u32 {
         // args: a2=to ptr, a3=value_lo, a4=value_hi
         let to_ptr = args[1] as usize;
         let value_lo = args[2] as u64;
         let value_hi = args[3] as u64;
         let value = value_lo | (value_hi << 32);
+
+        if matches!(metering.on_syscall_data(SYSCALL_TRANSFER, 20), MeterResult::Halt) {
+            panic!("Metering halted SYSCALL_TRANSFER");
+        }
 
         let borrowed = memory.borrow();
         let to_slice = borrowed.mem_slice(to_ptr, to_ptr + 20).expect("invalid to ptr");
@@ -560,9 +624,12 @@ impl DefaultSyscallHandler {
         if host.transfer(to, value) { 0 } else { 1 }
     }
 
-    fn sys_balance(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>) -> u32 {
+    fn sys_balance(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>, metering: &mut dyn Metering) -> u32 {
         // args: a1 = address pointer (20 bytes)
         let addr_ptr = args[0] as usize;
+        if matches!(metering.on_syscall_data(SYSCALL_BALANCE, 20), MeterResult::Halt) {
+            panic!("Metering halted SYSCALL_BALANCE");
+        }
         let addr = {
             let borrowed = memory.borrow();
             let addr_slice = borrowed.mem_slice(addr_ptr, addr_ptr + 20).expect("invalid addr ptr");

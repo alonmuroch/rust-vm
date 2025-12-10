@@ -1,12 +1,13 @@
 use std::rc::Rc;
 use std::cell::{RefCell, Cell};
 use std::convert::TryInto;
+use crate::metering::{Metering, MeterResult, MemoryAccessKind};
 
 #[derive(Debug, Clone)]
 pub struct MemoryPage {
     mem: Rc<RefCell<Vec<u8>>>,
     pub next_heap: Cell<u32>,
-    pub base_address: usize, // New: base address for guest memory mapping
+    pub base_address: usize, // base address for guest memory mapping
 }
 
 pub const HEAP_PTR_OFFSET: u32 = 0x100;
@@ -36,76 +37,129 @@ impl MemoryPage {
         addr.checked_sub(self.base_address).expect("Address below base_address")
     }
 
-    pub fn store_u16(&self, addr: usize, val: u16) {
+    fn meter_access(
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+        addr: usize,
+        bytes: usize,
+    ) -> bool {
+        matches!(metering.on_memory_access(kind, addr, bytes), MeterResult::Continue)
+    }
+
+    pub fn store_u16(
+        &self,
+        addr: usize,
+        val: u16,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> bool {
+        if !Self::meter_access(metering, kind, addr, 2) {
+            return false;
+        }
         let offset = self.offset(addr);
         let mut mem = self.mem.borrow_mut();
         if offset + 2 > mem.len() {
             panic!("store u16 out of bounds: addr = 0x{:08x}", addr);
         }
         mem[offset..offset + 2].copy_from_slice(&val.to_le_bytes());
+        true
     }
     
-    pub fn store_u32(&self, addr: usize, val: u32) {
+    pub fn store_u32(
+        &self,
+        addr: usize,
+        val: u32,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> bool {
+        if !Self::meter_access(metering, kind, addr, 4) {
+            return false;
+        }
         let offset = self.offset(addr);
         let mut mem = self.mem.borrow_mut();
         if offset + 4 > mem.len() {
             panic!("store u32 out of bounds: addr = 0x{:08x}", addr);
         }
         mem[offset..offset + 4].copy_from_slice(&val.to_le_bytes());
+        true
     }
 
-    pub fn store_u8(&self, addr: usize, val: u8) {
+    pub fn store_u8(
+        &self,
+        addr: usize,
+        val: u8,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> bool {
+        if !Self::meter_access(metering, kind, addr, 1) {
+            return false;
+        }
         let offset = self.offset(addr);
         let mut mem = self.mem.borrow_mut();
         if offset >= mem.len() {
             panic!("store u8 out of bounds: addr = 0x{:08x}", addr);
         }
         mem[offset] = val;
+        true
     }
 
-    pub fn load_u32(&self, addr: usize) -> u32 {
+    pub fn load_u32(
+        &self,
+        addr: usize,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> Option<u32> {
+        if !Self::meter_access(metering, kind, addr, 4) {
+            return None;
+        }
         let offset = self.offset(addr);
         let mem = self.mem.borrow();
         if offset + 4 > mem.len() {
             panic!("load u32 out of bounds: addr = 0x{:08x}", addr);
         }
-        u32::from_le_bytes(mem[offset..offset + 4].try_into().unwrap())
+        Some(u32::from_le_bytes(mem[offset..offset + 4].try_into().unwrap()))
     }
 
-    pub fn load_byte(&self, addr: usize) -> u8 {
+    pub fn load_byte(
+        &self,
+        addr: usize,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> Option<u8> {
+        if !Self::meter_access(metering, kind, addr, 1) {
+            return None;
+        }
         let offset = self.offset(addr);
         let mem = self.mem.borrow();
-        mem[offset]
+        Some(mem[offset])
     }
 
-    pub fn load_halfword(&self, addr: usize) -> u16 {
+    pub fn load_halfword(
+        &self,
+        addr: usize,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> Option<u16> {
+        if !Self::meter_access(metering, kind, addr, 2) {
+            return None;
+        }
         let offset = self.offset(addr);
         let mem = self.mem.borrow();
-        u16::from_le_bytes(mem[offset..offset + 2].try_into().unwrap())
+        Some(u16::from_le_bytes(mem[offset..offset + 2].try_into().unwrap()))
     }
 
-    pub fn load_word(&self, addr: usize) -> u32 {
+    pub fn load_word(
+        &self,
+        addr: usize,
+        metering: &mut dyn Metering,
+        kind: MemoryAccessKind,
+    ) -> Option<u32> {
+        if !Self::meter_access(metering, kind, addr, 4) {
+            return None;
+        }
         let offset = self.offset(addr);
         let mem = self.mem.borrow();
-        u32::from_le_bytes(mem[offset..offset + 4].try_into().unwrap())
-    }
-
-    pub fn store_byte(&mut self, addr: usize, value: u8) {
-        let offset = self.offset(addr);
-        let mut mem = self.mem.borrow_mut();
-        mem[offset] = value;
-    }
-
-    pub fn store_halfword(&mut self, addr: usize, value: u16) {
-        let offset = self.offset(addr);
-        let mut mem = self.mem.borrow_mut();
-        mem[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
-    }
-
-    pub fn store_word(&mut self, addr: usize, value: u32) {
-        let offset = self.offset(addr);
-        let mut mem = self.mem.borrow_mut();
-        mem[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+        Some(u32::from_le_bytes(mem[offset..offset + 4].try_into().unwrap()))
     }
 
     pub fn mem_slice(&self, start: usize, end: usize) -> Option<std::cell::Ref<[u8]>> {
@@ -158,13 +212,16 @@ impl Default for MemoryPage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::metering::NoopMeter;
 
     #[test]
     fn test_offset_zero_base() {
         let mem = MemoryPage::new_with_base(1024, 0);
+        let mut meter = NoopMeter::default();
         assert_eq!(mem.offset(0), 0);
         assert_eq!(mem.offset(100), 100);
         assert_eq!(mem.offset(1023), 1023);
+        assert_eq!(mem.load_u32(0, &mut meter, MemoryAccessKind::Load), Some(0));
     }
 
     #[test]

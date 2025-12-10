@@ -6,6 +6,7 @@ use vm::host_interface::HostInterface;
 use vm::sys_call::SyscallHandler;
 use vm::registers::Register;
 use std::any::Any;
+use vm::metering::Metering;
 
 /// Map RISC-V test exit codes to test case numbers
 /// Formula: exit_code = (TESTNUM << 1) | 1
@@ -54,6 +55,7 @@ impl SyscallHandler for TestSyscallHandler {
         _storage: Rc<RefCell<Storage>>,
         _host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
+        _metering: &mut dyn Metering,
     ) -> (u32, bool) {
         let mut result = 0;
         match call_id {

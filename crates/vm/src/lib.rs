@@ -8,3 +8,4 @@ pub mod registers;
 pub mod memory_page;
 pub mod sys_call;
 pub mod host_interface;
+pub mod metering;
