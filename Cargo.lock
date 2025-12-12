@@ -3,6 +3,10 @@
 version = 4
 
 [[package]]
+name = "aos"
+version = "0.1.0"
+
+[[package]]
 name = "avm"
 version = "0.1.0"
 dependencies = [

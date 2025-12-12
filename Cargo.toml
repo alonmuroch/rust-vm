@@ -3,6 +3,7 @@ members = [
     "crates/avm",
     "crates/compiler",
     "crates/examples",
+    "crates/aos",
     "crates/program",
     "crates/state",
     "crates/storage",
