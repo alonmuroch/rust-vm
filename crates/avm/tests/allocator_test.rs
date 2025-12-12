@@ -4,12 +4,12 @@ use std::rc::Rc;
 use storage::Storage;
 use vm::host_interface;
 use vm::metering::NoopMeter;
-use vm::memory::SharedMemory;
+use vm::memory::Memory;
 use vm::sys_call::{DefaultSyscallHandler, SyscallHandler, SYSCALL_ALLOC, SYSCALL_DEALLOC};
 
 #[test]
 fn test_allocator_syscalls() {
-    let memory: SharedMemory = Rc::new(MemoryPage::new(8192));
+    let memory: Memory = Rc::new(MemoryPage::new(8192));
     let storage = Rc::new(RefCell::new(Storage::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new();
@@ -47,7 +47,7 @@ fn test_allocator_syscalls() {
 
 #[test]
 fn test_multiple_allocations() {
-    let memory: SharedMemory = Rc::new(MemoryPage::new(8192));
+    let memory: Memory = Rc::new(MemoryPage::new(8192));
     let storage = Rc::new(RefCell::new(Storage::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new();
@@ -90,7 +90,7 @@ fn test_multiple_allocations() {
 
 #[test]
 fn test_alignment_requirements() {
-    let memory: SharedMemory = Rc::new(MemoryPage::new(8192));
+    let memory: Memory = Rc::new(MemoryPage::new(8192));
     let storage = Rc::new(RefCell::new(Storage::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new();
@@ -119,7 +119,7 @@ fn test_alignment_requirements() {
 
 #[test]
 fn test_invalid_alignment() {
-    let memory: SharedMemory = Rc::new(MemoryPage::new(8192));
+    let memory: Memory = Rc::new(MemoryPage::new(8192));
     let storage = Rc::new(RefCell::new(Storage::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new();

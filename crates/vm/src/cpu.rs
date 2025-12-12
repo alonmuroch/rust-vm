@@ -1,7 +1,7 @@
 use crate::decoder::{decode_compressed, decode_full};
 use crate::host_interface::HostInterface;
 use crate::instruction::Instruction;
-use crate::memory::SharedMemory;
+use crate::memory::Memory;
 use crate::metering::{MemoryAccessKind, MeterResult, Metering, NoopMeter};
 use crate::sys_call::SyscallHandler;
 use core::cell::RefCell;
@@ -213,7 +213,7 @@ impl CPU {
     /// redirects the flow (like a branch or jump instruction).
     pub fn step(
         &mut self,
-        memory: SharedMemory,
+        memory: Memory,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
     ) -> bool {
@@ -251,7 +251,7 @@ impl CPU {
         &mut self,
         instr: Instruction,
         size: u8,
-        memory: SharedMemory,
+        memory: Memory,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
     ) -> bool {
@@ -311,7 +311,7 @@ impl CPU {
     /// RETURN VALUE: Returns false to halt execution on invalid instructions
     fn unknown_instruction(
         &mut self,
-        memory: SharedMemory,
+        memory: Memory,
         _storage: Rc<RefCell<Storage>>,
     ) -> bool {
         // EDUCATIONAL: Try to read the invalid instruction bytes for debugging
@@ -347,7 +347,7 @@ impl CPU {
     /// an instruction is compressed (not 0b11) or regular (0b11).
     ///
     /// RETURN VALUE: Returns Some((instruction, size)) if successful, None if invalid
-    pub fn next_instruction(&mut self, memory: SharedMemory) -> Option<(Instruction, u8)> {
+    pub fn next_instruction(&mut self, memory: Memory) -> Option<(Instruction, u8)> {
         let pc = self.pc as usize;
 
         // EDUCATIONAL: Read 4 bytes from memory (enough for any instruction)

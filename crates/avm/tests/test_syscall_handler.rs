@@ -4,7 +4,7 @@ use std::rc::Rc;
 use storage::Storage;
 use vm::host_interface::HostInterface;
 use vm::metering::Metering;
-use vm::memory::SharedMemory;
+use vm::memory::Memory;
 use vm::registers::Register;
 use vm::sys_call::SyscallHandler;
 
@@ -24,7 +24,7 @@ fn exit_code_to_test_num(exit_code: u32) -> Option<u32> {
 #[derive(Debug)]
 pub struct TestSyscallHandler {
     tohost_addr: u64,
-    memory: Option<SharedMemory>,
+    memory: Option<Memory>,
 }
 
 impl TestSyscallHandler {
@@ -41,7 +41,7 @@ impl TestSyscallHandler {
     }
 
     /// Set the memory reference (needed to read .tohost)
-    pub fn set_memory(&mut self, memory: SharedMemory) {
+    pub fn set_memory(&mut self, memory: Memory) {
         self.memory = Some(memory);
     }
 }
@@ -54,7 +54,7 @@ impl SyscallHandler for TestSyscallHandler {
         &mut self,
         call_id: u32,
         _args: [u32; 6],
-        memory: SharedMemory,
+        memory: Memory,
         _storage: Rc<RefCell<Storage>>,
         _host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],

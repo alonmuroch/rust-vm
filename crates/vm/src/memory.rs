@@ -4,7 +4,7 @@ use crate::metering::{Metering, MemoryAccessKind};
 
 pub const HEAP_PTR_OFFSET: u32 = 0x100;
 
-pub trait Memory: std::fmt::Debug {
+pub trait memory: std::fmt::Debug {
     fn mem(&self) -> Ref<Vec<u8>>;
     fn mem_slice(&self, start: usize, end: usize) -> Option<std::cell::Ref<[u8]>>;
     fn store_u16(&self, addr: usize, val: u16, metering: &mut dyn Metering, kind: MemoryAccessKind) -> bool;
@@ -23,4 +23,4 @@ pub trait Memory: std::fmt::Debug {
     fn set_next_heap(&self, next: u32);
 }
 
-pub type SharedMemory = Rc<dyn Memory>;
+pub type Memory = Rc<dyn memory>;

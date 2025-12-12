@@ -1,7 +1,7 @@
 use core::cell::RefCell;
 use std::rc::Rc;
 
-use super::{Instruction, MemoryAccessKind, SharedMemory, CPU};
+use super::{Instruction, MemoryAccessKind, Memory, CPU};
 use crate::host_interface::HostInterface;
 use crate::instruction::CsrOp;
 use crate::registers::Register;
@@ -30,7 +30,7 @@ impl CPU {
     pub fn execute(
         &mut self,
         instr: Instruction,
-        memory: SharedMemory,
+        memory: Memory,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
     ) -> bool {

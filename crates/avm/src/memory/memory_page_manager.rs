@@ -1,12 +1,12 @@
 use std::rc::Rc;
 use crate::memory::MemoryPage;
-use vm::memory::SharedMemory;
+use vm::memory::Memory;
 
 #[derive(Debug)]
 pub struct MemoryPageManager {
     pub page_size: usize,
     max_pages: usize,
-    pages: Vec<SharedMemory>,
+    pages: Vec<Memory>,
 }
 
 impl MemoryPageManager {
@@ -22,7 +22,7 @@ impl MemoryPageManager {
     }
 
     /// Creates and owns a new page. Returns a mutable reference to it.
-    pub fn new_page(&mut self) -> SharedMemory {
+    pub fn new_page(&mut self) -> Memory {
         if self.pages.len() >= self.max_pages {
             panic!(
                 "Out of memory: maximum page count ({}) reached",
@@ -30,7 +30,7 @@ impl MemoryPageManager {
             );
         }
 
-        let page: SharedMemory = Rc::new(MemoryPage::new(self.page_size));
+        let page: Memory = Rc::new(MemoryPage::new(self.page_size));
         self.pages.push(Rc::clone(&page));
         return page;
     }
@@ -76,15 +76,15 @@ impl MemoryPageManager {
         }
     }
 
-    pub fn get_page(&self, index: usize) -> Option<SharedMemory> {
+    pub fn get_page(&self, index: usize) -> Option<Memory> {
         self.pages.get(index).cloned() // ✅ clone the Rc (increases refcount)
     }
 
-    pub fn first_page(&self) -> Option<SharedMemory> {
+    pub fn first_page(&self) -> Option<Memory> {
         self.pages.first().cloned() // ✅ clone the Rc (increases refcount)
     }
 
-    pub fn top_page(&self) -> Option<SharedMemory> {
+    pub fn top_page(&self) -> Option<Memory> {
         self.pages.last().cloned() // ✅ clone the Rc (increases refcount)
     }
 }

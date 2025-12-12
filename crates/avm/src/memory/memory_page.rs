@@ -1,7 +1,7 @@
 use std::cell::{Cell, Ref, RefCell};
 use std::convert::TryInto;
 use std::rc::Rc;
-use vm::memory::{Memory, HEAP_PTR_OFFSET};
+use vm::memory::{memory, HEAP_PTR_OFFSET};
 use vm::metering::{MeterResult, Metering, MemoryAccessKind};
 
 #[derive(Debug, Clone)]
@@ -225,7 +225,7 @@ impl Default for MemoryPage {
     }
 }
 
-impl Memory for MemoryPage {
+impl memory for MemoryPage {
     fn mem(&self) -> Ref<Vec<u8>> {
         MemoryPage::mem(self)
     }

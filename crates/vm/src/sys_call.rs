@@ -1,5 +1,5 @@
 use crate::host_interface::HostInterface;
-use crate::memory::{SharedMemory, HEAP_PTR_OFFSET};
+use crate::memory::{Memory, HEAP_PTR_OFFSET};
 use crate::metering::{MeterResult, Metering};
 use crate::registers::Register;
 use core::cell::RefCell;
@@ -38,7 +38,7 @@ pub trait SyscallHandler: std::fmt::Debug {
         &mut self,
         call_id: u32,
         args: [u32; 6],
-        memory: SharedMemory,
+        memory: Memory,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
@@ -81,7 +81,7 @@ impl SyscallHandler for DefaultSyscallHandler {
         &mut self,
         call_id: u32,
         args: [u32; 6],
-        memory: SharedMemory,
+        memory: Memory,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
@@ -116,7 +116,7 @@ impl DefaultSyscallHandler {
     pub fn sys_fire_event(
         &mut self,
         args: [u32; 6],
-        memory: SharedMemory,
+        memory: Memory,
         host: &mut Box<dyn HostInterface>,
         metering: &mut dyn Metering,
     ) -> u32 {
@@ -147,7 +147,7 @@ impl DefaultSyscallHandler {
     fn sys_storage_get(
         &mut self,
         args: [u32; 6],
-        memory: SharedMemory,
+        memory: Memory,
         storage: Rc<RefCell<Storage>>,
         metering: &mut dyn Metering,
     ) -> u32 {
@@ -249,7 +249,7 @@ impl DefaultSyscallHandler {
     fn sys_storage_set(
         &mut self,
         args: [u32; 6],
-        memory: SharedMemory,
+        memory: Memory,
         storage: Rc<RefCell<Storage>>,
         metering: &mut dyn Metering,
     ) -> u32 {
@@ -350,7 +350,7 @@ impl DefaultSyscallHandler {
         0
     }
 
-    fn sys_panic_with_message(&mut self, regs: &mut [u32; 32], memory: SharedMemory) -> u32 {
+    fn sys_panic_with_message(&mut self, regs: &mut [u32; 32], memory: Memory) -> u32 {
         let msg_ptr = regs[Register::A0 as usize] as usize;
         let msg_len = regs[Register::A1 as usize] as usize;
         let msg = memory
@@ -363,7 +363,7 @@ impl DefaultSyscallHandler {
     fn sys_log(
         &mut self,
         args: [u32; 6],
-        memory: SharedMemory,
+        memory: Memory,
         metering: &mut dyn Metering,
     ) -> u32 {
         let [fmt_ptr, fmt_len, arg_ptr, arg_len, ..] = args;
@@ -568,7 +568,7 @@ impl DefaultSyscallHandler {
     fn sys_call_program(
         &mut self,
         args: [u32; 6],
-        memory: SharedMemory,
+        memory: Memory,
         host: &mut Box<dyn HostInterface>,
         metering: &mut dyn Metering,
     ) -> u32 {
@@ -618,7 +618,7 @@ impl DefaultSyscallHandler {
     fn sys_alloc(
         &mut self,
         args: [u32; 6],
-        memory: SharedMemory,
+        memory: Memory,
         metering: &mut dyn Metering,
     ) -> u32 {
         let size = args[0] as usize; // A0 register
@@ -679,7 +679,7 @@ impl DefaultSyscallHandler {
     fn sys_dealloc(
         &mut self,
         args: [u32; 6],
-        _memory: SharedMemory,
+        _memory: Memory,
         metering: &mut dyn Metering,
     ) -> u32 {
         let size = args[1] as usize;
@@ -695,7 +695,7 @@ impl DefaultSyscallHandler {
     fn sys_transfer(
         &mut self,
         args: [u32; 6],
-        memory: SharedMemory,
+        memory: Memory,
         host: &mut Box<dyn HostInterface>,
         metering: &mut dyn Metering,
     ) -> u32 {
@@ -730,7 +730,7 @@ impl DefaultSyscallHandler {
     fn sys_balance(
         &mut self,
         args: [u32; 6],
-        memory: SharedMemory,
+        memory: Memory,
         host: &mut Box<dyn HostInterface>,
         metering: &mut dyn Metering,
     ) -> u32 {

@@ -1,6 +1,6 @@
 use crate::cpu::CPU;
 use crate::host_interface::HostInterface;
-use crate::memory::SharedMemory;
+use crate::memory::Memory;
 use crate::metering::Metering;
 use crate::registers::Register;
 use crate::sys_call::{DefaultSyscallHandler, SyscallHandler};
@@ -29,7 +29,7 @@ pub struct VM {
     pub cpu: CPU,
 
     /// Shared reference to the VM's memory (RAM)
-    pub memory: SharedMemory,
+    pub memory: Memory,
 
     /// Shared reference to persistent storage
     pub storage: Rc<RefCell<Storage>>,
@@ -40,7 +40,7 @@ pub struct VM {
 impl VM {
     /// Creates a new virtual machine with the specified memory, storage, and host, using the default syscall handler.
     pub fn new(
-        memory: SharedMemory,
+        memory: Memory,
         storage: Rc<RefCell<Storage>>,
         host: Box<dyn HostInterface>,
     ) -> Self {
@@ -54,7 +54,7 @@ impl VM {
 
     /// Creates a new virtual machine with a writer for logging output.
     pub fn new_with_writer(
-        memory: SharedMemory,
+        memory: Memory,
         storage: Rc<RefCell<Storage>>,
         host: Box<dyn HostInterface>,
         writer: Option<Rc<RefCell<dyn core::fmt::Write>>>,
@@ -70,7 +70,7 @@ impl VM {
     /// Creates a new virtual machine with a custom syscall handler.
     /// This is useful for testing or custom environments.
     pub fn new_with_syscall_handler(
-        memory: SharedMemory,
+        memory: Memory,
         storage: Rc<RefCell<Storage>>,
         host: Box<dyn HostInterface>,
         syscall_handler: Box<dyn SyscallHandler>,

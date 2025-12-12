@@ -7,7 +7,7 @@ use avm::memory::MemoryPage;
 use vm::vm::VM;
 mod test_syscall_handler;
 use test_syscall_handler::TestSyscallHandler;
-use vm::memory::SharedMemory;
+use vm::memory::Memory;
 
 /// Tests that are skipped and the reasons why
 const SKIPPED_TESTS: &[(&str, &str)] = &[
@@ -79,7 +79,7 @@ fn run_single_test(elf_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Set up VM memory (allocate enough to cover 0x80000000+)
-    let memory: SharedMemory = std::rc::Rc::new(MemoryPage::new_with_base(
+    let memory: Memory = std::rc::Rc::new(MemoryPage::new_with_base(
         0x20000,
         0x80000000,
     )); // 128KB at 0x80000000
