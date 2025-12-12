@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use vm::instruction::Instruction;
-use vm::metering::{MeterResult, Metering, MemoryAccessKind};
+use vm::metering::{MemoryAccessKind, MeterResult, Metering};
 use vm::sys_call::{
     SYSCALL_ALLOC, SYSCALL_BALANCE, SYSCALL_CALL_PROGRAM, SYSCALL_DEALLOC, SYSCALL_FIRE_EVENT,
     SYSCALL_LOG, SYSCALL_STORAGE_GET, SYSCALL_STORAGE_SET, SYSCALL_TRANSFER,

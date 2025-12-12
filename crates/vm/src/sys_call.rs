@@ -1,13 +1,13 @@
-use crate::memory_page::{MemoryPage, HEAP_PTR_OFFSET};
-use storage::Storage;
-use crate::registers::Register;
-use std::rc::Rc;
-use core::cell::RefCell;
 use crate::host_interface::HostInterface;
-use std::any::Any;
-use types::result::RESULT_SIZE;
+use crate::memory::{SharedMemory, HEAP_PTR_OFFSET};
+use crate::metering::{MeterResult, Metering};
+use crate::registers::Register;
+use core::cell::RefCell;
 use core::fmt::Write;
-use crate::metering::{Metering, MeterResult};
+use std::any::Any;
+use std::rc::Rc;
+use storage::Storage;
+use types::result::RESULT_SIZE;
 
 /// System call IDs for the VM.
 pub const SYSCALL_STORAGE_GET: u32 = 1;
@@ -21,16 +21,16 @@ pub const SYSCALL_DEALLOC: u32 = 8;
 pub const SYSCALL_TRANSFER: u32 = 9;
 pub const SYSCALL_BALANCE: u32 = 10;
 /// Represents different types of arguments that can be passed to system calls.
-/// 
+///
 /// EDUCATIONAL: This enum demonstrates how to handle different data types
 /// in system calls. In real operating systems, system calls need to handle
 /// various data types safely.
 enum Arg {
-    U32(u32),           // 32-bit unsigned integer
-    F32(f32),           // 32-bit floating point
-    Char(char),         // Single character
-    Str(String),        // String (owned)
-    Bytes(Vec<u8>),     // Raw bytes
+    U32(u32),       // 32-bit unsigned integer
+    F32(f32),       // 32-bit floating point
+    Char(char),     // Single character
+    Str(String),    // String (owned)
+    Bytes(Vec<u8>), // Raw bytes
 }
 
 pub trait SyscallHandler: std::fmt::Debug {
@@ -38,7 +38,7 @@ pub trait SyscallHandler: std::fmt::Debug {
         &mut self,
         call_id: u32,
         args: [u32; 6],
-        memory: Rc<RefCell<MemoryPage>>,
+        memory: SharedMemory,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
@@ -54,7 +54,10 @@ pub struct DefaultSyscallHandler {
 impl std::fmt::Debug for DefaultSyscallHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DefaultSyscallHandler")
-            .field("verbose_writer", &self.verbose_writer.as_ref().map(|_| "<dyn Write>"))
+            .field(
+                "verbose_writer",
+                &self.verbose_writer.as_ref().map(|_| "<dyn Write>"),
+            )
             .finish()
     }
 }
@@ -65,7 +68,7 @@ impl DefaultSyscallHandler {
             verbose_writer: None,
         }
     }
-    
+
     pub fn with_writer(writer: Option<Rc<RefCell<dyn Write>>>) -> Self {
         Self {
             verbose_writer: writer,
@@ -78,7 +81,7 @@ impl SyscallHandler for DefaultSyscallHandler {
         &mut self,
         call_id: u32,
         args: [u32; 6],
-        memory: Rc<RefCell<MemoryPage>>,
+        memory: SharedMemory,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
@@ -110,26 +113,31 @@ impl SyscallHandler for DefaultSyscallHandler {
 }
 
 impl DefaultSyscallHandler {
-	pub fn sys_fire_event(
-        &mut self, args: [u32; 6], 
-        memory: Rc<RefCell<MemoryPage>>, 
-        host: &mut Box<dyn HostInterface>, 
-        metering: &mut dyn Metering) -> u32 {
+    pub fn sys_fire_event(
+        &mut self,
+        args: [u32; 6],
+        memory: SharedMemory,
+        host: &mut Box<dyn HostInterface>,
+        metering: &mut dyn Metering,
+    ) -> u32 {
         // EDUCATIONAL: Extract key pointer and length from arguments
         let ptr = args[0] as usize;
         let len = args[1] as usize;
 
-        if matches!(metering.on_syscall_data(SYSCALL_FIRE_EVENT, len), MeterResult::Halt) {
+        if matches!(
+            metering.on_syscall_data(SYSCALL_FIRE_EVENT, len),
+            MeterResult::Halt
+        ) {
             panic!("Metering halted SYSCALL_FIRE_EVENT");
         }
 
-        let borrowed_memory = memory.borrow();
+        let borrowed_memory = memory.as_ref();
 
         // EDUCATIONAL: Safely read the key from memory
         // EDUCATIONAL: Create a limited scope to avoid borrow checker issues
         let event_bytes = match borrowed_memory.mem_slice(ptr, ptr + len) {
             Some(r) => r,
-            None => panic!("invalid memory access"),  // Invalid memory access
+            None => panic!("invalid memory access"), // Invalid memory access
         };
 
         host.fire_event(event_bytes.to_vec());
@@ -137,56 +145,74 @@ impl DefaultSyscallHandler {
     }
 
     fn sys_storage_get(
-        &mut self, 
-        args: [u32; 6], 
-        memory: Rc<RefCell<MemoryPage>>, 
-        storage: Rc<RefCell<Storage>>, 
-        metering: &mut dyn Metering) -> u32 {
+        &mut self,
+        args: [u32; 6],
+        memory: SharedMemory,
+        storage: Rc<RefCell<Storage>>,
+        metering: &mut dyn Metering,
+    ) -> u32 {
         let domain_ptr = args[0] as usize;
         let domain_len = args[1] as usize;
         let key_ptr = args[2] as usize;
         let key_len = args[3] as usize;
 
         let total_len = domain_len.saturating_add(key_len);
-        if matches!(metering.on_syscall_data(SYSCALL_STORAGE_GET, total_len), MeterResult::Halt) {
+        if matches!(
+            metering.on_syscall_data(SYSCALL_STORAGE_GET, total_len),
+            MeterResult::Halt
+        ) {
             panic!("Metering halted SYSCALL_STORAGE_GET");
         }
-        
-        let borrowed_memory = memory.borrow();
-        
+
+        let borrowed_memory = memory.as_ref();
+
         // Parse domain
         let domain_slice = {
-            let domain_slice_ref = match borrowed_memory.mem_slice(domain_ptr, domain_ptr + domain_len) {
-                Some(r) => r,
-                None => {
-                    println!("❌ Storage GET - Invalid domain memory access: ptr={}, len={}", domain_ptr, domain_len);
-                    return 0;
-                }
-            };
+            let domain_slice_ref =
+                match borrowed_memory.mem_slice(domain_ptr, domain_ptr + domain_len) {
+                    Some(r) => r,
+                    None => {
+                        println!(
+                            "❌ Storage GET - Invalid domain memory access: ptr={}, len={}",
+                            domain_ptr, domain_len
+                        );
+                        return 0;
+                    }
+                };
             domain_slice_ref.as_ref().to_vec()
         };
         let domain = match core::str::from_utf8(&domain_slice) {
             Ok(s) => s,
             Err(_) => {
-                println!("❌ Storage GET - Invalid UTF-8 in domain: {:?}", domain_slice);
+                println!(
+                    "❌ Storage GET - Invalid UTF-8 in domain: {:?}",
+                    domain_slice
+                );
                 return 0;
             }
         };
-        
+
         // Parse key
         let key_slice = {
             let key_slice_ref = match borrowed_memory.mem_slice(key_ptr, key_ptr + key_len) {
                 Some(r) => r,
                 None => {
-                    println!("❌ Storage GET - Invalid key memory access: ptr={}, len={}", key_ptr, key_len);
+                    println!(
+                        "❌ Storage GET - Invalid key memory access: ptr={}, len={}",
+                        key_ptr, key_len
+                    );
                     return 0;
                 }
             };
             key_slice_ref.as_ref().to_vec()
         };
         // Convert binary key to hex string for storage
-        let key = key_slice.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("");
-        
+        let key = key_slice
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<Vec<_>>()
+            .join("");
+
         // Format key for display based on domain
         let display_key = if domain == "P" {
             // For persistent domain, try to display key as ASCII
@@ -198,7 +224,7 @@ impl DefaultSyscallHandler {
             // For other domains, show domain as ASCII and key as hex
             format!("{}:{}", domain, key)
         };
-        
+
         if let Some(value) = storage.borrow().get(domain, &key) {
             let mut buf = (value.len() as u32).to_le_bytes().to_vec();
             buf.extend_from_slice(value.as_slice());
@@ -206,20 +232,27 @@ impl DefaultSyscallHandler {
                 panic!("Metering halted alloc during storage_get");
             }
             let addr = borrowed_memory.alloc_on_heap(&buf);
-            println!("✅ Found value for domain: '{}', Key: '{}'", domain, display_key);
+            println!(
+                "✅ Found value for domain: '{}', Key: '{}'",
+                domain, display_key
+            );
             return addr;
         } else {
-            println!("❌ No value found for domain: '{}', key: '{}'", domain, display_key);
+            println!(
+                "❌ No value found for domain: '{}', key: '{}'",
+                domain, display_key
+            );
             0
         }
     }
 
     fn sys_storage_set(
-        &mut self, 
-        args: [u32; 6], 
-        memory: Rc<RefCell<MemoryPage>>, 
-        storage: Rc<RefCell<Storage>>, 
-        metering: &mut dyn Metering) -> u32 {
+        &mut self,
+        args: [u32; 6],
+        memory: SharedMemory,
+        storage: Rc<RefCell<Storage>>,
+        metering: &mut dyn Metering,
+    ) -> u32 {
         let domain_ptr = args[0] as usize;
         let domain_len = args[1] as usize;
         let key_ptr = args[2] as usize;
@@ -227,20 +260,25 @@ impl DefaultSyscallHandler {
         let val_ptr = args[4] as usize;
         let val_len = args[5] as usize;
 
-        let total_len = domain_len
-            .saturating_add(key_len)
-            .saturating_add(val_len);
-        if matches!(metering.on_syscall_data(SYSCALL_STORAGE_SET, total_len), MeterResult::Halt) {
+        let total_len = domain_len.saturating_add(key_len).saturating_add(val_len);
+        if matches!(
+            metering.on_syscall_data(SYSCALL_STORAGE_SET, total_len),
+            MeterResult::Halt
+        ) {
             panic!("Metering halted SYSCALL_STORAGE_SET");
         }
-        
-        let borrowed_memory = memory.borrow();
-        
+
+        let borrowed_memory = memory.as_ref();
+
         // Parse domain
-        let domain_slice_ref = match borrowed_memory.mem_slice(domain_ptr, domain_ptr + domain_len) {
+        let domain_slice_ref = match borrowed_memory.mem_slice(domain_ptr, domain_ptr + domain_len)
+        {
             Some(r) => r,
             None => {
-                println!("❌ Storage SET - Invalid domain memory access: ptr={}, len={}", domain_ptr, domain_len);
+                println!(
+                    "❌ Storage SET - Invalid domain memory access: ptr={}, len={}",
+                    domain_ptr, domain_len
+                );
                 return 0;
             }
         };
@@ -248,23 +286,33 @@ impl DefaultSyscallHandler {
         let domain = match core::str::from_utf8(domain_slice) {
             Ok(s) => s,
             Err(_) => {
-                println!("❌ Storage SET - Invalid UTF-8 in domain: {:?}", domain_slice);
+                println!(
+                    "❌ Storage SET - Invalid UTF-8 in domain: {:?}",
+                    domain_slice
+                );
                 return 0;
             }
         };
-        
+
         // Parse key
         let key_slice_ref = match borrowed_memory.mem_slice(key_ptr, key_ptr + key_len) {
             Some(r) => r,
             None => {
-                println!("❌ Storage SET - Invalid key memory access: ptr={}, len={}", key_ptr, key_len);
+                println!(
+                    "❌ Storage SET - Invalid key memory access: ptr={}, len={}",
+                    key_ptr, key_len
+                );
                 return 0;
             }
         };
         let key_slice = key_slice_ref.as_ref();
         // Convert binary key to hex string for storage
-        let key = key_slice.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join("");
-        
+        let key = key_slice
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<Vec<_>>()
+            .join("");
+
         // Format key for display based on domain
         let display_key = if domain == "P" {
             // For persistent domain, try to display key as ASCII
@@ -276,54 +324,65 @@ impl DefaultSyscallHandler {
             // For other domains, show domain as ASCII and key as hex
             format!("{}:{}", domain, key)
         };
-        
+
         // Parse value
         let value_slice_ref = match borrowed_memory.mem_slice(val_ptr, val_ptr + val_len) {
             Some(r) => r,
             None => {
-                println!("❌ Storage SET - Invalid value memory access: ptr={}, len={}", val_ptr, val_len);
+                println!(
+                    "❌ Storage SET - Invalid value memory access: ptr={}, len={}",
+                    val_ptr, val_len
+                );
                 return 0;
             }
         };
         let value_slice = value_slice_ref.as_ref();
-        
-        println!("💾 Storage SET - Domain: '{}', Key: '{}', Value: {:?} ({} bytes)", 
-                domain, display_key, value_slice, value_slice.len());
-        
+
+        println!(
+            "💾 Storage SET - Domain: '{}', Key: '{}', Value: {:?} ({} bytes)",
+            domain,
+            display_key,
+            value_slice,
+            value_slice.len()
+        );
+
         storage.borrow_mut().set(domain, &key, value_slice.to_vec());
         0
     }
 
-    fn sys_panic_with_message(
-        &mut self, 
-        regs: &mut [u32; 32], 
-        memory: Rc<RefCell<MemoryPage>>) -> u32 {
+    fn sys_panic_with_message(&mut self, regs: &mut [u32; 32], memory: SharedMemory) -> u32 {
         let msg_ptr = regs[Register::A0 as usize] as usize;
         let msg_len = regs[Register::A1 as usize] as usize;
         let msg = memory
-            .borrow()
             .mem_slice(msg_ptr, msg_ptr + msg_len)
-            .map(|bytes| {
-                String::from_utf8_lossy(&bytes).into_owned()
-            })
+            .map(|bytes| String::from_utf8_lossy(bytes.as_ref()).into_owned())
             .unwrap_or_else(|| "<invalid memory access>".to_string());
         panic!("🔥 Guest panic: {}", msg);
     }
 
-    fn sys_log(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, metering: &mut dyn Metering) -> u32 {
+    fn sys_log(
+        &mut self,
+        args: [u32; 6],
+        memory: SharedMemory,
+        metering: &mut dyn Metering,
+    ) -> u32 {
         let [fmt_ptr, fmt_len, arg_ptr, arg_len, ..] = args;
         let payload_len = fmt_len.saturating_add(arg_len) as usize;
-        if matches!(metering.on_syscall_data(SYSCALL_LOG, payload_len), MeterResult::Halt) {
+        if matches!(
+            metering.on_syscall_data(SYSCALL_LOG, payload_len),
+            MeterResult::Halt
+        ) {
             panic!("Metering halted SYSCALL_LOG");
         }
-        let borrowed_memory = memory.borrow();
-        let fmt_slice = match borrowed_memory.mem_slice(fmt_ptr as usize, (fmt_ptr + fmt_len) as usize) {
-            Some(s) => s,
-            None => {
-                println!("⚠️ invalid format string @ 0x{:08x}", fmt_ptr);
-                return 0;
-            }
-        };
+        let borrowed_memory = memory.as_ref();
+        let fmt_slice =
+            match borrowed_memory.mem_slice(fmt_ptr as usize, (fmt_ptr + fmt_len) as usize) {
+                Some(s) => s,
+                None => {
+                    println!("⚠️ invalid format string @ 0x{:08x}", fmt_ptr);
+                    return 0;
+                }
+            };
         let fmt_bytes = fmt_slice.as_ref();
         let fmt = match core::str::from_utf8(fmt_bytes) {
             Ok(s) => s,
@@ -334,7 +393,8 @@ impl DefaultSyscallHandler {
                 return 0;
             }
         };
-        let args_bytes_slice = borrowed_memory.mem_slice(arg_ptr as usize, (arg_ptr + arg_len) as usize);
+        let args_bytes_slice =
+            borrowed_memory.mem_slice(arg_ptr as usize, (arg_ptr + arg_len) as usize);
         let args_bytes_holder;
         let args_bytes: &[u8] = if let Some(slice) = args_bytes_slice {
             args_bytes_holder = slice;
@@ -350,7 +410,9 @@ impl DefaultSyscallHandler {
         let mut raw_iter = raw_args.into_iter();
         let mut chars = fmt.chars().peekable();
         while let Some(c) = chars.next() {
-            if c != '%' { continue; }
+            if c != '%' {
+                continue;
+            }
             let spec: char = chars.next().unwrap_or('%');
             let mut next = || raw_iter.next().unwrap_or(0);
             match spec {
@@ -400,7 +462,7 @@ impl DefaultSyscallHandler {
                     }
                 }
                 'A' => {
-                    // Array of u8s  
+                    // Array of u8s
                     let ptr = next() as usize;
                     let len = next() as usize;
                     match borrowed_memory.mem_slice(ptr, ptr + len) {
@@ -446,11 +508,13 @@ impl DefaultSyscallHandler {
                             // Format bytes array nicely
                             output.push('[');
                             for (i, byte) in b.iter().enumerate() {
-                                if i > 0 { output.push_str(", "); }
+                                if i > 0 {
+                                    output.push_str(", ");
+                                }
                                 output.push_str(&format!("0x{:02x}", byte));
                             }
                             output.push(']');
-                        },
+                        }
                         _ => output.push_str("<err>"),
                     },
                     Some('a') => match args_iter.next() {
@@ -458,24 +522,29 @@ impl DefaultSyscallHandler {
                             // Format u32 array (bytes interpreted as u32s)
                             output.push('[');
                             for (i, chunk) in b.chunks_exact(4).enumerate() {
-                                if i > 0 { output.push_str(", "); }
-                                let val = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                                if i > 0 {
+                                    output.push_str(", ");
+                                }
+                                let val =
+                                    u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
                                 output.push_str(&format!("{}", val));
                             }
                             output.push(']');
-                        },
+                        }
                         _ => output.push_str("<err>"),
                     },
                     Some('A') => match args_iter.next() {
                         Some(Arg::Bytes(b)) => {
-                            // Format u8 array 
+                            // Format u8 array
                             output.push('[');
                             for (i, byte) in b.iter().enumerate() {
-                                if i > 0 { output.push_str(", "); }
+                                if i > 0 {
+                                    output.push_str(", ");
+                                }
                                 output.push_str(&format!("{}", byte));
                             }
                             output.push(']');
-                        },
+                        }
                         _ => output.push_str("<err>"),
                     },
                     Some('%') => output.push('%'),
@@ -496,7 +565,13 @@ impl DefaultSyscallHandler {
         0
     }
 
-    fn sys_call_program(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>, metering: &mut dyn Metering) -> u32 {
+    fn sys_call_program(
+        &mut self,
+        args: [u32; 6],
+        memory: SharedMemory,
+        host: &mut Box<dyn HostInterface>,
+        metering: &mut dyn Metering,
+    ) -> u32 {
         let to_ptr = args[0] as usize;
         let from_ptr = args[1] as usize;
         let input_ptr = args[2] as usize;
@@ -507,7 +582,7 @@ impl DefaultSyscallHandler {
             panic!("Metering halted SYSCALL_CALL_PROGRAM");
         }
         {
-            let borrowed_memory = memory.borrow();
+            let borrowed_memory = memory.as_ref();
             let to_slice = match borrowed_memory.mem_slice(to_ptr, to_ptr + 20) {
                 Some(r) => r,
                 None => return 0,
@@ -528,7 +603,7 @@ impl DefaultSyscallHandler {
             (result_ptr, page_index) = host.call_program(from_bytes, to_bytes, input_vec);
         }
         {
-            let borrowed_memory = memory.borrow_mut();
+            let borrowed_memory = memory.as_ref();
             let result_bytes = match host.read_memory_page(page_index, result_ptr, RESULT_SIZE) {
                 Some(b) => b,
                 None => return 0,
@@ -540,60 +615,73 @@ impl DefaultSyscallHandler {
         }
     }
 
-    fn sys_alloc(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, metering: &mut dyn Metering) -> u32 {
-        let size = args[0] as usize;  // A0 register
+    fn sys_alloc(
+        &mut self,
+        args: [u32; 6],
+        memory: SharedMemory,
+        metering: &mut dyn Metering,
+    ) -> u32 {
+        let size = args[0] as usize; // A0 register
         let align = args[1] as usize; // A1 register
 
         if matches!(metering.on_alloc(size), MeterResult::Halt) {
             panic!("Metering halted SYSCALL_ALLOC");
         }
-        
+
         if size == 0 {
             println!("VM Alloc: Invalid size 0");
             return 0;
         }
-        
+
         // Validate alignment (must be power of 2)
         if align == 0 || (align & (align - 1)) != 0 {
             println!("VM Alloc: Invalid alignment {}", align);
             return 0;
         }
-        
-        let current_heap = memory.borrow().next_heap.get();
-        
+
+        let current_heap = memory.next_heap();
+
         // Initialize heap pointer if not set (no code has been written)
         if current_heap == 0 {
-            memory.borrow().next_heap.set(HEAP_PTR_OFFSET);
+            memory.set_next_heap(HEAP_PTR_OFFSET);
         }
-        
+
         // Allocate aligned memory on heap
         let data = vec![0u8; size];
-        let ptr = memory.borrow().alloc_on_heap(&data);
-        
+        let ptr = memory.alloc_on_heap(&data);
+
         if ptr == 0 {
             println!("VM Alloc: Out of memory, failed to allocate {} bytes", size);
             return 0;
         }
-        
+
         // Check if allocated address meets alignment requirements
         if (ptr as usize) % align != 0 {
             // Re-allocate with enough space for alignment
             let total_size = size + align - 1;
             let padded_data = vec![0u8; total_size];
-            let padded_ptr = memory.borrow().alloc_on_heap(&padded_data);
+            let padded_ptr = memory.alloc_on_heap(&padded_data);
             if padded_ptr == 0 {
-                println!("VM Alloc: Out of memory, failed to allocate {} bytes for alignment", total_size);
+                println!(
+                    "VM Alloc: Out of memory, failed to allocate {} bytes for alignment",
+                    total_size
+                );
                 return 0;
             }
             // Return properly aligned pointer within the allocated region
             let aligned_ptr = ((padded_ptr as usize + align - 1) & !(align - 1)) as u32;
             return aligned_ptr;
         }
-        
+
         ptr
     }
-    
-    fn sys_dealloc(&mut self, args: [u32; 6], _memory: Rc<RefCell<MemoryPage>>, metering: &mut dyn Metering) -> u32 {
+
+    fn sys_dealloc(
+        &mut self,
+        args: [u32; 6],
+        _memory: SharedMemory,
+        metering: &mut dyn Metering,
+    ) -> u32 {
         let size = args[1] as usize;
         if matches!(metering.on_alloc(size), MeterResult::Halt) {
             panic!("Metering halted SYSCALL_DEALLOC");
@@ -604,41 +692,67 @@ impl DefaultSyscallHandler {
         0
     }
 
-    fn sys_transfer(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>, metering: &mut dyn Metering) -> u32 {
+    fn sys_transfer(
+        &mut self,
+        args: [u32; 6],
+        memory: SharedMemory,
+        host: &mut Box<dyn HostInterface>,
+        metering: &mut dyn Metering,
+    ) -> u32 {
         // args: a2=to ptr, a3=value_lo, a4=value_hi
         let to_ptr = args[1] as usize;
         let value_lo = args[2] as u64;
         let value_hi = args[3] as u64;
         let value = value_lo | (value_hi << 32);
 
-        if matches!(metering.on_syscall_data(SYSCALL_TRANSFER, 20), MeterResult::Halt) {
+        if matches!(
+            metering.on_syscall_data(SYSCALL_TRANSFER, 20),
+            MeterResult::Halt
+        ) {
             panic!("Metering halted SYSCALL_TRANSFER");
         }
 
-        let borrowed = memory.borrow();
-        let to_slice = borrowed.mem_slice(to_ptr, to_ptr + 20).expect("invalid to ptr");
+        let borrowed = memory.as_ref();
+        let to_slice = borrowed
+            .mem_slice(to_ptr, to_ptr + 20)
+            .expect("invalid to ptr");
 
         let mut to = [0u8; 20];
         to.copy_from_slice(to_slice.as_ref());
 
-        if host.transfer(to, value) { 0 } else { 1 }
+        if host.transfer(to, value) {
+            0
+        } else {
+            1
+        }
     }
 
-    fn sys_balance(&mut self, args: [u32; 6], memory: Rc<RefCell<MemoryPage>>, host: &mut Box<dyn HostInterface>, metering: &mut dyn Metering) -> u32 {
+    fn sys_balance(
+        &mut self,
+        args: [u32; 6],
+        memory: SharedMemory,
+        host: &mut Box<dyn HostInterface>,
+        metering: &mut dyn Metering,
+    ) -> u32 {
         // args: a1 = address pointer (20 bytes)
         let addr_ptr = args[0] as usize;
-        if matches!(metering.on_syscall_data(SYSCALL_BALANCE, 20), MeterResult::Halt) {
+        if matches!(
+            metering.on_syscall_data(SYSCALL_BALANCE, 20),
+            MeterResult::Halt
+        ) {
             panic!("Metering halted SYSCALL_BALANCE");
         }
         let addr = {
-            let borrowed = memory.borrow();
-            let addr_slice = borrowed.mem_slice(addr_ptr, addr_ptr + 20).expect("invalid addr ptr");
+            let borrowed = memory.as_ref();
+            let addr_slice = borrowed
+                .mem_slice(addr_ptr, addr_ptr + 20)
+                .expect("invalid addr ptr");
             let mut addr = [0u8; 20];
             addr.copy_from_slice(addr_slice.as_ref());
             addr
         };
 
         let bal = host.balance(addr);
-        memory.borrow().alloc_on_heap(&bal.to_le_bytes())
+        memory.alloc_on_heap(&bal.to_le_bytes())
     }
 }

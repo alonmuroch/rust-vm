@@ -1,6 +1,6 @@
-use types::address::Address;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
+use types::address::Address;
 use vm::vm::VM;
 
 /// Represents a single execution context during contract calls.
@@ -13,32 +13,27 @@ pub struct ExecutionContext {
     pub to: Address,
 
     // Data passed to the contract call
-    pub input_data: Rc<Vec<u8>>, 
+    pub input_data: Rc<Vec<u8>>,
 
     // Memory page
     pub vm: Rc<RefCell<VM>>,
 
-    pub events: Vec<Vec<u8>>, 
+    pub events: Vec<Vec<u8>>,
 
     // is exe_done marks context as executed
     pub exe_done: bool,
 }
 
 impl ExecutionContext {
-    pub fn new(
-        from: Address,
-         to: Address,
-         input_data: Vec<u8>,
-         vm: VM,
-    ) -> Self {
-        Self { 
+    pub fn new(from: Address, to: Address, input_data: Vec<u8>, vm: VM) -> Self {
+        Self {
             from,
             to,
-            input_data: Rc::new(input_data), 
-            vm: Rc::new(RefCell::new(vm)), 
+            input_data: Rc::new(input_data),
+            vm: Rc::new(RefCell::new(vm)),
             events: Vec::new(),
             exe_done: false,
-         }
+        }
     }
 }
 
@@ -58,15 +53,14 @@ impl ContextStack {
     /// returns index of the new execution context
     pub fn push(&mut self, from: Address, to: Address, input_data: Vec<u8>, vm: VM) -> usize {
         let index = self.stack.len();
-        self.stack.push(
-            ExecutionContext { 
-                from, 
-                to, 
-                input_data:Rc::new(input_data), 
-                vm:Rc::new(RefCell::new(vm)), 
-                events: Vec::new(),
-                exe_done: false,
-            });
+        self.stack.push(ExecutionContext {
+            from,
+            to,
+            input_data: Rc::new(input_data),
+            vm: Rc::new(RefCell::new(vm)),
+            events: Vec::new(),
+            exe_done: false,
+        });
         index
     }
 
@@ -92,7 +86,6 @@ impl ContextStack {
     pub fn current_mut(&mut self) -> Option<&mut ExecutionContext> {
         self.stack.last_mut()
     }
-
 
     pub fn iter(&self) -> impl Iterator<Item = &ExecutionContext> {
         self.stack.iter()

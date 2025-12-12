@@ -1,11 +1,12 @@
-use vm::memory_page::MemoryPage;
-use std::{cell::RefCell, rc::Rc};
+use std::rc::Rc;
+use crate::memory::MemoryPage;
+use vm::memory::SharedMemory;
 
 #[derive(Debug)]
 pub struct MemoryPageManager {
     pub page_size: usize,
     max_pages: usize,
-    pages: Vec<Rc<RefCell<MemoryPage>>>,
+    pages: Vec<SharedMemory>,
 }
 
 impl MemoryPageManager {
@@ -21,12 +22,15 @@ impl MemoryPageManager {
     }
 
     /// Creates and owns a new page. Returns a mutable reference to it.
-    pub fn new_page(&mut self) -> Rc<RefCell<MemoryPage>> {
+    pub fn new_page(&mut self) -> SharedMemory {
         if self.pages.len() >= self.max_pages {
-            panic!("Out of memory: maximum page count ({}) reached", self.max_pages);
+            panic!(
+                "Out of memory: maximum page count ({}) reached",
+                self.max_pages
+            );
         }
 
-        let page = Rc::new(RefCell::new(MemoryPage::new(self.page_size)));
+        let page: SharedMemory = Rc::new(MemoryPage::new(self.page_size));
         self.pages.push(Rc::clone(&page));
         return page;
     }
@@ -41,8 +45,7 @@ impl MemoryPageManager {
         for (i, page_rc) in self.pages.iter().enumerate() {
             println!("\n=== Page {} ===", i);
 
-            let page = page_rc.borrow();
-            let mem = page.mem();
+            let mem = page_rc.mem();
 
             for (j, chunk) in mem.chunks(16).enumerate() {
                 print!("0x{:04x}: ", j * 16);
@@ -71,20 +74,17 @@ impl MemoryPageManager {
                 println!("|");
             }
         }
-}
+    }
 
-
-
-    pub fn get_page(&self, index: usize) -> Option<Rc<RefCell<MemoryPage>>> {
+    pub fn get_page(&self, index: usize) -> Option<SharedMemory> {
         self.pages.get(index).cloned() // ✅ clone the Rc (increases refcount)
     }
 
-    pub fn first_page(&self) -> Option<Rc<RefCell<MemoryPage>>> {
+    pub fn first_page(&self) -> Option<SharedMemory> {
         self.pages.first().cloned() // ✅ clone the Rc (increases refcount)
     }
 
-    pub fn top_page(&self) -> Option<Rc<RefCell<MemoryPage>>> {
+    pub fn top_page(&self) -> Option<SharedMemory> {
         self.pages.last().cloned() // ✅ clone the Rc (increases refcount)
-    }   
-
+    }
 }

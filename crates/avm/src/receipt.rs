@@ -1,5 +1,5 @@
-use types::{Result}; 
 use crate::transaction::Transaction;
+use types::Result;
 
 /// Represents the result of a transaction execution.
 #[derive(Debug, Clone)]
@@ -12,7 +12,6 @@ pub struct TransactionReceipt {
 
     // /// Gas used by this transaction alone.
     // pub gas_used: u64,
-
     pub result: Result,
 
     /// List of log entries generated during execution.
@@ -36,7 +35,7 @@ impl TransactionReceipt {
         self.events.push(event);
         self
     }
-    
+
     /// Optionally add multiple events at once.
     pub fn set_events(mut self, events: Vec<Vec<u8>>) -> Self {
         self.events = events;
@@ -55,7 +54,11 @@ impl fmt::Display for TransactionReceipt {
         writeln!(f, "Events:")?;
 
         for (i, event) in self.events.iter().enumerate() {
-            let hex = event.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ");
+            let hex = event
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(" ");
             writeln!(f, "  [{}] {}", i, hex)?;
         }
 
@@ -78,7 +81,11 @@ impl TransactionReceipt {
         let _ = writeln!(writer);
     }
 
-    pub fn pretty_print_event(event: &[u8], abi_registry: &Vec<EventAbi>, writer: &mut dyn fmt::Write) {
+    pub fn pretty_print_event(
+        event: &[u8],
+        abi_registry: &Vec<EventAbi>,
+        writer: &mut dyn fmt::Write,
+    ) {
         if event.len() < 32 {
             let _ = writeln!(writer, "Invalid event: too short");
             return;
@@ -100,7 +107,11 @@ impl TransactionReceipt {
                     match param.kind {
                         ParamType::Address => {
                             if offset + 20 > data.len() {
-                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(
+                                    writer,
+                                    "  {}: <invalid - data too short>",
+                                    param.name
+                                );
                                 break;
                             }
                             let bytes: &[u8] = &data[offset..offset + 20];
@@ -109,7 +120,11 @@ impl TransactionReceipt {
                         }
                         ParamType::Uint(256) => {
                             if offset + 32 > data.len() {
-                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(
+                                    writer,
+                                    "  {}: <invalid - data too short>",
+                                    param.name
+                                );
                                 break;
                             }
                             let bytes = &data[offset..offset + 32];
@@ -118,7 +133,11 @@ impl TransactionReceipt {
                         }
                         ParamType::Uint(128) => {
                             if offset + 16 > data.len() {
-                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(
+                                    writer,
+                                    "  {}: <invalid - data too short>",
+                                    param.name
+                                );
                                 break;
                             }
                             let bytes = &data[offset..offset + 16];
@@ -128,7 +147,11 @@ impl TransactionReceipt {
                         }
                         ParamType::Uint(64) => {
                             if offset + 8 > data.len() {
-                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(
+                                    writer,
+                                    "  {}: <invalid - data too short>",
+                                    param.name
+                                );
                                 break;
                             }
                             let bytes = &data[offset..offset + 8];
@@ -138,7 +161,11 @@ impl TransactionReceipt {
                         }
                         ParamType::Uint(32) => {
                             if offset + 4 > data.len() {
-                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(
+                                    writer,
+                                    "  {}: <invalid - data too short>",
+                                    param.name
+                                );
                                 break;
                             }
                             let bytes = &data[offset..offset + 4];
@@ -148,7 +175,11 @@ impl TransactionReceipt {
                         }
                         ParamType::Bool => {
                             if offset + 1 > data.len() {
-                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(
+                                    writer,
+                                    "  {}: <invalid - data too short>",
+                                    param.name
+                                );
                                 break;
                             }
                             let b = data[offset];
@@ -157,13 +188,21 @@ impl TransactionReceipt {
                         }
                         ParamType::Bytes => {
                             if offset + 1 > data.len() {
-                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(
+                                    writer,
+                                    "  {}: <invalid - data too short>",
+                                    param.name
+                                );
                                 break;
                             }
                             let len = data[offset] as usize;
                             offset += 1;
                             if offset + len > data.len() {
-                                let _ = writeln!(writer, "  {}: <invalid - data too short>", param.name);
+                                let _ = writeln!(
+                                    writer,
+                                    "  {}: <invalid - data too short>",
+                                    param.name
+                                );
                                 break;
                             }
                             let bytes = &data[offset..offset + len];

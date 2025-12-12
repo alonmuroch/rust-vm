@@ -1,6 +1,6 @@
-use vm::host_interface::HostInterface;
-use types::address::Address;
 use crate::avm::AVM;
+use types::address::Address;
+use vm::host_interface::HostInterface;
 
 // HostShim is a lightweight adapter that allows a VM to call back into the AVM.
 // It implements the HostInterface trait and holds a raw pointer to the AVM.
@@ -43,7 +43,11 @@ impl<'a> HostInterface for HostShim {
         unsafe {
             // SAFETY: self.avm_ptr must point to a valid AVM that has access to the callee's memory
             let avm = &mut *self.avm_ptr;
-            avm.context_stack.current_mut().expect("must have current context").events.push(event.clone());
+            avm.context_stack
+                .current_mut()
+                .expect("must have current context")
+                .events
+                .push(event.clone());
 
             let hex_string: String = event
                 .iter()
@@ -55,14 +59,22 @@ impl<'a> HostInterface for HostShim {
         }
     }
 
-    fn read_memory_page(&mut self, page_index: usize, guest_ptr: u32, len: usize) -> Option<Vec<u8>> {
+    fn read_memory_page(
+        &mut self,
+        page_index: usize,
+        guest_ptr: u32,
+        len: usize,
+    ) -> Option<Vec<u8>> {
         unsafe {
             // SAFETY: self.avm_ptr must point to a valid AVM that has access to the callee's memory
             let avm = &*self.avm_ptr;
 
-            let ee = avm.context_stack.get(page_index).expect("missing execution context");
+            let ee = avm
+                .context_stack
+                .get(page_index)
+                .expect("missing execution context");
             let vm = ee.vm.borrow();
-            let page_ref = vm.memory.borrow();
+            let page_ref = vm.memory.as_ref();
 
             // Assume the callee's memory manager is accessible here
             let mem = page_ref.mem();

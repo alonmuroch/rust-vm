@@ -1,14 +1,14 @@
-use crate::decoder::{decode_full, decode_compressed};
-use crate::instruction::Instruction;
-use crate::memory_page::MemoryPage;
-use storage::Storage;
-use std::rc::Rc;
-use core::cell::RefCell;
+use crate::decoder::{decode_compressed, decode_full};
 use crate::host_interface::HostInterface;
+use crate::instruction::Instruction;
+use crate::memory::SharedMemory;
+use crate::metering::{MemoryAccessKind, MeterResult, Metering, NoopMeter};
 use crate::sys_call::SyscallHandler;
+use core::cell::RefCell;
 use core::fmt::Write;
 use std::collections::HashMap;
-use crate::metering::{Metering, MeterResult, NoopMeter, MemoryAccessKind};
+use std::rc::Rc;
+use storage::Storage;
 #[path = "exe.rs"]
 mod exec;
 
@@ -37,11 +37,11 @@ mod exec;
 /// This allows us to run programs written for one architecture (RISC-V) on
 /// different hardware (like x86 or ARM). The VM provides an abstraction layer
 /// that makes the underlying hardware details transparent to the running program.
-/// 
-/// MEMORY MANAGEMENT: We use Rc<RefCell<>> for shared mutable access to memory
-/// and storage, which allows the CPU to read/write memory while maintaining
-/// Rust's safety guarantees.
-/// 
+///
+/// MEMORY MANAGEMENT: We use Rc-backed trait objects for shared memory and
+/// Rc<RefCell<Storage>> for storage, which allows the CPU to read/write memory
+/// while maintaining Rust's safety guarantees.
+///
 /// PERFORMANCE CONSIDERATIONS: This is an interpretive VM, meaning each
 /// instruction is decoded and executed one at a time. Real CPUs use techniques
 /// like pipelining, out-of-order execution, and just-in-time compilation to
@@ -88,7 +88,10 @@ impl std::fmt::Debug for CPU {
             .field("regs", &self.regs)
             .field("verbose", &self.verbose)
             .field("reservation_addr", &self.reservation_addr)
-            .field("verbose_writer", &self.verbose_writer.as_ref().map(|_| "Some(<writer>)"))
+            .field(
+                "verbose_writer",
+                &self.verbose_writer.as_ref().map(|_| "Some(<writer>)"),
+            )
             .field("metering", &"<dyn Metering>")
             .finish()
     }
@@ -210,7 +213,7 @@ impl CPU {
     /// redirects the flow (like a branch or jump instruction).
     pub fn step(
         &mut self,
-        memory: Rc<RefCell<MemoryPage>>,
+        memory: SharedMemory,
         storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
     ) -> bool {
@@ -245,19 +248,35 @@ impl CPU {
     /// - memory: Shared reference to memory for load/store operations
     /// - storage: Shared reference to persistent storage
     fn run_instruction(
-        &mut self, 
-        instr: Instruction, 
-        size: u8, 
-        memory: Rc<RefCell<MemoryPage>>, 
+        &mut self,
+        instr: Instruction,
+        size: u8,
+        memory: SharedMemory,
         storage: Rc<RefCell<Storage>>,
-        host: &mut Box<dyn HostInterface>) -> bool {
+        host: &mut Box<dyn HostInterface>,
+    ) -> bool {
         // EDUCATIONAL: Debug output to help understand what's happening
         // Get the actual instruction bytes for debugging
-        if let Some(bytes) = memory.borrow().mem_slice(self.pc as usize, self.pc as usize + size as usize) {
-            let hex_bytes = bytes.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(" ");
-            self.log(&format!("PC = 0x{:08x}, Bytes = [{}], Instr = {}", self.pc, hex_bytes, instr.pretty_print()), true);
+        if let Some(bytes) = memory.mem_slice(self.pc as usize, self.pc as usize + size as usize) {
+            let hex_bytes = bytes
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(" ");
+            self.log(
+                &format!(
+                    "PC = 0x{:08x}, Bytes = [{}], Instr = {}",
+                    self.pc,
+                    hex_bytes,
+                    instr.pretty_print()
+                ),
+                true,
+            );
         } else {
-            self.log(&format!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print()), true);
+            self.log(
+                &format!("PC = 0x{:08x}, Instr = {}", self.pc, instr.pretty_print()),
+                true,
+            );
         }
 
         if !Self::can_continue(self.metering.on_instruction(self.pc, &instr, size)) {
@@ -266,9 +285,9 @@ impl CPU {
 
         // EDUCATIONAL: Remember the old PC to detect if the instruction changed it
         let old_pc = self.pc;
-        
+
         // EDUCATIONAL: Execute the instruction
-        let result = self.execute(instr, memory, storage, host);      
+        let result = self.execute(instr, memory, storage, host);
 
         // EDUCATIONAL: Only increment PC if the instruction didn't change it
         // This handles branches, jumps, and calls correctly
@@ -281,28 +300,32 @@ impl CPU {
     }
 
     /// Handles unknown or invalid instructions.
-    /// 
+    ///
     /// EDUCATIONAL PURPOSE: This demonstrates error handling in CPU design.
     /// When a CPU encounters an invalid instruction, it needs to handle it
     /// gracefully rather than crashing.
-    /// 
+    ///
     /// DEBUGGING: This function provides detailed information about what
     /// went wrong, including the hex dump of the invalid bytes.
-    /// 
+    ///
     /// RETURN VALUE: Returns false to halt execution on invalid instructions
-    fn unknown_instruction(&mut self, memory: Rc<RefCell<MemoryPage>>, _storage: Rc<RefCell<Storage>>) -> bool {
+    fn unknown_instruction(
+        &mut self,
+        memory: SharedMemory,
+        _storage: Rc<RefCell<Storage>>,
+    ) -> bool {
         // EDUCATIONAL: Try to read the invalid instruction bytes for debugging
-        if let Some(slice_ref) = memory.borrow().mem_slice(self.pc as usize, self.pc as usize + 4) {
+        if let Some(slice_ref) = memory.mem_slice(self.pc as usize, self.pc as usize + 4) {
             // EDUCATIONAL: Convert bytes to hex for human-readable debugging
-            let hex_dump = slice_ref.iter()
+            let hex_dump = slice_ref
+                .iter()
                 .map(|b| format!("{:02x}", b)) // still needs deref
                 .collect::<Vec<_>>()
                 .join(" ");
 
             panic!(
                 "🚨 Unknown or invalid instruction at PC = 0x{:08x} (bytes: [{}])",
-                self.pc,
-                hex_dump
+                self.pc, hex_dump
             );
         } else {
             panic!(
@@ -314,22 +337,21 @@ impl CPU {
     }
 
     /// Fetches and decodes the next instruction from memory.
-    /// 
+    ///
     /// EDUCATIONAL PURPOSE: This demonstrates the fetch and decode phases
     /// of the instruction cycle. It handles both regular (32-bit) and
     /// compressed (16-bit) RISC-V instructions.
-    /// 
+    ///
     /// RISC-V COMPRESSED INSTRUCTIONS: RISC-V supports 16-bit compressed
     /// instructions to reduce code size. The bottom 2 bits determine if
     /// an instruction is compressed (not 0b11) or regular (0b11).
-    /// 
+    ///
     /// RETURN VALUE: Returns Some((instruction, size)) if successful, None if invalid
-    pub fn next_instruction(&mut self, memory: Rc<RefCell<MemoryPage>>) -> Option<(Instruction, u8)> {
+    pub fn next_instruction(&mut self, memory: SharedMemory) -> Option<(Instruction, u8)> {
         let pc = self.pc as usize;
-        let mem_ref = memory.borrow();
-        
+
         // EDUCATIONAL: Read 4 bytes from memory (enough for any instruction)
-        let bytes = mem_ref.mem_slice(pc, pc + 4)?;
+        let bytes = memory.mem_slice(pc, pc + 4)?;
 
         // EDUCATIONAL: Need at least 2 bytes for any instruction
         if bytes.len() < 2 {
@@ -386,7 +408,10 @@ impl CPU {
 
     /// Add to the stack pointer (x2) with metering.
     fn sp_add(&mut self, delta: u32) -> bool {
-        let sp = match self.read_reg(2) { Some(v) => v, None => return false };
+        let sp = match self.read_reg(2) {
+            Some(v) => v,
+            None => return false,
+        };
         self.write_reg(2, sp.wrapping_add(delta))
     }
 

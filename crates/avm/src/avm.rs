@@ -1,20 +1,23 @@
-use crate::memory_page_manager::MemoryPageManager;
-use crate::receipt::TransactionReceipt;
-use crate::metering::{GasMeter, SharedGasMeter};
-use storage::Storage;
-use vm::vm::VM;
-use vm::registers::Register;
-use state::{State, Account};
-use crate::transaction::{TransactionType, Transaction};
+use crate::execution_context::{ContextStack, ExecutionContext};
 use crate::global::Config;
-use crate::execution_context::{ExecutionContext, ContextStack};
 use crate::host_interface::HostShim;
-use types::address::Address;
-use types::result::Result;
-use std::{panic::{catch_unwind, AssertUnwindSafe}, usize};
-use std::rc::Rc;
+use crate::memory::MemoryPageManager;
+use crate::metering::{GasMeter, SharedGasMeter};
+use crate::receipt::TransactionReceipt;
+use crate::transaction::{Transaction, TransactionType};
 use core::cell::RefCell;
 use core::fmt::Write;
+use state::{Account, State};
+use std::rc::Rc;
+use std::{
+    panic::{AssertUnwindSafe, catch_unwind},
+    usize,
+};
+use storage::Storage;
+use types::address::Address;
+use types::result::Result;
+use vm::registers::Register;
+use vm::vm::VM;
 
 /// Application Virtual Machine (AVM) - the main orchestrator for smart contract execution.
 /// 
@@ -211,10 +214,14 @@ impl AVM {
             TransactionType::ProgramCall => {
                 // EDUCATIONAL: Execute an existing smart contract
                 // First verify the destination is actually a contract
-                assert!(self.state.is_contract(tx.to), "destination address is not a contract");
+                assert!(
+                    self.state.is_contract(tx.to),
+                    "destination address is not a contract"
+                );
 
                 // EDUCATIONAL: Call the contract and extract the result
-                let (result_ptr, context_index) = self.call_contract(tx.from, tx.to, tx.data.clone());
+                let (result_ptr, context_index) =
+                    self.call_contract(tx.from, tx.to, tx.data.clone());
 
                 // verify context stack is empty
                 if !self.context_stack.is_empty() {
@@ -262,9 +269,12 @@ impl AVM {
     /// to prevent reading invalid memory.
     fn extract_result(&self, _result_ptr: u32, context_index: usize) -> Result {
         // EDUCATIONAL: Get the memory page where the result was stored
-        let ee = self.context_stack.get(context_index).expect("missing execution context");
+        let ee = self
+            .context_stack
+            .get(context_index)
+            .expect("missing execution context");
         let vm = ee.vm.borrow();
-        let page = vm.memory.borrow();
+        let page = vm.memory.as_ref();
 
         // EDUCATIONAL: Use the memory page's offset calculation to get the correct memory location
         let start = page.offset(Config::RESULT_ADDR as usize); // Use memory page offset
@@ -424,12 +434,21 @@ impl AVM {
 
         // add new context execution
         let context_index = self.context_stack.push(from, to, input_data, vm);
-        let context = self.context_stack.current_mut().expect("missing execution context");
+        let context = self
+            .context_stack
+            .current_mut()
+            .expect("missing execution context");
 
         // EDUCATIONAL: Set up function parameters in registers
         // This follows the RISC-V calling convention
-        let _address_ptr = context.vm.borrow_mut().set_reg_to_data(Register::A0, to.0.as_ref());      // Contract address
-        let _pubkey_ptr = context.vm.borrow_mut().set_reg_to_data(Register::A1, from.0.as_ref());     // Caller address
+        let _address_ptr = context
+            .vm
+            .borrow_mut()
+            .set_reg_to_data(Register::A0, to.0.as_ref()); // Contract address
+        let _pubkey_ptr = context
+            .vm
+            .borrow_mut()
+            .set_reg_to_data(Register::A1, from.0.as_ref()); // Caller address
 
         // EDUCATIONAL: Validate input size to prevent resource exhaustion
         let input_len = context.input_data.len();
@@ -442,8 +461,14 @@ impl AVM {
         }
 
         // EDUCATIONAL: Set up input data (no result pointer needed)
-        let _input_ptr = context.vm.borrow_mut().set_reg_to_data(Register::A2, &context.input_data);          // Input data
-        context.vm.borrow_mut().set_reg_u32(Register::A3, input_len as u32);                          // Input length
+        let _input_ptr = context
+            .vm
+            .borrow_mut()
+            .set_reg_to_data(Register::A2, &context.input_data); // Input data
+        context
+            .vm
+            .borrow_mut()
+            .set_reg_u32(Register::A3, input_len as u32); // Input length
 
         // EDUCATIONAL: Run the VM safely with panic handling
         let result = catch_unwind(AssertUnwindSafe(|| {
@@ -463,9 +488,12 @@ impl AVM {
 
         // EDUCATIONAL: set context execution done
         context.exe_done = true;
-        
+
         // Log execution termination for binary comparison tracking (after all borrows are done)
-        self.log(&format!("Execution terminated for address {}", to_addr_str), false);
+        self.log(
+            &format!("Execution terminated for address {}", to_addr_str),
+            false,
+        );
 
         (Config::RESULT_ADDR, context_index) // Fixed result address
     }

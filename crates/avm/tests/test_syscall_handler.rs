@@ -1,12 +1,12 @@
+use std::any::Any;
+use std::cell::RefCell;
 use std::rc::Rc;
-use core::cell::RefCell;
-use vm::memory_page::MemoryPage;
 use storage::Storage;
 use vm::host_interface::HostInterface;
-use vm::sys_call::SyscallHandler;
-use vm::registers::Register;
-use std::any::Any;
 use vm::metering::Metering;
+use vm::memory::SharedMemory;
+use vm::registers::Register;
+use vm::sys_call::SyscallHandler;
 
 /// Map RISC-V test exit codes to test case numbers
 /// Formula: exit_code = (TESTNUM << 1) | 1
@@ -24,12 +24,15 @@ fn exit_code_to_test_num(exit_code: u32) -> Option<u32> {
 #[derive(Debug)]
 pub struct TestSyscallHandler {
     tohost_addr: u64,
-    memory: Option<Rc<RefCell<MemoryPage>>>,
+    memory: Option<SharedMemory>,
 }
 
 impl TestSyscallHandler {
     pub fn new() -> Self {
-        Self { tohost_addr: 0, memory: None }
+        Self {
+            tohost_addr: 0,
+            memory: None,
+        }
     }
 
     /// Set the address of the .tohost section
@@ -38,7 +41,7 @@ impl TestSyscallHandler {
     }
 
     /// Set the memory reference (needed to read .tohost)
-    pub fn set_memory(&mut self, memory: Rc<RefCell<MemoryPage>>) {
+    pub fn set_memory(&mut self, memory: SharedMemory) {
         self.memory = Some(memory);
     }
 }
@@ -51,7 +54,7 @@ impl SyscallHandler for TestSyscallHandler {
         &mut self,
         call_id: u32,
         _args: [u32; 6],
-        memory: Rc<RefCell<MemoryPage>>,
+        memory: SharedMemory,
         _storage: Rc<RefCell<Storage>>,
         _host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
@@ -62,11 +65,11 @@ impl SyscallHandler for TestSyscallHandler {
             SYSCALL_TEST_DONE => {
                 // Read .tohost value
                 let mem_ref = self.memory.as_ref().unwrap_or(&memory);
-                let offset = mem_ref.borrow().offset(self.tohost_addr as usize);
-                let mem_guard = mem_ref.borrow();
-                let mem = mem_guard.mem();
+                let offset = mem_ref.offset(self.tohost_addr as usize);
+                let mem = mem_ref.mem();
                 if offset + 8 <= mem.len() {
-                    let tohost_val = u64::from_le_bytes(mem[offset..offset+8].try_into().unwrap());
+                    let tohost_val =
+                        u64::from_le_bytes(mem[offset..offset + 8].try_into().unwrap());
                     // Use .tohost value as the test result
                     result = tohost_val as u32;
                 } else {
@@ -74,21 +77,24 @@ impl SyscallHandler for TestSyscallHandler {
                 }
                 if result == 0 {
                     return (result, true);
-                } 
+                }
                 panic!("[spec-test] FAIL: .tohost value = 0x{:x}", result);
-            },
+            }
             SYSCALL_TERMINATE => {
                 let exit_code = regs[Register::A0 as usize];
                 if exit_code != 0 {
                     // Try to map exit code to test case number
                     if let Some(test_num) = exit_code_to_test_num(exit_code) {
-                        panic!("[spec-test] FAIL: Test case {} failed (exit code {})", test_num, exit_code);
+                        panic!(
+                            "[spec-test] FAIL: Test case {} failed (exit code {})",
+                            test_num, exit_code
+                        );
                     } else {
                         panic!("[spec-test] FAIL: Test failed with exit code {}", exit_code);
                     }
                 }
                 return (exit_code, false); // halt VM
-            },
+            }
             _ => {
                 panic!("Unknown syscall ID: {}", call_id);
             }
@@ -97,4 +103,4 @@ impl SyscallHandler for TestSyscallHandler {
     fn as_any(&self) -> &dyn Any {
         self
     }
-} 
+}
