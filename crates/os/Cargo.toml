@@ -1,0 +1,12 @@
+[package]
+name = "os"
+version = "0.1.0"
+edition = "2024"
+readme = "README.md"
+
+[dependencies]
+avm = { path = "../avm" }
+vm = { path = "../vm" }
+storage = { path = "../storage" }
+types = { path = "../types" }
+goblin = "0.10"

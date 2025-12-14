@@ -1,6 +1,6 @@
-# aOS (Alon's OS)
+# OS (Alon's OS)
 
-Alon's OS (aOS) is a minimal operating system purpose-built for deterministic, blockchain-style program execution. It replaces the current `avm` crate with a layered OS: a bootloader for trust establishment, a kernel that orchestrates stateful execution, and `liba`, the standard library that application programs link against.
+Alon's OS (OS) is a minimal operating system purpose-built for deterministic, blockchain-style program execution. It replaces the current `avm` crate with a layered OS: a bootloader for trust establishment, a kernel that orchestrates stateful execution, and `liba`, the standard library that application programs link against.
 
 ## Goals
 - Deterministic, replayable execution for consensus environments
@@ -46,7 +46,7 @@ Alon's OS (aOS) is a minimal operating system purpose-built for deterministic, b
 5. State and receipts are persisted; the resulting state root/receipts are exposed to consensus.
 
 ## Relationship to Existing Workspace
-- `aos` replaces the `avm` crate as the orchestrator/runtime.
+- `os` replaces the `avm` crate as the orchestrator/runtime.
 - `program` is internalized as `liba` inside this crate (module structure will mirror the current APIs).
 - `vm`, `state`, `storage`, `types`, and `compiler` remain the core building blocks for CPU execution, state transitions, persistence, shared types, and toolchain support.
 
