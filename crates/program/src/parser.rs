@@ -1,5 +1,4 @@
 //! Simple parser for reading typed values from a byte slice.
-use core::convert::TryInto;
 use types::address::Address;
 use crate::vm_panic;
 

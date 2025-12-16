@@ -1,3 +1,4 @@
+#![cfg_attr(target_arch = "riscv32", no_std)]
 //! Deterministic OS scaffold for blockchain-style execution.
 //!
 //! This crate provides a bootloader skeleton that:
@@ -8,7 +9,11 @@
 //! Memory utilities are local copies of the VM page primitives to keep the OS
 //! independent from the execution engine.
 
+#[cfg(target_arch = "riscv32")]
+pub mod allocator;
+#[cfg(not(target_arch = "riscv32"))]
 pub mod bootloader;
-pub mod kernel;
+#[cfg(not(target_arch = "riscv32"))]
 pub mod memory;
+#[cfg(not(target_arch = "riscv32"))]
 pub mod traps;

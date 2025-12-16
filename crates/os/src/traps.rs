@@ -48,9 +48,11 @@ impl fmt::Debug for TrapTable {
 
 impl TrapTable {
     pub fn new() -> Self {
-        Self {
+        let mut table = Self {
             handlers: HashMap::new(),
-        }
+        };
+        table.register_logging_stubs();
+        table
     }
 
     pub fn register(&mut self, syscall_id: u32, handler: TrapHandler) {
@@ -64,4 +66,28 @@ impl TrapTable {
             TrapAction::KillKernel
         }
     }
+
+    /// Install a default stub for every VM syscall that just logs the call.
+    pub fn register_logging_stubs(&mut self) {
+        self.register(syscall::STORAGE_GET, log_stub("STORAGE_GET"));
+        self.register(syscall::STORAGE_SET, log_stub("STORAGE_SET"));
+        self.register(syscall::PANIC, log_stub("PANIC"));
+        self.register(syscall::LOG, log_stub("LOG"));
+        self.register(syscall::CALL_PROGRAM, log_stub("CALL_PROGRAM"));
+        self.register(syscall::FIRE_EVENT, log_stub("FIRE_EVENT"));
+        self.register(syscall::ALLOC, log_stub("ALLOC"));
+        self.register(syscall::DEALLOC, log_stub("DEALLOC"));
+        self.register(syscall::TRANSFER, log_stub("TRANSFER"));
+        self.register(syscall::BALANCE, log_stub("BALANCE"));
+    }
+}
+
+fn log_stub(name: &'static str) -> TrapHandler {
+    Box::new(move |frame: &mut TrapFrame| {
+        println!(
+            "trap {} called (id={}, pc=0x{:08x}, args={:?})",
+            name, frame.syscall_id, frame.pc, frame.args
+        );
+        TrapAction::Continue
+    })
 }

@@ -4,9 +4,22 @@ version = "0.1.0"
 edition = "2024"
 readme = "README.md"
 
+[features]
+guest_kernel = []
+
 [dependencies]
-avm = { path = "../avm" }
+types = { path = "../types" }
+
+[target.'cfg(not(target_arch = "riscv32"))'.dependencies]
 vm = { path = "../vm" }
 storage = { path = "../storage" }
-types = { path = "../types" }
 goblin = "0.10"
+compiler = { path = "../compiler" }
+
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+program = { path = "../program", default-features = false }
+
+[[bin]]
+name = "kernel"
+path = "src/kernel.rs"
+required-features = ["guest_kernel"]

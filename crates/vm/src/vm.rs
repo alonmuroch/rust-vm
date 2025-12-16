@@ -151,7 +151,6 @@ impl VM {
             addr,
             data.len()
         );
-        println!("📦 data written to 0x{:08x}: {:02x?}", addr, data);
 
         addr
     }

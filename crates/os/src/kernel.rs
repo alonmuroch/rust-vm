@@ -1,78 +1,88 @@
-use core::slice;
-use std::convert::TryInto;
+#![no_std]
+#![no_main]
 
-use avm::transaction::{Transaction, TransactionBundle, TransactionType};
-use types::address::Address;
+extern crate alloc;
+
+#[cfg(target_arch = "riscv32")]
+mod allocator;
+use program::log;
+use program::logf;
+
+use core::slice;
+use core::mem::forget;
+use types::transaction::{Transaction, TransactionBundle};
+
+#[cfg(target_arch = "riscv32")]
+#[global_allocator]
+static ALLOC: allocator::VmAllocator = allocator::VmAllocator;
 
 /// Kernel entrypoint. Receives a pointer/length pair to an encoded `TransactionBundle`
 /// (produced by the bootloader) and walks each transaction.
 #[unsafe(no_mangle)]
-pub extern "C" fn _start(bundle_ptr: *const u8, bundle_len: usize) -> ! {
-    let encoded = unsafe { slice::from_raw_parts(bundle_ptr, bundle_len) };
+pub extern "C" fn _start(bundle_ptr: *const u8, bundle_len: usize) {
+    // Copy args to locals before any syscalls (ecall clobbers a0).
+    let ptr = bundle_ptr;
+    let len = bundle_len;
 
-    if let Some(bundle) = decode_bundle(encoded) {
-        for tx in &bundle.transactions {
-            execute_transaction(tx);
+    log!("kernel boot");
+    logf!("bundle_len=%d", len as u32);
+
+    let encoded = unsafe { slice::from_raw_parts(ptr, len) };
+
+    if let Some(bundle) = TransactionBundle::decode(encoded) {
+        let count = bundle.transactions.len();
+        logf!("decoded tx count=%d", count as u32);
+        for i in 0..count {
+            logf!("processing tx %d/%d", (i + 1) as u32, count as u32);
+            if let Some(tx) = bundle.transactions.get(i) {
+                execute_transaction(tx);
+            } else {
+                logf!("missing tx at index %d", i as u32);
+            }
         }
+        // Avoid drop-time teardown that can allocate/deallocate; we halt immediately.
+        forget(bundle);
+    } else {
+        log!("bundle decode failed");
     }
-
-    // In a real kernel this would never return; loop forever for now.
-    loop {}
+    log!("finished bundle execution");
+    halt();
 }
 
 fn execute_transaction(_tx: &Transaction) {
-    // TODO: dispatch to programs; for now this is a stub.
+    log!("executing transaction");
 }
 
-fn decode_bundle(encoded: &[u8]) -> Option<TransactionBundle> {
-    let mut cursor = 0usize;
+#[inline(never)]
+fn halt() -> ! {
+    // Signal completion to the host by triggering a trap and stop execution.
+    unsafe { core::arch::asm!("ebreak") };
+    loop {}
+}
 
-    let mut read = |len: usize| -> Option<&[u8]> {
-        if cursor + len > encoded.len() {
-            return None;
-        }
-        let slice = &encoded[cursor..cursor + len];
-        cursor += len;
-        Some(slice)
-    };
-
-    let tx_count_bytes = read(4)?;
-    let tx_count = u32::from_le_bytes(tx_count_bytes.try_into().ok()?) as usize;
-    let mut transactions = Vec::with_capacity(tx_count);
-
-    for _ in 0..tx_count {
-        let tx_type_byte = *read(1)?.first()?;
-        let tx_type = match tx_type_byte {
-            0 => TransactionType::Transfer,
-            1 => TransactionType::CreateAccount,
-            2 => TransactionType::ProgramCall,
-            _ => return None,
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    #[cfg(target_arch = "riscv32")]
+    {
+        let msg_bytes = if let Some(s) = info.message().as_str() {
+            s.as_bytes()
+        } else {
+            b"kernel panic (non-str message)"
         };
-
-        let mut to = [0u8; 20];
-        to.copy_from_slice(read(20)?);
-        let mut from = [0u8; 20];
-        from.copy_from_slice(read(20)?);
-
-        let data_len_bytes = read(4)?;
-        let data_len = u32::from_le_bytes(data_len_bytes.try_into().ok()?) as usize;
-        let data = read(data_len)?.to_vec();
-
-        let value_bytes = read(8)?;
-        let value = u64::from_le_bytes(value_bytes.try_into().ok()?);
-
-        let nonce_bytes = read(8)?;
-        let nonce = u64::from_le_bytes(nonce_bytes.try_into().ok()?);
-
-        transactions.push(Transaction {
-            tx_type,
-            to: Address(to),
-            from: Address(from),
-            data,
-            value,
-            nonce,
-        });
+        unsafe {
+            core::arch::asm!(
+                "li a7, 3", // SYSCALL_PANIC
+                "ecall",
+                in("a0") msg_bytes.as_ptr(),
+                in("a1") msg_bytes.len(),
+            );
+            core::arch::asm!("ebreak", options(nomem, nostack));
+        }
+        loop {}
     }
 
-    Some(TransactionBundle { transactions })
+    #[cfg(not(target_arch = "riscv32"))]
+    {
+        panic!("kernel panic: {:?}", info);
+    }
 }

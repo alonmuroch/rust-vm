@@ -1,8 +1,8 @@
 use std::env;
 use std::fs;
 
-use avm::transaction::{Transaction, TransactionBundle, TransactionType};
 use os::bootloader::Bootloader;
+use types::transaction::{Transaction, TransactionBundle, TransactionType};
 use types::address::Address;
 
 fn main() {

@@ -1,5 +1,7 @@
 #![no_std]  
 
+extern crate alloc;
+
 pub mod address;
 pub use address::Address;
 
@@ -12,6 +14,9 @@ pub use o::*; // Allow `$crate::O` in macros
 
 pub mod primitives;
 pub use primitives::*; 
+
+pub mod transaction;
+pub use transaction::*;
 
 // used for serialization
 pub trait SerializeField {

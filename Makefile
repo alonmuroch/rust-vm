@@ -1,5 +1,9 @@
 .PHONY: all
 
+# Nightly cargo for avm32 builds (used for kernel ELF and examples).
+CARGO_NIGHTLY ?= cargo +nightly-aarch64-apple-darwin
+AVM32 := $(CARGO_NIGHTLY) run -p compiler --bin avm32 --
+
 all: clean program examples test utils summary
 
 .PHONY: run_examples
@@ -7,8 +11,11 @@ all: clean program examples test utils summary
 run_examples:
 	@echo "=== Building example programs ==="
 	RUSTFLAGS="-Awarnings" $(MAKE) -C crates/examples
+	@echo "=== Building kernel ELF ==="
+	@mkdir -p crates/os/bin
+	@$(AVM32) all --bin kernel --manifest-path crates/os/Cargo.toml --features guest_kernel --out-dir crates/os/bin
 	@echo "=== Running example crate tests ==="
-	cd crates/examples && RUSTFLAGS="-Awarnings" cargo test -- --nocapture
+	cd crates/examples && RUSTFLAGS="-Awarnings" KERNEL_ELF="../os/bin/kernel.elf" cargo test test_examples -- --nocapture
 	@echo "=== Example programs build and tests complete ==="
 
 clean:
