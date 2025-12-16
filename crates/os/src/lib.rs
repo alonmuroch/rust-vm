@@ -3,7 +3,6 @@
 //!
 //! This crate provides a bootloader skeleton that:
 //! - loads a kernel program into fresh pages,
-//! - wires a simple syscall trap table, and
 //! - hands the loaded image off to a future kernel runtime.
 //!
 //! Memory utilities are local copies of the VM page primitives to keep the OS
@@ -16,4 +15,8 @@ pub mod bootloader;
 #[cfg(not(target_arch = "riscv32"))]
 pub mod memory;
 #[cfg(not(target_arch = "riscv32"))]
-pub mod traps;
+pub use vm::sys_call;
+#[cfg(not(target_arch = "riscv32"))]
+pub mod syscalls;
+#[cfg(not(target_arch = "riscv32"))]
+pub use syscalls::DefaultSyscallHandler;

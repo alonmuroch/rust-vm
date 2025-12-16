@@ -41,6 +41,7 @@ test: generate_abis
 	cargo test -p types -p storage -p state -- --nocapture
 	cargo test -p program -- --nocapture
 	cargo test -p vm -- --nocapture
+	cargo test -p os -- --nocapture
 	cargo test -p compiler -- --nocapture
 	cd crates/examples && cargo test -- --nocapture
 	@echo "=== Tests complete ==="

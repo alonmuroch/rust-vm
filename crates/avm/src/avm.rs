@@ -18,6 +18,7 @@ use types::address::Address;
 use types::result::Result;
 use vm::registers::Register;
 use vm::vm::VM;
+use os::DefaultSyscallHandler;
 
 /// Application Virtual Machine (AVM) - the main orchestrator for smart contract execution.
 /// 
@@ -421,7 +422,12 @@ impl AVM {
         // - Removes the need for lifetimes like &'a mut dyn HostInterface
         // - Enables recursive call_contract logic, since the Box owns the host and doesn't borrow `self`
         // Without Box, we would need to track lifetimes manually and would hit borrow checker issues.
-        let mut vm: VM = VM::new_with_writer(memory_page, storage.clone(), Box::new(shim), self.verbose_writer.clone());
+        let mut vm: VM = VM::new(
+            memory_page,
+            storage.clone(),
+            Box::new(shim),
+            Box::new(DefaultSyscallHandler::with_writer(self.verbose_writer.clone())),
+        );
         let shared_meter = SharedGasMeter::new(Rc::clone(&self.gas_meter));
         vm.set_metering(Box::new(shared_meter));
         vm.set_code(0, Config::PROGRAM_START_ADDR, &account.code);

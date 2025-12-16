@@ -7,7 +7,7 @@ use compiler::elf::parse_elf_from_bytes;
 use goblin::elf::Elf;
 
 use crate::memory::StackedMemory;
-use crate::traps::{TrapAction, TrapFrame, TrapHandler, TrapTable};
+use crate::DefaultSyscallHandler;
 use storage::Storage;
 use vm::host_interface::NoopHost;
 use vm::memory::{Memory, HEAP_PTR_OFFSET};
@@ -27,12 +27,11 @@ impl Default for BootConfig {
 }
 
 /// Bootloader skeleton that loads a kernel image into fresh memory and
-/// mediates syscall traps until the kernel installs its own handlers.
+/// hands control to the kernel.
 #[derive(Debug)]
 pub struct Bootloader {
     pub config: BootConfig,
     memory: StackedMemory,
-    traps: TrapTable,
 }
 
 impl Bootloader {
@@ -40,13 +39,7 @@ impl Bootloader {
         Self {
             config: BootConfig::default(),
             memory: StackedMemory::new(max_pages, page_size),
-            traps: TrapTable::new(),
         }
-    }
-
-    /// Register a syscall trap handler that will run before transferring control to the kernel.
-    pub fn register_syscall_trap(&mut self, syscall_id: u32, handler: TrapHandler) {
-        self.traps.register(syscall_id, handler);
     }
 
     /// Load an ELF kernel image into a fresh page and return its entry point + backing memory.
@@ -90,11 +83,6 @@ impl Bootloader {
         (entry_point, page)
     }
 
-    /// Dispatch a syscall trap using the boot-time trap table.
-    pub fn handle_trap(&self, frame: &mut TrapFrame) -> TrapAction {
-        self.traps.dispatch(frame)
-    }
-
     /// Execute a transaction bundle by delegating to the kernel. This mirrors the
     /// AVM entry point where the kernel is responsible for invoking programs.
     pub fn execute_bundle(&mut self, kernel_elf: &[u8], bundle: &TransactionBundle) {
@@ -102,12 +90,16 @@ impl Bootloader {
         let storage = Rc::new(RefCell::new(Storage::new()));
         let host: Box<dyn vm::host_interface::HostInterface> = Box::new(NoopHost);
 
-        let mut vm = VM::new(memory.clone(), storage, host);
+        let mut vm = VM::new(
+            memory.clone(),
+            storage,
+            host,
+            Box::new(DefaultSyscallHandler::new()),
+        );
         self.place_bundle(&mut vm, bundle);
         vm.cpu.pc = entry_point;
 
-        // TODO: write the bundle into memory for the kernel to consume, and
-        // extend VM host to forward syscalls into the trap table.
+        // TODO: write the bundle into memory for the kernel to consume.
         vm.raw_run();
     }
 

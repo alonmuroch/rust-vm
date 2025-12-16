@@ -1,11 +1,11 @@
-use avm::memory::MemoryPage;
+use os::memory::MemoryPage;
+use os::DefaultSyscallHandler;
 use std::cell::RefCell;
 use std::rc::Rc;
 use storage::Storage;
 use vm::host_interface;
-use vm::metering::NoopMeter;
 use vm::memory::Memory;
-use os::DefaultSyscallHandler;
+use vm::metering::NoopMeter;
 use vm::sys_call::{SyscallHandler, SYSCALL_ALLOC, SYSCALL_DEALLOC};
 
 #[test]

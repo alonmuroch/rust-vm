@@ -3,7 +3,7 @@ use crate::host_interface::HostInterface;
 use crate::memory::Memory;
 use crate::metering::Metering;
 use crate::registers::Register;
-use crate::sys_call::{DefaultSyscallHandler, SyscallHandler};
+use crate::sys_call::SyscallHandler;
 use core::cell::RefCell;
 use std::rc::Rc;
 use storage::Storage;
@@ -38,33 +38,14 @@ pub struct VM {
 }
 
 impl VM {
-    /// Creates a new virtual machine with the specified memory, storage, and host, using the default syscall handler.
+    /// Creates a new virtual machine with the specified memory, storage, host, and syscall handler.
     pub fn new(
         memory: Memory,
         storage: Rc<RefCell<Storage>>,
         host: Box<dyn HostInterface>,
+        syscall_handler: Box<dyn SyscallHandler>,
     ) -> Self {
-        Self::new_with_syscall_handler(
-            memory,
-            storage,
-            host,
-            Box::new(DefaultSyscallHandler::new()),
-        )
-    }
-
-    /// Creates a new virtual machine with a writer for logging output.
-    pub fn new_with_writer(
-        memory: Memory,
-        storage: Rc<RefCell<Storage>>,
-        host: Box<dyn HostInterface>,
-        writer: Option<Rc<RefCell<dyn core::fmt::Write>>>,
-    ) -> Self {
-        Self::new_with_syscall_handler(
-            memory,
-            storage,
-            host,
-            Box::new(DefaultSyscallHandler::with_writer(writer)),
-        )
+        Self::new_with_syscall_handler(memory, storage, host, syscall_handler)
     }
 
     /// Creates a new virtual machine with a custom syscall handler.
