@@ -4,7 +4,7 @@ use crate::SerializeField;
 
 pub const ADDRESS_LEN: usize = 20;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(C)]
 pub struct Address(pub [u8; 20]);
 

@@ -9,6 +9,7 @@ use std::rc::Rc;
 use core::cell::RefCell;
 use core::fmt::Write;
 use bootloader::bootloader::Bootloader;
+use state::State;
 
 // File writer for logging to disk
 struct FileWriter {
@@ -126,6 +127,7 @@ impl TestRunner {
     /// Run a single test case
     fn run_test_case(&self, case: &super::TestCase) -> Result<(), String> {
         let mut bootloader = Bootloader::new(self.max_memory_pages, self.vm_memory_size);
+        let state = Rc::new(RefCell::new(State::new()));
 
         // Write test case header
         writeln!(
@@ -154,31 +156,13 @@ impl TestRunner {
         }
         writeln!(self.writer.borrow_mut()).unwrap();
 
-        // Load kernel via bootloader before executing transactions with the AVM path.
-        if let Some(kernel) = &self.kernel_bytes {
-            writeln!(
-                self.writer.borrow_mut(),
-                "🚀 Booting kernel ELF {} via bootloader...",
-                self.kernel_path
-                    .as_deref()
-                    .unwrap_or("<inline kernel bytes>")
-            )
-            .unwrap();
-            bootloader.execute_bundle(kernel, &case.bundle);
-        } else {
-            writeln!(
-                self.writer.borrow_mut(),
-                "⚠️  KERNEL_ELF not set or unreadable; skipping bootloader run."
-            )
-            .unwrap();
-        }
-
         // Execute the whole bundle via the bootloader/kernel path.
         bootloader.execute_bundle(
             self.kernel_bytes.as_ref().ok_or_else(|| {
                 "KERNEL_ELF not set or unreadable; bootloader path required".to_string()
             })?,
             &case.bundle,
+            state,
         );
 
         // For now we treat successful bootloader execution as a passed test.

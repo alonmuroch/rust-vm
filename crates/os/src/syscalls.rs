@@ -12,7 +12,7 @@ use vm::registers::Register;
 use vm::sys_call::{
     SYSCALL_ALLOC, SYSCALL_BALANCE, SYSCALL_CALL_PROGRAM, SYSCALL_DEALLOC, SYSCALL_FIRE_EVENT,
     SYSCALL_LOG, SYSCALL_PANIC, SYSCALL_STORAGE_GET, SYSCALL_STORAGE_SET, SYSCALL_TRANSFER,
-    SyscallHandler,
+    SYSCALL_COMMIT_STATE, SyscallHandler,
 };
 
 /// Represents different types of arguments that can be passed to system calls.
@@ -89,6 +89,7 @@ impl SyscallHandler for DefaultSyscallHandler {
             SYSCALL_DEALLOC => self.sys_dealloc(args, memory, metering),
             SYSCALL_TRANSFER => self.sys_transfer(args, memory, host, metering),
             SYSCALL_BALANCE => self.sys_balance(args, memory, host, metering),
+            SYSCALL_COMMIT_STATE => self.sys_commit_state(args, memory, metering),
             _ => {
                 panic!("Unknown syscall: {}", call_id);
             }
@@ -787,5 +788,25 @@ impl DefaultSyscallHandler {
 
         let bal = host.balance(addr);
         memory.alloc_on_heap(&bal.to_le_bytes())
+    }
+
+    fn sys_commit_state(
+        &mut self,
+        args: [u32; 6],
+        memory: Memory,
+        metering: &mut dyn Metering,
+    ) -> u32 {
+        let ptr = args[0] as usize;
+        let len = args[1] as usize;
+
+        if matches!(
+            metering.on_syscall_data(SYSCALL_COMMIT_STATE, len),
+            MeterResult::Halt
+        ) {
+            panic!("Metering halted SYSCALL_COMMIT_STATE");
+        }
+
+        println!("commit state called (ptr=0x{:08x}, len={})", ptr, len);
+        0
     }
 }

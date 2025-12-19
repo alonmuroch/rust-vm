@@ -4,9 +4,6 @@ mod utils;
 #[path = "common/test_runner.rs"]
 mod test_runner;
 
-#[path = "common/config.rs"]
-mod config;
-
 #[path = "common/state.rs"]
 mod state_helper;
 

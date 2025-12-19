@@ -16,6 +16,9 @@ pub extern crate types;
 pub mod integers;
 pub use integers::*;
 
+pub mod config;
+pub use config::Config;
+
 pub mod transfer;
 pub use transfer::transfer;
 pub use transfer::balance;

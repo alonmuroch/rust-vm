@@ -83,15 +83,21 @@ impl Bootloader {
 
     /// Execute a transaction bundle by delegating to the kernel. This mirrors the
     /// AVM entry point where the kernel is responsible for invoking programs.
-    pub fn execute_bundle(&mut self, kernel_elf: &[u8], bundle: &TransactionBundle) {
+    pub fn execute_bundle(
+        &mut self,
+        kernel_elf: &[u8],
+        bundle: &TransactionBundle,
+        state: Rc<RefCell<State>>,
+    ) {
         let (entry_point, memory) = self.load_kernel(kernel_elf);
-        let state = Rc::new(RefCell::new(State::new()));
         let host: Box<dyn vm::host_interface::HostInterface> = Box::new(NoopHost);
 
-        let mut vm = VM::new(memory.clone(), host, Box::new(DefaultSyscallHandler::new(state)));
+        let mut vm = VM::new(memory.clone(), host, Box::new(DefaultSyscallHandler::new(state.clone())));
         vm.cpu.pc = entry_point;
 
         self.place_bundle(&mut vm, bundle);
+        let encoded_state = state.borrow().encode();
+        self.place_state(&mut vm, &encoded_state);
         vm.raw_run();
     }
 
@@ -103,5 +109,12 @@ impl Bootloader {
         // Keep heap aligned after our write.
         vm.memory
             .set_next_heap((addr as usize + encoded.len() + HEAP_PTR_OFFSET as usize) as u32);
+    }
+
+    fn place_state(&mut self, vm: &mut VM, state: &[u8]) {
+        let addr = vm.set_reg_to_data(Register::A2, state);
+        vm.set_reg_u32(Register::A3, state.len() as u32);
+        vm.memory
+            .set_next_heap((addr as usize + state.len() + HEAP_PTR_OFFSET as usize) as u32);
     }
 }

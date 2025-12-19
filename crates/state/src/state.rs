@@ -1,10 +1,15 @@
-use std::rc::Rc;
-use std::collections::HashMap;
-use storage::Storage;
-use crate::{Account};
-use types::address::Address;
-use hex::encode as hex_encode;
 use alloc::collections::BTreeMap;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+#[cfg(feature = "std")]
+use std::rc::Rc;
+#[cfg(feature = "std")]
+use storage::Storage;
+use crate::Account;
+use types::address::Address;
+#[cfg(feature = "std")]
+use hex::encode as hex_encode;
 
 /// Represents the global state of the blockchain virtual machine.
 /// 
@@ -47,7 +52,7 @@ pub struct State {
     /// EDUCATIONAL: This is the core data structure that represents the
     /// entire blockchain state. Each entry contains an account with its
     /// balance, code, storage, and other metadata.
-    pub accounts: HashMap<Address, Account>,
+    pub accounts: BTreeMap<Address, Account>,
 }
 
 impl State {
@@ -60,7 +65,7 @@ impl State {
     /// USAGE: Typically called when starting a new blockchain or when
     /// resetting the state for testing purposes.
     pub fn new() -> Self {
-        Self { accounts: HashMap::new() }
+        Self { accounts: BTreeMap::new() }
     }
 
     /// Constructs a State from an existing Storage instance.
@@ -72,8 +77,9 @@ impl State {
     /// NOTE: This is currently a placeholder implementation that always
     /// returns an empty state. In a real system, this would deserialize
     /// the state from the provided storage.
+    #[cfg(feature = "std")]
     pub fn new_from_storage(_storage: Rc<Storage>) -> Self {
-        Self { accounts: HashMap::new() }
+        Self { accounts: BTreeMap::new() }
     }
 
     /// Retrieves an account by address (immutable reference).
@@ -154,6 +160,118 @@ impl State {
         return true;
     }   
 
+    /// Encode state into a byte buffer for guest consumption.
+    pub fn encode(&self) -> alloc::vec::Vec<u8> {
+        let mut out = alloc::vec::Vec::new();
+        out.extend_from_slice(&(self.accounts.len() as u32).to_le_bytes());
+
+        for (addr, acc) in &self.accounts {
+            out.extend_from_slice(&addr.0);
+            out.extend_from_slice(&acc.balance.to_le_bytes());
+            out.extend_from_slice(&acc.nonce.to_le_bytes());
+            out.push(acc.is_contract as u8);
+            out.extend_from_slice(&(acc.code.len() as u32).to_le_bytes());
+            out.extend_from_slice(&acc.code);
+
+            out.extend_from_slice(&(acc.storage.len() as u32).to_le_bytes());
+            for (k, v) in &acc.storage {
+                out.extend_from_slice(&(k.len() as u32).to_le_bytes());
+                out.extend_from_slice(k.as_bytes());
+                out.extend_from_slice(&(v.len() as u32).to_le_bytes());
+                out.extend_from_slice(v);
+            }
+        }
+
+        out
+    }
+
+    /// Decode state produced by `encode`.
+    pub fn decode(bytes: &[u8]) -> Option<Self> {
+        let mut cursor = 0usize;
+        let mut read = |len: usize| -> Option<&[u8]> {
+            if cursor + len > bytes.len() {
+                return None;
+            }
+            let slice = &bytes[cursor..cursor + len];
+            cursor += len;
+            Some(slice)
+        };
+
+        let count = {
+            let raw = read(4)?;
+            let mut buf = [0u8; 4];
+            buf.copy_from_slice(raw);
+            u32::from_le_bytes(buf) as usize
+        };
+
+        let mut accounts = BTreeMap::new();
+        for _ in 0..count {
+            let mut addr = [0u8; 20];
+            addr.copy_from_slice(read(20)?);
+
+            let balance = {
+                let mut buf = [0u8; 16];
+                buf.copy_from_slice(read(16)?);
+                u128::from_le_bytes(buf)
+            };
+
+            let nonce = {
+                let mut buf = [0u8; 8];
+                buf.copy_from_slice(read(8)?);
+                u64::from_le_bytes(buf)
+            };
+
+            let is_contract = read(1)?.first().copied()? != 0;
+
+            let code_len = {
+                let mut buf = [0u8; 4];
+                buf.copy_from_slice(read(4)?);
+                u32::from_le_bytes(buf) as usize
+            };
+            let code = read(code_len)?.to_vec();
+
+            let storage_len = {
+                let mut buf = [0u8; 4];
+                buf.copy_from_slice(read(4)?);
+                u32::from_le_bytes(buf) as usize
+            };
+            let mut storage = BTreeMap::new();
+            for _ in 0..storage_len {
+                let key_len = {
+                    let mut buf = [0u8; 4];
+                    buf.copy_from_slice(read(4)?);
+                    u32::from_le_bytes(buf) as usize
+                };
+                let key = {
+                    let raw = read(key_len)?;
+                    core::str::from_utf8(raw).ok()?.to_string()
+                };
+
+                let val_len = {
+                    let mut buf = [0u8; 4];
+                    buf.copy_from_slice(read(4)?);
+                    u32::from_le_bytes(buf) as usize
+                };
+                let val = read(val_len)?.to_vec();
+
+                storage.insert(key, val);
+            }
+
+            accounts.insert(
+                Address(addr),
+                Account {
+                    nonce,
+                    balance,
+                    code,
+                    is_contract,
+                    storage,
+                },
+            );
+        }
+
+        Some(Self { accounts })
+    }
+
     /// Deploys a contract to a specific address.
     /// 
     /// EDUCATIONAL PURPOSE: This demonstrates smart contract deployment.
@@ -201,6 +319,7 @@ impl State {
     /// - Storage contents
     /// 
     /// USAGE: Useful for debugging, testing, and educational demonstrations.
+    #[cfg(feature = "std")]
     pub fn pretty_print(&self) {
         println!("--- State Dump ---");
         for (addr, acc) in &self.accounts {
@@ -246,6 +365,7 @@ impl State {
     /// 
     /// Storage keys are formatted as: "domain:key"
     /// where domain is like "P" or "Balances" and key is hex-encoded
+    #[cfg(feature = "std")]
     fn parse_domain_key(key: &str) -> Option<(String, String)> {
         // Find the first colon to separate domain and key
         if let Some(colon_pos) = key.find(':') {

@@ -8,9 +8,6 @@ use std::rc::Rc;
 #[path = "examples_test.rs"]
 mod examples_test;
 
-#[path = "common/config.rs"]
-mod config;
-
 #[path = "common/utils.rs"]
 mod utils;
 

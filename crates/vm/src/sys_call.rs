@@ -14,6 +14,7 @@ pub const SYSCALL_ALLOC: u32 = 7;
 pub const SYSCALL_DEALLOC: u32 = 8;
 pub const SYSCALL_TRANSFER: u32 = 9;
 pub const SYSCALL_BALANCE: u32 = 10;
+pub const SYSCALL_COMMIT_STATE: u32 = 11;
 
 /// Trait implemented by syscall handlers consumed by the VM.
 pub trait SyscallHandler: std::fmt::Debug {
