@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use core::cell::RefCell;
 use core::fmt::Write;
-use os::bootloader::Bootloader;
+use bootloader::bootloader::Bootloader;
 
 // File writer for logging to disk
 struct FileWriter {

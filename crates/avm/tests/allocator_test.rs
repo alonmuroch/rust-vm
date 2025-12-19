@@ -5,7 +5,7 @@ use storage::Storage;
 use vm::host_interface;
 use vm::metering::NoopMeter;
 use vm::memory::Memory;
-use os::DefaultSyscallHandler;
+use bootloader::DefaultSyscallHandler;
 use vm::sys_call::{SyscallHandler, SYSCALL_ALLOC, SYSCALL_DEALLOC};
 
 #[test]

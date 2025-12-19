@@ -18,7 +18,7 @@ use types::address::Address;
 use types::result::Result;
 use vm::registers::Register;
 use vm::vm::VM;
-use os::DefaultSyscallHandler;
+use bootloader::DefaultSyscallHandler;
 
 /// Application Virtual Machine (AVM) - the main orchestrator for smart contract execution.
 /// 

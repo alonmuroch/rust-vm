@@ -1,4 +1,4 @@
-use os::memory::MemoryPage;
+use bootloader::memory::MemoryPage;
 use vm::metering::{MemoryAccessKind, NoopMeter};
 
 #[test]

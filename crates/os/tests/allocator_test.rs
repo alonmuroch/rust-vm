@@ -1,5 +1,5 @@
-use os::memory::MemoryPage;
-use os::DefaultSyscallHandler;
+use bootloader::memory::MemoryPage;
+use bootloader::DefaultSyscallHandler;
 use state::State;
 use std::cell::RefCell;
 use std::rc::Rc;

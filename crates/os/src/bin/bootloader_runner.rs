@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-use os::bootloader::Bootloader;
+use bootloader::bootloader::Bootloader;
 use types::address::Address;
 use types::transaction::{Transaction, TransactionBundle, TransactionType};
 
