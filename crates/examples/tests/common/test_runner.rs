@@ -25,7 +25,9 @@ impl FileWriter {
 
 impl Write for FileWriter {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.file.write_all(s.as_bytes()).map_err(|_| core::fmt::Error)?;
+        self.file
+            .write_all(s.as_bytes())
+            .map_err(|_| core::fmt::Error)?;
         self.file.flush().map_err(|_| core::fmt::Error)?;
         Ok(())
     }
@@ -86,8 +88,8 @@ impl TestRunner {
         TestRunner {
             writer,
             verbose: false,
-            vm_memory_size: 512 * 1024,  // larger default to accommodate bigger binaries without RVC
-            max_memory_pages: 128,       // allow more pages for larger programs
+            vm_memory_size: 512 * 1024, // larger default to accommodate bigger binaries without RVC
+            max_memory_pages: 128,      // allow more pages for larger programs
             kernel_bytes: Self::load_kernel_from_env(),
             kernel_path: env::var("KERNEL_ELF").ok(),
         }
@@ -98,7 +100,12 @@ impl TestRunner {
         use super::TEST_CASES;
 
         writeln!(self.writer.borrow_mut(), "=== Starting Test Run ===").unwrap();
-        writeln!(self.writer.borrow_mut(), "Verbose logging: {}", if self.verbose { "enabled" } else { "disabled" }).unwrap();
+        writeln!(
+            self.writer.borrow_mut(),
+            "Verbose logging: {}",
+            if self.verbose { "enabled" } else { "disabled" }
+        )
+        .unwrap();
 
         for case in TEST_CASES.iter() {
             self.run_test_case(case)?;
@@ -106,7 +113,12 @@ impl TestRunner {
 
         // Write test summary
         writeln!(self.writer.borrow_mut(), "\n=== Test Run Complete ===").unwrap();
-        writeln!(self.writer.borrow_mut(), "Total test cases: {}", TEST_CASES.len()).unwrap();
+        writeln!(
+            self.writer.borrow_mut(),
+            "Total test cases: {}",
+            TEST_CASES.len()
+        )
+        .unwrap();
 
         Ok(())
     }
@@ -116,9 +128,22 @@ impl TestRunner {
         let mut bootloader = Bootloader::new(self.max_memory_pages, self.vm_memory_size);
 
         // Write test case header
-        writeln!(self.writer.borrow_mut(), "\n############################################").unwrap();
-        writeln!(self.writer.borrow_mut(), "#### Running test case: {} ####", case.name).unwrap();
-        writeln!(self.writer.borrow_mut(), "############################################").unwrap();
+        writeln!(
+            self.writer.borrow_mut(),
+            "\n############################################"
+        )
+        .unwrap();
+        writeln!(
+            self.writer.borrow_mut(),
+            "#### Running test case: {} ####",
+            case.name
+        )
+        .unwrap();
+        writeln!(
+            self.writer.borrow_mut(),
+            "############################################"
+        )
+        .unwrap();
 
         // Print address to binary mappings
         if !case.address_mappings.is_empty() {
@@ -169,8 +194,8 @@ impl Default for TestRunner {
 
 impl TestRunner {
     fn load_kernel_from_env() -> Option<Vec<u8>> {
-        let path = env::var("KERNEL_ELF")
-            .unwrap_or_else(|_| "crates/os/bin/kernel.elf".to_string());
+        let path =
+            env::var("KERNEL_ELF").unwrap_or_else(|_| "crates/os/bin/kernel.elf".to_string());
         fs::read(&path).ok()
     }
 }

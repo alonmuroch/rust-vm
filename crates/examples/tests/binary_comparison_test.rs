@@ -1,19 +1,22 @@
+use core::cell::RefCell;
+use core::fmt::Write;
 use std::fs;
 use std::path::Path;
 use std::rc::Rc;
-use core::cell::RefCell;
-use core::fmt::Write;
 
 // Import the test runner and related modules
 #[path = "examples_test.rs"]
 mod examples_test;
 
+#[path = "common/config.rs"]
+mod config;
+
 #[path = "common/utils.rs"]
 mod utils;
 
 use examples_test::TestRunner;
-use k256::ecdsa::{signature::hazmat::PrehashVerifier, VerifyingKey, Signature};
 use examples_test::build_ecdsa_payload;
+use k256::ecdsa::{Signature, VerifyingKey, signature::hazmat::PrehashVerifier};
 
 #[test]
 fn test_vm_binary_comparison() -> Result<(), String> {
@@ -21,11 +24,14 @@ fn test_vm_binary_comparison() -> Result<(), String> {
 
     // Step 1: Create TestRunner with file output
     let vm_log_path = "/tmp/vm_binary_comparison.log";
-    println!("Step 1: Running TestRunner with file output to: {}", vm_log_path);
+    println!(
+        "Step 1: Running TestRunner with file output to: {}",
+        vm_log_path
+    );
 
     // Create a file writer for the TestRunner
-    let file = fs::File::create(vm_log_path)
-        .map_err(|e| format!("Failed to create log file: {}", e))?;
+    let file =
+        fs::File::create(vm_log_path).map_err(|e| format!("Failed to create log file: {}", e))?;
 
     // Create a Write adapter for the file
     struct FileWriter(fs::File);
@@ -33,7 +39,9 @@ fn test_vm_binary_comparison() -> Result<(), String> {
     impl Write for FileWriter {
         fn write_str(&mut self, s: &str) -> core::fmt::Result {
             use std::io::Write;
-            self.0.write_all(s.as_bytes()).map_err(|_| core::fmt::Error)?;
+            self.0
+                .write_all(s.as_bytes())
+                .map_err(|_| core::fmt::Error)?;
             self.0.flush().map_err(|_| core::fmt::Error)?;
             Ok(())
         }
@@ -43,9 +51,9 @@ fn test_vm_binary_comparison() -> Result<(), String> {
 
     // Create TestRunner with file output and verbose mode for instruction tracing
     let runner = TestRunner::with_writer(writer)
-                   .with_verbose(true)  // Enable verbose mode for PC traces
-                   .with_memory_size(512 * 1024)  // Larger memory for crypto-heavy binaries
-                   .with_max_pages(128);
+        .with_verbose(true) // Enable verbose mode for PC traces
+        .with_memory_size(512 * 1024) // Larger memory for crypto-heavy binaries
+        .with_max_pages(128);
 
     // Run all test cases
     runner.execute()?;
@@ -60,16 +68,22 @@ fn test_vm_binary_comparison() -> Result<(), String> {
     println!("Step 2: VM log file created, size: {} bytes", log_size);
 
     // Step 3: Parse the log to extract test cases and instructions
-    let log_content = fs::read_to_string(vm_log_path)
-        .map_err(|e| format!("Failed to read log file: {}", e))?;
+    let log_content =
+        fs::read_to_string(vm_log_path).map_err(|e| format!("Failed to read log file: {}", e))?;
 
     let test_cases = extract_test_cases(&log_content);
-    println!("\nStep 3: Extracted {} test cases from log", test_cases.len());
+    println!(
+        "\nStep 3: Extracted {} test cases from log",
+        test_cases.len()
+    );
 
     // Step 4: Check for corresponding ELF binaries
     let binaries_dir = Path::new("../../target/avm32/release");
 
-    println!("\nStep 4: Checking for ELF binaries in: {}", binaries_dir.display());
+    println!(
+        "\nStep 4: Checking for ELF binaries in: {}",
+        binaries_dir.display()
+    );
 
     let mut comparison_results = Vec::new();
 
@@ -123,7 +137,10 @@ fn test_vm_binary_comparison() -> Result<(), String> {
     for result in &comparison_results {
         println!("\n📊 {} ({})", result.test_name, result.binary_name);
         println!("   VM Instructions: {}", result.vm_instructions);
-        println!("   ELF Found: {}", if result.elf_found { "Yes" } else { "No" });
+        println!(
+            "   ELF Found: {}",
+            if result.elf_found { "Yes" } else { "No" }
+        );
 
         if result.elf_found {
             println!("   Match: {:.1}%", result.match_percentage);
@@ -162,8 +179,13 @@ fn test_vm_binary_comparison() -> Result<(), String> {
     }
 
     if binaries_found == 0 {
-        println!("⚠️  Warning: No ELF binaries found for any of the {} test cases", total_test_cases);
-        println!("   To build binaries, run: cargo build -p examples --release --target crates/compiler/targets/avm32.json --features binaries");
+        println!(
+            "⚠️  Warning: No ELF binaries found for any of the {} test cases",
+            total_test_cases
+        );
+        println!(
+            "   To build binaries, run: cargo build -p examples --release --target crates/compiler/targets/avm32.json --features binaries"
+        );
         println!("   Skipping binary comparison validation.");
         println!("\n✅ Test completed (skipped binary validation)");
         cleanup();
@@ -178,7 +200,10 @@ fn test_vm_binary_comparison() -> Result<(), String> {
         ));
     }
 
-    println!("🎉 All {} found binaries matched 100% with VM execution!", binaries_found);
+    println!(
+        "🎉 All {} found binaries matched 100% with VM execution!",
+        binaries_found
+    );
     println!("\n✅ Binary comparison test completed successfully!");
 
     cleanup();
@@ -292,7 +317,11 @@ fn parse_instruction_line(line: &str) -> Option<Instruction> {
     let instr_part = line.split("Instr = ").nth(1)?;
     let mnemonic = instr_part.to_string();
 
-    Some(Instruction { pc, bytes, mnemonic })
+    Some(Instruction {
+        pc,
+        bytes,
+        mnemonic,
+    })
 }
 
 fn calculate_match_percentage(instructions: &[Instruction]) -> f64 {

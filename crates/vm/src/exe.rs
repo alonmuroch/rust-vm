@@ -1,11 +1,7 @@
-use core::cell::RefCell;
-use std::rc::Rc;
-
 use super::{Instruction, MemoryAccessKind, Memory, CPU};
 use crate::host_interface::HostInterface;
 use crate::instruction::CsrOp;
 use crate::registers::Register;
-use storage::Storage;
 
 impl CPU {
     /// Executes a decoded instruction.
@@ -31,7 +27,6 @@ impl CPU {
         &mut self,
         instr: Instruction,
         memory: Memory,
-        storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
     ) -> bool {
         match instr {
@@ -800,7 +795,6 @@ impl CPU {
                     call_id,
                     args,
                     memory,
-                    storage,
                     host,
                     &mut self.regs,
                     self.metering.as_mut(),

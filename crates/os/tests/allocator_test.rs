@@ -1,8 +1,8 @@
 use os::memory::MemoryPage;
 use os::DefaultSyscallHandler;
+use state::State;
 use std::cell::RefCell;
 use std::rc::Rc;
-use storage::Storage;
 use vm::host_interface;
 use vm::memory::Memory;
 use vm::metering::NoopMeter;
@@ -11,9 +11,9 @@ use vm::sys_call::{SyscallHandler, SYSCALL_ALLOC, SYSCALL_DEALLOC};
 #[test]
 fn test_allocator_syscalls() {
     let memory: Memory = Rc::new(MemoryPage::new(8192));
-    let storage = Rc::new(RefCell::new(Storage::new()));
+    let state = Rc::new(RefCell::new(State::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
-    let mut syscall_handler = DefaultSyscallHandler::new();
+    let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
     let mut meter = NoopMeter::default();
 
     // Test SYSCALL_ALLOC
@@ -23,7 +23,6 @@ fn test_allocator_syscalls() {
         SYSCALL_ALLOC,
         args,
         memory.clone(),
-        storage.clone(),
         &mut host,
         &mut regs,
         &mut meter,
@@ -37,7 +36,6 @@ fn test_allocator_syscalls() {
         SYSCALL_DEALLOC,
         dealloc_args,
         memory.clone(),
-        storage.clone(),
         &mut host,
         &mut regs,
         &mut meter,
@@ -49,9 +47,9 @@ fn test_allocator_syscalls() {
 #[test]
 fn test_multiple_allocations() {
     let memory: Memory = Rc::new(MemoryPage::new(8192));
-    let storage = Rc::new(RefCell::new(Storage::new()));
+    let state = Rc::new(RefCell::new(State::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
-    let mut syscall_handler = DefaultSyscallHandler::new();
+    let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
     let mut regs = [0u32; 32];
     let mut meter = NoopMeter::default();
 
@@ -66,7 +64,6 @@ fn test_multiple_allocations() {
             SYSCALL_ALLOC,
             args,
             memory.clone(),
-            storage.clone(),
             &mut host,
             &mut regs,
             &mut meter,
@@ -92,9 +89,9 @@ fn test_multiple_allocations() {
 #[test]
 fn test_alignment_requirements() {
     let memory: Memory = Rc::new(MemoryPage::new(8192));
-    let storage = Rc::new(RefCell::new(Storage::new()));
+    let state = Rc::new(RefCell::new(State::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
-    let mut syscall_handler = DefaultSyscallHandler::new();
+    let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
     let mut regs = [0u32; 32];
     let mut meter = NoopMeter::default();
 
@@ -107,7 +104,6 @@ fn test_alignment_requirements() {
             SYSCALL_ALLOC,
             args,
             memory.clone(),
-            storage.clone(),
             &mut host,
             &mut regs,
             &mut meter,
@@ -121,9 +117,9 @@ fn test_alignment_requirements() {
 #[test]
 fn test_invalid_alignment() {
     let memory: Memory = Rc::new(MemoryPage::new(8192));
-    let storage = Rc::new(RefCell::new(Storage::new()));
+    let state = Rc::new(RefCell::new(State::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
-    let mut syscall_handler = DefaultSyscallHandler::new();
+    let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
     let mut regs = [0u32; 32];
     let mut meter = NoopMeter::default();
 
@@ -136,7 +132,6 @@ fn test_invalid_alignment() {
             SYSCALL_ALLOC,
             args,
             memory.clone(),
-            storage.clone(),
             &mut host,
             &mut regs,
             &mut meter,

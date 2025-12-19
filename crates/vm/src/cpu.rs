@@ -8,7 +8,6 @@ use core::cell::RefCell;
 use core::fmt::Write;
 use std::collections::HashMap;
 use std::rc::Rc;
-use storage::Storage;
 #[path = "exe.rs"]
 mod exec;
 
@@ -38,9 +37,8 @@ mod exec;
 /// different hardware (like x86 or ARM). The VM provides an abstraction layer
 /// that makes the underlying hardware details transparent to the running program.
 ///
-/// MEMORY MANAGEMENT: We use Rc-backed trait objects for shared memory and
-/// Rc<RefCell<Storage>> for storage, which allows the CPU to read/write memory
-/// while maintaining Rust's safety guarantees.
+/// MEMORY MANAGEMENT: We use Rc-backed trait objects for shared memory, which
+/// allows the CPU to read/write memory while maintaining Rust's safety guarantees.
 ///
 /// PERFORMANCE CONSIDERATIONS: This is an interpretive VM, meaning each
 /// instruction is decoded and executed one at a time. Real CPUs use techniques
@@ -204,19 +202,14 @@ impl CPU {
     /// 
     /// RETURN VALUE: Returns true if execution should continue, false to halt
     /// 
-    /// MEMORY ACCESS: Uses shared references to memory and storage to allow
+    /// MEMORY ACCESS: Uses shared references to memory to allow
     /// the CPU to read/write while maintaining Rust's safety guarantees.
     /// 
     /// REAL-WORLD ANALOGY: This is like a factory assembly line where each
     /// worker (instruction) performs a specific task. The conveyor belt (PC)
     /// moves to the next task automatically, unless a task specifically
     /// redirects the flow (like a branch or jump instruction).
-    pub fn step(
-        &mut self,
-        memory: Memory,
-        storage: Rc<RefCell<Storage>>,
-        host: &mut Box<dyn HostInterface>,
-    ) -> bool {
+    pub fn step(&mut self, memory: Memory, host: &mut Box<dyn HostInterface>) -> bool {
         // EDUCATIONAL: Step 1 - Fetch and decode the next instruction
         let instr = self.next_instruction(Rc::clone(&memory));
         
@@ -224,11 +217,11 @@ impl CPU {
         match instr {
             Some((instr, size)) => {
                 // Valid instruction found - execute it
-                self.run_instruction(instr, size, Rc::clone(&memory), storage, host)
+                self.run_instruction(instr, size, Rc::clone(&memory), host)
             }
             None => {
                 // No valid instruction found - handle the error
-                self.unknown_instruction(Rc::clone(&memory), storage)
+                self.unknown_instruction(Rc::clone(&memory))
             }
         }
     }
@@ -246,13 +239,11 @@ impl CPU {
     /// - instr: The decoded instruction to execute
     /// - size: Size of the instruction in bytes (2 for compressed, 4 for full)
     /// - memory: Shared reference to memory for load/store operations
-    /// - storage: Shared reference to persistent storage
     fn run_instruction(
         &mut self,
         instr: Instruction,
         size: u8,
         memory: Memory,
-        storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
     ) -> bool {
         // EDUCATIONAL: Debug output to help understand what's happening
@@ -287,7 +278,7 @@ impl CPU {
         let old_pc = self.pc;
 
         // EDUCATIONAL: Execute the instruction
-        let result = self.execute(instr, memory, storage, host);
+        let result = self.execute(instr, memory, host);
 
         // EDUCATIONAL: Only increment PC if the instruction didn't change it
         // This handles branches, jumps, and calls correctly
@@ -309,11 +300,7 @@ impl CPU {
     /// went wrong, including the hex dump of the invalid bytes.
     ///
     /// RETURN VALUE: Returns false to halt execution on invalid instructions
-    fn unknown_instruction(
-        &mut self,
-        memory: Memory,
-        _storage: Rc<RefCell<Storage>>,
-    ) -> bool {
+    fn unknown_instruction(&mut self, memory: Memory) -> bool {
         // EDUCATIONAL: Try to read the invalid instruction bytes for debugging
         if let Some(slice_ref) = memory.mem_slice(self.pc as usize, self.pc as usize + 4) {
             // EDUCATIONAL: Convert bytes to hex for human-readable debugging

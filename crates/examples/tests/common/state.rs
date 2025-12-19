@@ -1,5 +1,5 @@
-use state::State;
 use super::utils::to_address;
+use state::State;
 
 /// Build a test state with prefunded accounts.
 pub fn test_state() -> State {

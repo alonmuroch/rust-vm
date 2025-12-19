@@ -10,16 +10,11 @@ guest_kernel = []
 [dependencies]
 types = { path = "../types" }
 
-[target.'cfg(not(target_arch = "riscv32"))'.dependencies]
+[target.'cfg(not(target_os = "none"))'.dependencies]
 vm = { path = "../vm" }
-storage = { path = "../storage" }
+state = { path = "../state" }
 goblin = "0.10"
 compiler = { path = "../compiler" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 program = { path = "../program", default-features = false }
-
-[[bin]]
-name = "kernel"
-path = "src/kernel.rs"
-required-features = ["guest_kernel"]

@@ -2,9 +2,6 @@ use crate::host_interface::HostInterface;
 use crate::memory::Memory;
 use crate::metering::Metering;
 use core::any::Any;
-use core::cell::RefCell;
-use std::rc::Rc;
-use storage::Storage;
 
 /// System call IDs for the VM.
 pub const SYSCALL_STORAGE_GET: u32 = 1;
@@ -25,7 +22,6 @@ pub trait SyscallHandler: std::fmt::Debug {
         call_id: u32,
         args: [u32; 6],
         memory: Memory,
-        storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
         metering: &mut dyn Metering,

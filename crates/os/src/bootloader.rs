@@ -2,15 +2,15 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::vec::Vec;
 
-use types::transaction::TransactionBundle;
 use compiler::elf::parse_elf_from_bytes;
 use goblin::elf::Elf;
+use types::transaction::TransactionBundle;
 
-use crate::memory::StackedMemory;
 use crate::DefaultSyscallHandler;
-use storage::Storage;
+use crate::memory::StackedMemory;
+use state::State;
 use vm::host_interface::NoopHost;
-use vm::memory::{Memory, HEAP_PTR_OFFSET};
+use vm::memory::{HEAP_PTR_OFFSET, Memory};
 use vm::registers::Register;
 use vm::vm::VM;
 
@@ -22,7 +22,9 @@ pub struct BootConfig {
 
 impl Default for BootConfig {
     fn default() -> Self {
-        Self { debug_console: true }
+        Self {
+            debug_console: true,
+        }
     }
 }
 
@@ -49,18 +51,14 @@ impl Bootloader {
             .expect("failed to parse entry point")
             .entry as u32;
 
-        let (code, code_base) = elf
-            .get_flat_code()
-            .expect("kernel ELF missing .text");
+        let (code, code_base) = elf.get_flat_code().expect("kernel ELF missing .text");
         let (rodata, ro_base) = elf.get_flat_rodata().unwrap_or((Vec::new(), code_base));
 
         let min_base = core::cmp::min(code_base, ro_base) as usize;
         let code_end = (code_base + code.len() as u64) as usize;
         let ro_end = (ro_base + rodata.len() as u64) as usize;
         let image_end = core::cmp::max(code_end, ro_end);
-        let image_size = image_end
-            .checked_sub(min_base)
-            .expect("invalid image size");
+        let image_size = image_end.checked_sub(min_base).expect("invalid image size");
 
         let page = self.memory.new_page();
         assert!(
@@ -87,15 +85,10 @@ impl Bootloader {
     /// AVM entry point where the kernel is responsible for invoking programs.
     pub fn execute_bundle(&mut self, kernel_elf: &[u8], bundle: &TransactionBundle) {
         let (entry_point, memory) = self.load_kernel(kernel_elf);
-        let storage = Rc::new(RefCell::new(Storage::new()));
+        let state = Rc::new(RefCell::new(State::new()));
         let host: Box<dyn vm::host_interface::HostInterface> = Box::new(NoopHost);
 
-        let mut vm = VM::new(
-            memory.clone(),
-            storage,
-            host,
-            Box::new(DefaultSyscallHandler::new()),
-        );
+        let mut vm = VM::new(memory.clone(), host, Box::new(DefaultSyscallHandler::new(state)));
         self.place_bundle(&mut vm, bundle);
         vm.cpu.pc = entry_point;
 

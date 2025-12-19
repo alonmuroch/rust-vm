@@ -1,6 +1,5 @@
-use core::mem::{size_of, MaybeUninit};
 use crate::{require, types::O, types::address::Address};
-use crate::logf;
+use core::mem::{MaybeUninit, size_of};
 
 /// Trait for types that can be used as storage keys in `StorageMap`.
 pub trait StorageKey {
@@ -15,11 +14,10 @@ impl StorageKey for Address {
     }
 }
 
-
 pub struct StorageMap;
 
 impl StorageMap {
-    pub fn get<V>(domain: &[u8], key: &[u8]) -> O<V>
+    pub fn get<V>(address: &Address, domain: &[u8], key: &[u8]) -> O<V>
     where
         V: Copy + Default,
     {
@@ -31,14 +29,15 @@ impl StorageMap {
 
         #[cfg(target_arch = "riscv32")]
         unsafe {
+            let packed_lens: u32 = ((key.len() as u32) << 16) | (domain.len() as u32);
             let mut value_ptr: u32;
             core::arch::asm!(
                 "li a7, 1", // syscall_storage_read
                 "ecall",
-                in("a1") domain.as_ptr(), // a1 - domain ptr
-                in("a2") domain.len(), // a2 - domain len
+                in("a1") address.as_ref().as_ptr(), // a1 - address ptr
+                in("a2") domain.as_ptr(), // a2 - domain ptr
                 in("a3") full_key.as_ptr(), // a3 - key ptr
-                in("a4") key.len(), // a4 - key len
+                in("a4") packed_lens, // a4 - packed lens (domain | key)
                 out("a0") value_ptr, // a0
             );
 
@@ -63,12 +62,13 @@ impl StorageMap {
 
         #[cfg(not(target_arch = "riscv32"))]
         {
+            let _ = address;
             // For non-RISC-V targets, return None
             O::None
         }
     }
 
-    pub fn set<V>(domain: &[u8], key: &[u8], val: V)
+    pub fn set<V>(address: &Address, domain: &[u8], key: &[u8], val: V)
     where
         V: Copy,
     {
@@ -78,19 +78,19 @@ impl StorageMap {
         let mut full_key = [0u8; 64];
         full_key[..key.len()].copy_from_slice(key);
 
-        let val_bytes = unsafe {
-            core::slice::from_raw_parts((&val as *const V) as *const u8, size_of::<V>())
-        };
-        
+        let val_bytes =
+            unsafe { core::slice::from_raw_parts((&val as *const V) as *const u8, size_of::<V>()) };
+
         #[cfg(target_arch = "riscv32")]
         unsafe {
+            let packed_lens: u32 = ((key.len() as u32) << 16) | (domain.len() as u32);
             core::arch::asm!(
                 "li a7, 2", // syscall_storage_write
                 "ecall",
-                in("a1") domain.as_ptr(), // a1 - domain ptr
-                in("a2") domain.len(), // a2 - domain len
+                in("a1") address.as_ref().as_ptr(), // a1 - address ptr
+                in("a2") domain.as_ptr(), // a2 - domain ptr
                 in("a3") full_key.as_ptr(), // a3 - key ptr
-                in("a4") key.len(), // a4 - key len
+                in("a4") packed_lens, // a4 - packed lens (domain | key)
                 in("a5") val_bytes.as_ptr(), // a5 - value ptr
                 in("a6") val_bytes.len(), // a6 - value len
                 options(readonly, nostack, preserves_flags)
@@ -99,11 +99,11 @@ impl StorageMap {
 
         #[cfg(not(target_arch = "riscv32"))]
         {
+            let _ = address;
             // For non-RISC-V targets, do nothing
         }
     }
 }
-
 
 #[macro_export]
 macro_rules! Map {
@@ -131,30 +131,37 @@ macro_rules! Map {
                 key_len
             }
 
-            pub fn get<K, V>(key: K) -> $crate::types::O<V>
+            pub fn get<K, V>(
+                address: &$crate::types::address::Address,
+                key: K,
+            ) -> $crate::types::O<V>
             where
                 K: $crate::StorageKey,
                 V: Copy + Default,
             {
                 let mut buf = [0u8; Self::MAX_KEY_LEN];
                 let total_len = Self::build_key(key, &mut buf);
-                $crate::StorageMap::get::<V>(Self::DOMAIN_NAME.as_bytes(), &buf[..total_len])
+                $crate::StorageMap::get::<V>(
+                    address,
+                    Self::DOMAIN_NAME.as_bytes(),
+                    &buf[..total_len],
+                )
             }
 
-            pub fn set<K, V>(key: K, val: V)
+            pub fn set<K, V>(address: &$crate::types::address::Address, key: K, val: V)
             where
                 K: $crate::StorageKey,
                 V: Copy,
             {
                 let mut buf = [0u8; Self::MAX_KEY_LEN];
                 let total_len = Self::build_key(key, &mut buf);
-                $crate::StorageMap::set::<V>(Self::DOMAIN_NAME.as_bytes(), &buf[..total_len], val);
+                $crate::StorageMap::set::<V>(
+                    address,
+                    Self::DOMAIN_NAME.as_bytes(),
+                    &buf[..total_len],
+                    val,
+                );
             }
         }
     };
 }
-
-
-
-
-

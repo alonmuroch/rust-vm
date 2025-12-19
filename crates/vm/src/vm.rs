@@ -4,25 +4,22 @@ use crate::memory::Memory;
 use crate::metering::Metering;
 use crate::registers::Register;
 use crate::sys_call::SyscallHandler;
-use core::cell::RefCell;
 use std::rc::Rc;
-use storage::Storage;
 
 /// Represents a complete RISC-V virtual machine.
 ///
 /// EDUCATIONAL PURPOSE: This struct encapsulates all the components needed
-/// to run a virtual machine: CPU, memory, and persistent storage. It provides
+/// to run a virtual machine: CPU and memory. It provides
 /// a high-level interface for VM operations while hiding the complexity of
 /// the underlying components.
 ///
 /// VM ARCHITECTURE OVERVIEW:
 /// - CPU: Executes RISC-V instructions
 /// - Memory: Provides RAM for the running program
-/// - Storage: Persistent storage for data that survives between runs
 ///
-/// MEMORY MANAGEMENT: Uses Rc to share a trait-backed memory implementation
-/// and Rc<RefCell<Storage>> for persistent storage, allowing the VM to manage
-/// resources efficiently while maintaining Rust's safety guarantees.
+/// MEMORY MANAGEMENT: Uses Rc to share a trait-backed memory implementation,
+/// allowing the VM to manage resources efficiently while maintaining Rust's
+/// safety guarantees.
 #[derive(Debug)]
 pub struct VM {
     /// The CPU that executes RISC-V instructions
@@ -31,28 +28,23 @@ pub struct VM {
     /// Shared reference to the VM's memory (RAM)
     pub memory: Memory,
 
-    /// Shared reference to persistent storage
-    pub storage: Rc<RefCell<Storage>>,
-
     pub host: Box<dyn HostInterface>,
 }
 
 impl VM {
-    /// Creates a new virtual machine with the specified memory, storage, host, and syscall handler.
+    /// Creates a new virtual machine with the specified memory, host, and syscall handler.
     pub fn new(
         memory: Memory,
-        storage: Rc<RefCell<Storage>>,
         host: Box<dyn HostInterface>,
         syscall_handler: Box<dyn SyscallHandler>,
     ) -> Self {
-        Self::new_with_syscall_handler(memory, storage, host, syscall_handler)
+        Self::new_with_syscall_handler(memory, host, syscall_handler)
     }
 
     /// Creates a new virtual machine with a custom syscall handler.
     /// This is useful for testing or custom environments.
     pub fn new_with_syscall_handler(
         memory: Memory,
-        storage: Rc<RefCell<Storage>>,
         host: Box<dyn HostInterface>,
         syscall_handler: Box<dyn SyscallHandler>,
     ) -> Self {
@@ -61,7 +53,6 @@ impl VM {
         Self {
             cpu,
             memory,
-            storage,
             host,
         }
     }
@@ -257,10 +248,6 @@ impl VM {
     /// call this after setting up the initial state.
     pub fn raw_run(&mut self) {
         // EDUCATIONAL: Main execution loop - fetch, decode, execute
-        while self.cpu.step(
-            Rc::clone(&self.memory),
-            Rc::clone(&self.storage),
-            &mut self.host,
-        ) {}
+        while self.cpu.step(Rc::clone(&self.memory), &mut self.host) {}
     }
 }

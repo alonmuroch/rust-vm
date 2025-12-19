@@ -4,19 +4,25 @@ mod utils;
 #[path = "common/test_runner.rs"]
 mod test_runner;
 
+#[path = "common/config.rs"]
+mod config;
+
 #[path = "common/state.rs"]
 mod state_helper;
 
 #[path = "common/ecdsa.rs"]
 mod ecdsa;
 
-use avm::transaction::{TransactionType, TransactionBundle, Transaction};
-use avm::router::{encode_router_calls, HostFuncCall};
-use once_cell::sync::Lazy;
+#[path = "common/router.rs"]
+mod router;
+
+use router::{HostFuncCall, encode_router_calls};
+use types::transaction::{Transaction, TransactionBundle, TransactionType};
 use compiler::EventAbi;
-pub use ecdsa::{build_ecdsa_payload, ECDSA_HASH, ECDSA_SK_BYTES};
+pub use ecdsa::{ECDSA_HASH, ECDSA_SK_BYTES, build_ecdsa_payload};
+use once_cell::sync::Lazy;
 pub use test_runner::TestRunner;
-use utils::{to_address, load_abi_from_file, load_abis_from_files, get_program_code};
+use utils::{get_program_code, load_abi_from_file, load_abis_from_files, to_address};
 
 /// Centralized ELF binary paths for testing
 pub struct ElfBinary {
@@ -89,7 +95,6 @@ pub fn get_elf_path(name: &str) -> Option<String> {
     get_elf_by_name(name).map(|elf| format!("crates/examples/{}", elf.path))
 }
 
-
 #[derive(Debug)]
 pub struct TestCase<'a> {
     pub name: &'a str,
@@ -109,11 +114,9 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             expected_error_code: 0,
             expected_data: Some(vec![128, 240, 250, 2]), // Expected data: 50,000,000 in little-endian
             abi: load_abi_from_file("bin/erc20.abi.json"),
-            address_mappings: vec![
-                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1", "erc20"),
-            ],
+            address_mappings: vec![("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1", "erc20")],
             bundle: TransactionBundle::new(vec![
-                 Transaction {
+                Transaction {
                     tx_type: TransactionType::CreateAccount,
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
@@ -125,23 +128,21 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::ProgramCall,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: encode_router_calls(&[
-                        HostFuncCall {
-                            selector: 0x01, // initialize
-                            args: (|| {
-                                // max supply
-                                let max_supply: u32 = 100000000; // 100 million
-                                let mut max_supply_bytes: Vec<u8> = max_supply.to_le_bytes().to_vec();
+                    data: encode_router_calls(&[HostFuncCall {
+                        selector: 0x01, // initialize
+                        args: (|| {
+                            // max supply
+                            let max_supply: u32 = 100000000; // 100 million
+                            let mut max_supply_bytes: Vec<u8> = max_supply.to_le_bytes().to_vec();
 
-                                // decimals
-                                let decimals: u8 = 18;
+                            // decimals
+                            let decimals: u8 = 18;
 
-                                // combine
-                                max_supply_bytes.extend(vec![decimals]);
-                                max_supply_bytes
-                            })(),
-                        }
-                    ]),
+                            // combine
+                            max_supply_bytes.extend(vec![decimals]);
+                            max_supply_bytes
+                        })(),
+                    }]),
                     value: 0,
                     nonce: 0,
                 },
@@ -149,22 +150,20 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::ProgramCall,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: encode_router_calls(&[
-                        HostFuncCall {
-                            selector: 0x02, // transfer
-                            args: (|| {
-                                // to address (20 bytes)
-                                let to_addr = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d2");
-                                let mut args = to_addr.0.to_vec();
+                    data: encode_router_calls(&[HostFuncCall {
+                        selector: 0x02, // transfer
+                        args: (|| {
+                            // to address (20 bytes)
+                            let to_addr = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d2");
+                            let mut args = to_addr.0.to_vec();
 
-                                // amount (4 bytes)
-                                let amount: u32 = 50000000; // 50 million tokens
-                                args.extend(amount.to_le_bytes());
+                            // amount (4 bytes)
+                            let amount: u32 = 50000000; // 50 million tokens
+                            args.extend(amount.to_le_bytes());
 
-                                args
-                            })(),
-                        }
-                    ]),
+                            args
+                        })(),
+                    }]),
                     value: 0,
                     nonce: 0,
                 },
@@ -172,22 +171,19 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::ProgramCall,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: encode_router_calls(&[
-                        HostFuncCall {
-                            selector: 0x05, // balance_of
-                            args: (|| {
-                                // check balance of the original caller (d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0)
-                                let owner_addr = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0");
-                                owner_addr.0.to_vec()
-                            })(),
-                        }
-                    ]),
+                    data: encode_router_calls(&[HostFuncCall {
+                        selector: 0x05, // balance_of
+                        args: (|| {
+                            // check balance of the original caller (d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0)
+                            let owner_addr = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0");
+                            owner_addr.0.to_vec()
+                        })(),
+                    }]),
                     value: 0,
                     nonce: 0,
                 },
             ]),
         },
-
         TestCase {
             name: "call program",
             expected_success: true,
@@ -207,7 +203,7 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     value: 0,
                     nonce: 0,
                 },
-                 Transaction {
+                Transaction {
                     tx_type: TransactionType::CreateAccount,
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
@@ -220,7 +216,9 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     data: (|| {
-                        let mut data = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1").0.to_vec();
+                        let mut data = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1")
+                            .0
+                            .to_vec();
                         data.extend(vec![100, 0, 0, 0, 42, 0, 0, 0]);
                         data
                     })(),
@@ -229,16 +227,13 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 },
             ]),
         },
-
         TestCase {
             name: "account create (storage)",
             expected_success: true,
             expected_error_code: 0,
             expected_data: None,
             abi: None,
-            address_mappings: vec![
-                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "storage"),
-            ],
+            address_mappings: vec![("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "storage")],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -258,16 +253,13 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 },
             ]),
         },
-
         TestCase {
             name: "account create (simple)",
             expected_success: true,
             expected_error_code: 0,
             expected_data: Some(vec![100, 0, 0, 0]), // Expected data: 100 in little-endian
             abi: None,
-            address_mappings: vec![
-                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "simple"),
-            ],
+            address_mappings: vec![("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "simple")],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -282,24 +274,21 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     data: vec![
-                        100, 0, 0, 0,   // first u64 = 100
-                        42, 0, 0, 0,      // second u64 = 42
+                        100, 0, 0, 0, // first u64 = 100
+                        42, 0, 0, 0, // second u64 = 42
                     ],
                     value: 0,
                     nonce: 0,
                 },
             ]),
         },
-
         TestCase {
             name: "multi function (simple)",
             expected_success: true,
             expected_error_code: 0,
             expected_data: Some(vec![100, 0, 0, 0]), // Expected data: 100 in little-endian
             abi: None,
-            address_mappings: vec![
-                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "multi_func"),
-            ],
+            address_mappings: vec![("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "multi_func")],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -313,30 +302,25 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::ProgramCall,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    data: encode_router_calls(&[
-                        HostFuncCall {
-                            selector: 0x01,
-                            args: vec![
-                                100, 0, 0, 0, // first = 100
-                                42, 0, 0, 0,  // second = 42
-                            ],
-                        }
-                    ]),
+                    data: encode_router_calls(&[HostFuncCall {
+                        selector: 0x01,
+                        args: vec![
+                            100, 0, 0, 0, // first = 100
+                            42, 0, 0, 0, // second = 42
+                        ],
+                    }]),
                     value: 0,
                     nonce: 0,
                 },
             ]),
         },
-
         TestCase {
             name: "allocator demo",
             expected_success: true,
             expected_error_code: 0,
-            expected_data: None,//Some(b"VM allocator demo completed successfully!".to_vec()),
+            expected_data: None, //Some(b"VM allocator demo completed successfully!".to_vec()),
             abi: None,
-            address_mappings: vec![
-                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "allocator_demo"),
-            ],
+            address_mappings: vec![("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "allocator_demo")],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -353,19 +337,14 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     // 6 x u32 little-endian:
                     // Vec: 12, 15, 100; Map: 95, 87, 92
                     data: vec![
-                        12, 0, 0, 0,
-                        15, 0, 0, 0,
-                        100, 0, 0, 0,
-                        95, 0, 0, 0,
-                        87, 0, 0, 0,
-                        92, 0, 0, 0,
+                        12, 0, 0, 0, 15, 0, 0, 0, 100, 0, 0, 0, 95, 0, 0, 0, 87, 0, 0, 0, 92, 0, 0,
+                        0,
                     ],
                     value: 0,
                     nonce: 0,
                 },
             ]),
         },
-
         TestCase {
             name: "native transfer",
             expected_success: true,
@@ -373,18 +352,15 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
             expected_data: None,
             abi: None,
             address_mappings: vec![],
-            bundle: TransactionBundle::new(vec![
-                Transaction {
-                    tx_type: TransactionType::Transfer,
-                    to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
-                    from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
-                    data: vec![],
-                    value: 10,
-                    nonce: 0,
-                },
-            ]),
+            bundle: TransactionBundle::new(vec![Transaction {
+                tx_type: TransactionType::Transfer,
+                to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0"),
+                from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
+                data: vec![],
+                value: 10,
+                nonce: 0,
+            }]),
         },
-
         TestCase {
             name: "guest transfer syscall",
             expected_success: true,
@@ -394,9 +370,10 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 v
             }),
             abi: None,
-            address_mappings: vec![
-                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d4", "native_transfer"),
-            ],
+            address_mappings: vec![(
+                "d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d4",
+                "native_transfer",
+            )],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -411,7 +388,9 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d4"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
                     data: (|| {
-                        let mut data = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0").0.to_vec();
+                        let mut data = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0")
+                            .0
+                            .to_vec();
                         data.extend_from_slice(&42u64.to_le_bytes());
                         data
                     })(),
@@ -420,7 +399,6 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 },
             ]),
         },
-
         TestCase {
             name: "dex amm",
             expected_success: true,
@@ -449,18 +427,16 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::ProgramCall,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
-                    data: encode_router_calls(&[
-                        HostFuncCall {
-                            selector: 0x01, // init
-                            args: (|| {
-                                let mut args = Vec::new();
-                                let supply: u32 = 1_000_000;
-                                args.extend_from_slice(&supply.to_le_bytes());
-                                args.push(0); // decimals
-                                args
-                            })(),
-                        }
-                    ]),
+                    data: encode_router_calls(&[HostFuncCall {
+                        selector: 0x01, // init
+                        args: (|| {
+                            let mut args = Vec::new();
+                            let supply: u32 = 1_000_000;
+                            args.extend_from_slice(&supply.to_le_bytes());
+                            args.push(0); // decimals
+                            args
+                        })(),
+                    }]),
                     value: 0,
                     nonce: 1,
                 },
@@ -468,17 +444,17 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                     tx_type: TransactionType::ProgramCall,
                     to: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d1"),
                     from: to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d3"),
-                    data: encode_router_calls(&[
-                        HostFuncCall {
-                            selector: 0x02, // transfer
-                            args: (|| {
-                                let mut args = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d5").0.to_vec();
-                                let amount: u32 = 500_000;
-                                args.extend_from_slice(&amount.to_le_bytes());
-                                args
-                            })(),
-                        }
-                    ]),
+                    data: encode_router_calls(&[HostFuncCall {
+                        selector: 0x02, // transfer
+                        args: (|| {
+                            let mut args = to_address("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d5")
+                                .0
+                                .to_vec();
+                            let amount: u32 = 500_000;
+                            args.extend_from_slice(&amount.to_le_bytes());
+                            args
+                        })(),
+                    }]),
                     value: 0,
                     nonce: 2,
                 },
@@ -533,16 +509,13 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 },
             ]),
         },
-
         TestCase {
             name: "ecdsa verify",
             expected_success: true,
             expected_error_code: 0,
             expected_data: None,
             abi: None,
-            address_mappings: vec![
-                ("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "ecdsa_verify"),
-            ],
+            address_mappings: vec![("d5a3c7f85d2b6e91fa78cd3210b45f6ae913d0d0", "ecdsa_verify")],
             bundle: TransactionBundle::new(vec![
                 Transaction {
                     tx_type: TransactionType::CreateAccount,
@@ -562,7 +535,6 @@ pub static TEST_CASES: Lazy<Vec<TestCase<'static>>> = Lazy::new(|| {
                 },
             ]),
         },
-
     ]
 });
 

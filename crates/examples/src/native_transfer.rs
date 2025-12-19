@@ -3,15 +3,16 @@
 
 extern crate program;
 
-use program::{entrypoint, require, DataParser};
 use program::types::address::Address;
 use program::types::result::Result;
+use program::{DataParser, entrypoint, require};
 
 /// Demonstrates transferring the native AM token from the caller to a target
 /// address using the VM's transfer syscall. The input payload is:
 /// - 20 bytes: destination address
 /// - 8 bytes: amount (little-endian u64)
-fn transfer_entry(_self_address: Address, _caller: Address, data: &[u8]) -> Result {
+fn transfer_entry(program: Address, _caller: Address, data: &[u8]) -> Result {
+    let _ = program;
     let mut parser = DataParser::new(data);
     // Need at least 20 bytes for the address and 8 bytes for the value
     require(parser.remaining() >= 28, b"transfer: need addr + amount");

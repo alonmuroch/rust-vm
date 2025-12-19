@@ -3,17 +3,18 @@ use core::fmt::Write;
 use std::any::Any;
 use std::rc::Rc;
 
-use storage::Storage;
-use types::result::RESULT_SIZE;
+use state::State;
+use types::{ADDRESS_LEN, address::Address, result::RESULT_SIZE};
 use vm::host_interface::HostInterface;
-use vm::memory::{Memory, HEAP_PTR_OFFSET};
+use vm::memory::{HEAP_PTR_OFFSET, Memory};
 use vm::metering::{MeterResult, Metering};
 use vm::registers::Register;
 use vm::sys_call::{
-    SyscallHandler, SYSCALL_ALLOC, SYSCALL_BALANCE, SYSCALL_CALL_PROGRAM, SYSCALL_DEALLOC,
-    SYSCALL_FIRE_EVENT, SYSCALL_LOG, SYSCALL_PANIC, SYSCALL_STORAGE_GET, SYSCALL_STORAGE_SET,
-    SYSCALL_TRANSFER,
+    SYSCALL_ALLOC, SYSCALL_BALANCE, SYSCALL_CALL_PROGRAM, SYSCALL_DEALLOC, SYSCALL_FIRE_EVENT,
+    SYSCALL_LOG, SYSCALL_PANIC, SYSCALL_STORAGE_GET, SYSCALL_STORAGE_SET, SYSCALL_TRANSFER,
+    SyscallHandler,
 };
+
 /// Represents different types of arguments that can be passed to system calls.
 ///
 /// EDUCATIONAL: This enum demonstrates how to handle different data types
@@ -30,6 +31,7 @@ enum Arg {
 
 pub struct DefaultSyscallHandler {
     verbose_writer: Option<Rc<RefCell<dyn Write>>>,
+    state: Rc<RefCell<State>>,
 }
 
 impl std::fmt::Debug for DefaultSyscallHandler {
@@ -39,20 +41,26 @@ impl std::fmt::Debug for DefaultSyscallHandler {
                 "verbose_writer",
                 &self.verbose_writer.as_ref().map(|_| "<dyn Write>"),
             )
+            .field("state", &"<State>")
             .finish()
     }
 }
 
 impl DefaultSyscallHandler {
-    pub fn new() -> Self {
+    pub fn new(state: Rc<RefCell<State>>) -> Self {
         Self {
             verbose_writer: None,
+            state,
         }
     }
 
-    pub fn with_writer(writer: Option<Rc<RefCell<dyn Write>>>) -> Self {
+    pub fn with_writer(
+        state: Rc<RefCell<State>>,
+        writer: Option<Rc<RefCell<dyn Write>>>,
+    ) -> Self {
         Self {
             verbose_writer: writer,
+            state,
         }
     }
 }
@@ -63,7 +71,6 @@ impl SyscallHandler for DefaultSyscallHandler {
         call_id: u32,
         args: [u32; 6],
         memory: Memory,
-        storage: Rc<RefCell<Storage>>,
         host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
         metering: &mut dyn Metering,
@@ -72,8 +79,8 @@ impl SyscallHandler for DefaultSyscallHandler {
             panic!("Metering halted syscall {}", call_id);
         }
         let result = match call_id {
-            SYSCALL_STORAGE_GET => self.sys_storage_get(args, memory, storage, metering),
-            SYSCALL_STORAGE_SET => self.sys_storage_set(args, memory, storage, metering),
+            SYSCALL_STORAGE_GET => self.sys_storage_get(args, memory, metering),
+            SYSCALL_STORAGE_SET => self.sys_storage_set(args, memory, metering),
             SYSCALL_PANIC => self.sys_panic_with_message(regs, memory),
             SYSCALL_LOG => self.sys_log(args, memory, metering),
             SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, host, metering),
@@ -129,15 +136,18 @@ impl DefaultSyscallHandler {
         &mut self,
         args: [u32; 6],
         memory: Memory,
-        storage: Rc<RefCell<Storage>>,
         metering: &mut dyn Metering,
     ) -> u32 {
-        let domain_ptr = args[0] as usize;
-        let domain_len = args[1] as usize;
+        let address_ptr = args[0] as usize;
+        let domain_ptr = args[1] as usize;
         let key_ptr = args[2] as usize;
-        let key_len = args[3] as usize;
+        let lens_packed = args[3] as usize;
+        let domain_len = lens_packed & 0xffff;
+        let key_len = lens_packed >> 16;
 
-        let total_len = domain_len.saturating_add(key_len);
+        let total_len = ADDRESS_LEN
+            .saturating_add(domain_len)
+            .saturating_add(key_len);
         if matches!(
             metering.on_syscall_data(SYSCALL_STORAGE_GET, total_len),
             MeterResult::Halt
@@ -146,6 +156,28 @@ impl DefaultSyscallHandler {
         }
 
         let borrowed_memory = memory.as_ref();
+
+        // Parse address
+        let address_slice_ref =
+            match borrowed_memory.mem_slice(address_ptr, address_ptr + ADDRESS_LEN) {
+                Some(r) => r,
+                None => {
+                    println!(
+                        "❌ Storage GET - Invalid address memory access: ptr={}, len={}",
+                        address_ptr, ADDRESS_LEN
+                    );
+                    return 0;
+                }
+            };
+        let address_bytes = address_slice_ref.as_ref();
+        let address_hex = address_bytes
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<Vec<_>>()
+            .join("");
+        let mut addr_arr = [0u8; ADDRESS_LEN];
+        addr_arr.copy_from_slice(address_bytes);
+        let address = Address(addr_arr);
 
         // Parse domain
         let domain_slice = {
@@ -206,7 +238,14 @@ impl DefaultSyscallHandler {
             format!("{}:{}", domain, key)
         };
 
-        if let Some(value) = storage.borrow().get(domain, &key) {
+        let value = {
+            let state_ref = self.state.borrow();
+            state_ref
+                .get_account(&address)
+                .and_then(|acc| acc.storage.get(&format!("{}:{}", domain, key)).cloned())
+        };
+
+        if let Some(value) = value {
             let mut buf = (value.len() as u32).to_le_bytes().to_vec();
             buf.extend_from_slice(value.as_slice());
             if matches!(metering.on_alloc(buf.len()), MeterResult::Halt) {
@@ -214,14 +253,14 @@ impl DefaultSyscallHandler {
             }
             let addr = borrowed_memory.alloc_on_heap(&buf);
             println!(
-                "✅ Found value for domain: '{}', Key: '{}'",
-                domain, display_key
+                "✅ Found value for address: '{}', domain: '{}', Key: '{}'",
+                address_hex, domain, display_key
             );
             return addr;
         } else {
             println!(
-                "❌ No value found for domain: '{}', key: '{}'",
-                domain, display_key
+                "❌ No value found for address: '{}', domain: '{}', key: '{}'",
+                address_hex, domain, display_key
             );
             0
         }
@@ -231,17 +270,22 @@ impl DefaultSyscallHandler {
         &mut self,
         args: [u32; 6],
         memory: Memory,
-        storage: Rc<RefCell<Storage>>,
         metering: &mut dyn Metering,
     ) -> u32 {
-        let domain_ptr = args[0] as usize;
-        let domain_len = args[1] as usize;
+        let address_ptr = args[0] as usize;
+        let domain_ptr = args[1] as usize;
         let key_ptr = args[2] as usize;
-        let key_len = args[3] as usize;
+        let lens_packed = args[3] as usize;
         let val_ptr = args[4] as usize;
         let val_len = args[5] as usize;
 
-        let total_len = domain_len.saturating_add(key_len).saturating_add(val_len);
+        let domain_len = lens_packed & 0xffff;
+        let key_len = lens_packed >> 16;
+
+        let total_len = ADDRESS_LEN
+            .saturating_add(domain_len)
+            .saturating_add(key_len)
+            .saturating_add(val_len);
         if matches!(
             metering.on_syscall_data(SYSCALL_STORAGE_SET, total_len),
             MeterResult::Halt
@@ -250,6 +294,28 @@ impl DefaultSyscallHandler {
         }
 
         let borrowed_memory = memory.as_ref();
+
+        // Parse address
+        let address_slice_ref =
+            match borrowed_memory.mem_slice(address_ptr, address_ptr + ADDRESS_LEN) {
+                Some(r) => r,
+                None => {
+                    println!(
+                        "❌ Storage SET - Invalid address memory access: ptr={}, len={}",
+                        address_ptr, ADDRESS_LEN
+                    );
+                    return 0;
+                }
+            };
+        let address_bytes = address_slice_ref.as_ref();
+        let address_hex = address_bytes
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<Vec<_>>()
+            .join("");
+        let mut addr_arr = [0u8; ADDRESS_LEN];
+        addr_arr.copy_from_slice(address_bytes);
+        let address = Address(addr_arr);
 
         // Parse domain
         let domain_slice_ref = match borrowed_memory.mem_slice(domain_ptr, domain_ptr + domain_len)
@@ -327,7 +393,12 @@ impl DefaultSyscallHandler {
             value_slice.len()
         );
 
-        storage.borrow_mut().set(domain, &key, value_slice.to_vec());
+        let composite_key = format!("{}:{}", domain, key);
+        self.state
+            .borrow_mut()
+            .get_account_mut(&address)
+            .storage
+            .insert(composite_key, value_slice.to_vec());
         0
     }
 
@@ -341,12 +412,7 @@ impl DefaultSyscallHandler {
         panic!("🔥 Guest panic: {}", msg);
     }
 
-    fn sys_log(
-        &mut self,
-        args: [u32; 6],
-        memory: Memory,
-        metering: &mut dyn Metering,
-    ) -> u32 {
+    fn sys_log(&mut self, args: [u32; 6], memory: Memory, metering: &mut dyn Metering) -> u32 {
         let [fmt_ptr, fmt_len, arg_ptr, arg_len, ..] = args;
         let payload_len = fmt_len.saturating_add(arg_len) as usize;
         if matches!(
@@ -596,12 +662,7 @@ impl DefaultSyscallHandler {
         }
     }
 
-    fn sys_alloc(
-        &mut self,
-        args: [u32; 6],
-        memory: Memory,
-        metering: &mut dyn Metering,
-    ) -> u32 {
+    fn sys_alloc(&mut self, args: [u32; 6], memory: Memory, metering: &mut dyn Metering) -> u32 {
         let size = args[0] as usize; // A0 register
         let align = args[1] as usize; // A1 register
 
@@ -657,12 +718,7 @@ impl DefaultSyscallHandler {
         ptr
     }
 
-    fn sys_dealloc(
-        &mut self,
-        args: [u32; 6],
-        _memory: Memory,
-        metering: &mut dyn Metering,
-    ) -> u32 {
+    fn sys_dealloc(&mut self, args: [u32; 6], _memory: Memory, metering: &mut dyn Metering) -> u32 {
         let size = args[1] as usize;
         if matches!(metering.on_alloc(size), MeterResult::Halt) {
             panic!("Metering halted SYSCALL_DEALLOC");
@@ -701,11 +757,7 @@ impl DefaultSyscallHandler {
         let mut to = [0u8; 20];
         to.copy_from_slice(to_slice.as_ref());
 
-        if host.transfer(to, value) {
-            0
-        } else {
-            1
-        }
+        if host.transfer(to, value) { 0 } else { 1 }
     }
 
     fn sys_balance(

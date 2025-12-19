@@ -2,8 +2,8 @@ use std::env;
 use std::fs;
 
 use os::bootloader::Bootloader;
-use types::transaction::{Transaction, TransactionBundle, TransactionType};
 use types::address::Address;
+use types::transaction::{Transaction, TransactionBundle, TransactionType};
 
 fn main() {
     let kernel_path = env::args()

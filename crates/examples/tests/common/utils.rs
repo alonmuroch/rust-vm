@@ -1,10 +1,10 @@
-use types::address::Address;
+use super::config::Config;
+use compiler::elf::parse_elf_from_bytes;
+use compiler::{EventAbi, EventParam, ParamType};
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use compiler::elf::parse_elf_from_bytes;
-use avm::global::Config;
-use compiler::{EventParam, EventAbi, ParamType};
-use serde_json::Value;
+use types::address::Address;
 
 pub fn to_address(hex: &str) -> Address {
     assert!(hex.len() == 40, "Hex string must be exactly 40 characters");
@@ -30,11 +30,19 @@ pub fn to_address(hex: &str) -> Address {
 }
 
 pub fn load_abi_from_file<P: AsRef<Path>>(path: P) -> Option<Vec<EventAbi>> {
-    let content = fs::read_to_string(&path)
-        .unwrap_or_else(|_| panic!("❌ Failed to read ABI file from {}", path.as_ref().display()));
+    let content = fs::read_to_string(&path).unwrap_or_else(|_| {
+        panic!(
+            "❌ Failed to read ABI file from {}",
+            path.as_ref().display()
+        )
+    });
 
-    let json: Value = serde_json::from_str(&content)
-        .unwrap_or_else(|_| panic!("❌ Failed to parse ABI JSON from {}", path.as_ref().display()));
+    let json: Value = serde_json::from_str(&content).unwrap_or_else(|_| {
+        panic!(
+            "❌ Failed to parse ABI JSON from {}",
+            path.as_ref().display()
+        )
+    });
 
     let events = json.get("events")?;
     let events_array = events.as_array()?;
@@ -48,7 +56,10 @@ pub fn load_abi_from_file<P: AsRef<Path>>(path: P) -> Option<Vec<EventAbi>> {
         for input in inputs {
             let param_name = input.get("name")?.as_str()?.to_string();
             let param_type_str = input.get("type")?.as_str()?;
-            let indexed = input.get("indexed").and_then(|v| v.as_bool()).unwrap_or(false);
+            let indexed = input
+                .get("indexed")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
 
             let param_type = match param_type_str {
                 "address" => ParamType::Address,
@@ -110,18 +121,22 @@ pub fn get_program_code(name: &str) -> Vec<u8> {
         .unwrap_or_else(|_| panic!("❌ Failed to parse ELF from {}", name));
 
     let (code, code_start) = elf
-    .get_flat_code()
-    .unwrap_or_else(|| panic!("❌ No code sections found in ELF {}", name));
+        .get_flat_code()
+        .unwrap_or_else(|| panic!("❌ No code sections found in ELF {}", name));
 
     let (rodata, rodata_start) = elf
         .get_flat_rodata()
-        .unwrap_or_else(|| {
-            (vec![], usize::MAX as u64)
-        });
+        .unwrap_or_else(|| (vec![], usize::MAX as u64));
 
     // assert sizes
-    assert!(code.len() <= Config::CODE_SIZE_LIMIT, "code size exceeds limit");
-    assert!(rodata.len() <= Config::RO_DATA_SIZE_LIMIT, "read only data size exceeds limit");
+    assert!(
+        code.len() <= Config::CODE_SIZE_LIMIT,
+        "code size exceeds limit"
+    );
+    assert!(
+        rodata.len() <= Config::RO_DATA_SIZE_LIMIT,
+        "read only data size exceeds limit"
+    );
 
     let mut total_len = code_start + code.len() as u64; // assumes rodata is after code
     if rodata.len() > 0 {
@@ -136,7 +151,8 @@ pub fn get_program_code(name: &str) -> Vec<u8> {
 
     // Copy rodata (if it exists)
     if rodata.len() > 0 {
-        combined[rodata_start as usize..rodata_start as usize + rodata.len()].copy_from_slice(&rodata);
+        combined[rodata_start as usize..rodata_start as usize + rodata.len()]
+            .copy_from_slice(&rodata);
     }
     combined
 }

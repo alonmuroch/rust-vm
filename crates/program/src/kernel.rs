@@ -1,20 +1,10 @@
 #![no_std]
 #![no_main]
 
-extern crate alloc;
-
-#[cfg(target_arch = "riscv32")]
-mod allocator;
-use program::log;
-use program::logf;
-
-use core::slice;
 use core::mem::forget;
+use core::slice;
+use program::{log, logf};
 use types::transaction::{Transaction, TransactionBundle};
-
-#[cfg(target_arch = "riscv32")]
-#[global_allocator]
-static ALLOC: allocator::VmAllocator = allocator::VmAllocator;
 
 /// Kernel entrypoint. Receives a pointer/length pair to an encoded `TransactionBundle`
 /// (produced by the bootloader) and walks each transaction.
@@ -58,31 +48,4 @@ fn halt() -> ! {
     // Signal completion to the host by triggering a trap and stop execution.
     unsafe { core::arch::asm!("ebreak") };
     loop {}
-}
-
-#[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
-    #[cfg(target_arch = "riscv32")]
-    {
-        let msg_bytes = if let Some(s) = info.message().as_str() {
-            s.as_bytes()
-        } else {
-            b"kernel panic (non-str message)"
-        };
-        unsafe {
-            core::arch::asm!(
-                "li a7, 3", // SYSCALL_PANIC
-                "ecall",
-                in("a0") msg_bytes.as_ptr(),
-                in("a1") msg_bytes.len(),
-            );
-            core::arch::asm!("ebreak", options(nomem, nostack));
-        }
-        loop {}
-    }
-
-    #[cfg(not(target_arch = "riscv32"))]
-    {
-        panic!("kernel panic: {:?}", info);
-    }
 }

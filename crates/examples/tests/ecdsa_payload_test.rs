@@ -1,4 +1,4 @@
-use k256::ecdsa::{signature::hazmat::PrehashVerifier, Signature, SigningKey, VerifyingKey};
+use k256::ecdsa::{Signature, SigningKey, VerifyingKey, signature::hazmat::PrehashVerifier};
 
 #[path = "common/ecdsa.rs"]
 mod ecdsa;

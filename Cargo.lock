@@ -145,7 +145,6 @@ dependencies = [
 name = "examples"
 version = "0.1.0"
 dependencies = [
- "avm",
  "compiler",
  "k256",
  "once_cell",
@@ -264,7 +263,7 @@ dependencies = [
  "compiler",
  "goblin",
  "program",
- "storage",
+ "state",
  "types",
  "vm",
 ]
@@ -487,7 +486,6 @@ version = "0.1.0"
 dependencies = [
  "compiler",
  "state",
- "storage",
  "types",
 ]
 

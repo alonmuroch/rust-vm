@@ -6,6 +6,12 @@ edition = "2024"
 [features]
 default = ["guest_handlers"]
 guest_handlers = []
+guest_kernel = []
 
 [dependencies]
 types = { path = "../types" }
+
+[[bin]]
+name = "kernel"
+path = "src/kernel.rs"
+required-features = ["guest_kernel"]

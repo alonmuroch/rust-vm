@@ -3,7 +3,7 @@
 extern crate alloc;
 
 pub mod address;
-pub use address::Address;
+pub use address::{Address, ADDRESS_LEN};
 
 pub mod result;
 pub use result::Result;

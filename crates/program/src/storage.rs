@@ -1,15 +1,15 @@
-use types::O;
+use types::{O, address::Address};
 
 /// Domain constant for persistent storage
 pub const PERSISTENT_DOMAIN: &str = "P";
 
 /// Trait for persistent structs
 pub trait Persistent {
-    fn load() -> O<Self>
+    fn load(address: &Address) -> O<Self>
     where
         Self: Sized;
 
-    fn store(&self);
+    fn store(&self, address: &Address);
 }
 
 /// Macro that defines persistent structs with embedded static key
@@ -58,21 +58,22 @@ macro_rules! persist_struct {
                 }
             }
 
-            pub fn load() -> $crate::types::O<Self> {
-                <$name as $crate::Persistent>::load()
+            pub fn load(address: &$crate::types::address::Address) -> $crate::types::O<Self> {
+                <$name as $crate::Persistent>::load(address)
             }
 
-            pub fn store(&self) {
-                <$name as $crate::Persistent>::store(self)
+            pub fn store(&self, address: &$crate::types::address::Address) {
+                <$name as $crate::Persistent>::store(self, address)
             }
         }
 
         impl $crate::Persistent for $name {
-            fn load() -> $crate::types::O<Self> {
+            fn load(address: &$crate::types::address::Address) -> $crate::types::O<Self> {
                 #[cfg(target_arch = "riscv32")]
                 unsafe {
                     let key_ptr = $name::key_ptr();
                     let key_len = $name::key_len();
+                    let packed_lens: u32 = ((key_len as u32) << 16) | ($crate::PERSISTENT_DOMAIN.len() as u32);
 
                     if key_len == 0 {
                         $crate::vm_panic(
@@ -84,10 +85,10 @@ macro_rules! persist_struct {
                     core::arch::asm!(
                         "li a7, 1",  // syscall_storage_read
                         "ecall",
-                        in("a1") $crate::PERSISTENT_DOMAIN.as_ptr(), // domain ptr - use constant
-                        in("a2") $crate::PERSISTENT_DOMAIN.len(), // domain len
+                        in("a1") address.as_ref().as_ptr(), // address ptr
+                        in("a2") $crate::PERSISTENT_DOMAIN.as_ptr(), // domain ptr - use constant
                         in("a3") key_ptr, // key ptr
-                        in("a4") key_len, // key len
+                        in("a4") packed_lens, // packed lens (domain | key)
                         out("a0") value_ptr,
                     );
 
@@ -106,7 +107,7 @@ macro_rules! persist_struct {
                     if value_len == 0 {
                         $crate::require(value_len > 0, b"Decoded value len is 0 for bytes");
                         return $crate::types::O::None;
-                    }    
+                    }
 
                     let data_ptr = (value_ptr + 4) as *const u8;
                     let value_buf = core::slice::from_raw_parts(data_ptr, value_len);
@@ -116,16 +117,18 @@ macro_rules! persist_struct {
 
                 #[cfg(not(target_arch = "riscv32"))]
                 {
+                    let _ = address;
                     // For non-RISC-V targets, return None
                     $crate::types::O::None
                 }
             }
 
-            fn store(&self) {
+            fn store(&self, address: &$crate::types::address::Address) {
                 #[cfg(target_arch = "riscv32")]
                 unsafe {
                     let key_ptr = $name::key_ptr();
                     let key_len = $name::key_len();
+                    let packed_lens: u32 = ((key_len as u32) << 16) | ($crate::PERSISTENT_DOMAIN.len() as u32);
 
                     if key_len == 0 {
                         $crate::vm_panic(
@@ -145,10 +148,10 @@ macro_rules! persist_struct {
                     core::arch::asm!(
                         "li a7, 2", // syscall_storage_write
                         "ecall",
-                        in("a1") $crate::PERSISTENT_DOMAIN.as_ptr(), // domain ptr - use constant
-                        in("a2") $crate::PERSISTENT_DOMAIN.len(), // domain len
+                        in("a1") address.as_ref().as_ptr(), // address ptr
+                        in("a2") $crate::PERSISTENT_DOMAIN.as_ptr(), // domain ptr - use constant
                         in("a3") key_ptr, // key ptr
-                        in("a4") key_len, // key len
+                        in("a4") packed_lens, // packed lens (domain | key)
                         in("a5") val_ptr, // value ptr
                         in("a6") val_len, // value len
                         options(readonly, nostack, preserves_flags)
@@ -157,6 +160,7 @@ macro_rules! persist_struct {
 
                 #[cfg(not(target_arch = "riscv32"))]
                 {
+                    let _ = address;
                     // For non-RISC-V targets, do nothing
                 }
             }

@@ -1,8 +1,8 @@
 use std::cell::{Cell, Ref, RefCell};
 use std::convert::TryInto;
 use std::rc::Rc;
-use vm::memory::{memory, HEAP_PTR_OFFSET};
-use vm::metering::{MeterResult, Metering, MemoryAccessKind};
+use vm::memory::{HEAP_PTR_OFFSET, memory};
+use vm::metering::{MemoryAccessKind, MeterResult, Metering};
 
 #[derive(Debug, Clone)]
 pub struct MemoryPage {
@@ -179,7 +179,9 @@ impl MemoryPage {
         if end_offset > mem_ref.len() || start_offset > end_offset {
             return None;
         }
-        Some(std::cell::Ref::map(mem_ref, move |v| &v[start_offset..end_offset]))
+        Some(std::cell::Ref::map(mem_ref, move |v| {
+            &v[start_offset..end_offset]
+        }))
     }
 
     pub fn write_code(&self, start_addr: usize, code: &[u8]) {
