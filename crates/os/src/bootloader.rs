@@ -89,10 +89,9 @@ impl Bootloader {
         let host: Box<dyn vm::host_interface::HostInterface> = Box::new(NoopHost);
 
         let mut vm = VM::new(memory.clone(), host, Box::new(DefaultSyscallHandler::new(state)));
-        self.place_bundle(&mut vm, bundle);
         vm.cpu.pc = entry_point;
 
-        // TODO: write the bundle into memory for the kernel to consume.
+        self.place_bundle(&mut vm, bundle);
         vm.raw_run();
     }
 
