@@ -10,4 +10,4 @@ state = { path = "../state" }  # adjust path as needed
 storage = { path = "../storage" }  # adjust path as needed
 vm = { path = "../vm" }  # adjust path as needed
 types = { path = "../types" }  # adjust path as needed
-bootloader = { path = "../os" }
+bootloader = { path = "../bootloader" }

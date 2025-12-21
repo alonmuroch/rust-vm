@@ -179,7 +179,7 @@ impl Default for TestRunner {
 impl TestRunner {
     fn load_kernel_from_env() -> Option<Vec<u8>> {
         let path =
-            env::var("KERNEL_ELF").unwrap_or_else(|_| "crates/os/bin/kernel.elf".to_string());
+            env::var("KERNEL_ELF").unwrap_or_else(|_| "crates/bootloader/bin/kernel.elf".to_string());
         fs::read(&path).ok()
     }
 }
