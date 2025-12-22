@@ -62,27 +62,6 @@ impl VM {
         self.cpu.set_metering(metering);
     }
 
-    /// Loads program code into memory and sets the starting address.
-    ///
-    /// EDUCATIONAL PURPOSE: This demonstrates how programs are loaded into
-    /// a VM. In real systems, this would involve loading from disk, parsing
-    /// executable formats, and setting up memory protection.
-    ///
-    /// PARAMETERS:
-    /// - alloc_add: The address where the code should be allocated in memory
-    /// - start_addr: Where the program should start executing from
-    /// - code: The binary program code to load
-    ///
-    /// MEMORY LAYOUT: Programs are typically loaded at specific addresses
-    /// to ensure proper alignment and to avoid conflicts with system memory.
-    pub fn set_code(&mut self, alloc_add: u32, start_addr: u32, code: &[u8]) {
-        // EDUCATIONAL: Write the program code to memory starting at address 0
-        self.memory.write_code(VirtualAddress(alloc_add), code);
-
-        // EDUCATIONAL: Set the program counter to the starting address
-        self.cpu.pc = start_addr;
-    }
-
     /// Allocates memory on the heap and writes data to it.
     ///
     /// EDUCATIONAL PURPOSE: This demonstrates dynamic memory allocation in a VM.

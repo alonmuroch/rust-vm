@@ -3,7 +3,7 @@
 use std::env;
 use std::fs::{self, File};
 use std::io::Write as IoWrite;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use core::cell::RefCell;
@@ -155,6 +155,12 @@ impl TestRunner {
             })?,
             &case.bundle,
             state,
+            self.verbose,
+            if self.verbose {
+                Some(self.writer.clone())
+            } else {
+                None
+            },
         );
 
         // For now we treat successful bootloader execution as a passed test.
@@ -170,8 +176,9 @@ impl Default for TestRunner {
 
 impl TestRunner {
     fn load_kernel_from_env() -> Option<Vec<u8>> {
-        let path =
-            env::var("KERNEL_ELF").unwrap_or_else(|_| "crates/bootloader/bin/kernel.elf".to_string());
+        let path = env::var("KERNEL_ELF")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../bootloader/bin/kernel.elf"));
         fs::read(&path).ok()
     }
 }

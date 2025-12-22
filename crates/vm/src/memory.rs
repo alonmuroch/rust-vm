@@ -104,6 +104,8 @@ pub trait Mmu: std::fmt::Debug {
     fn load_byte(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u8>;
     fn load_halfword(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u16>;
     fn load_word(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u32>;
+    /// Map a virtual range with the provided permissions.
+    fn map_range(&self, start: VirtualAddress, len: usize, perms: Perms);
     /// Set the current page-table root (index/identifier) used for translation.
     fn set_root(&self, root: usize);
     /// Get the current page-table root (index/identifier).

@@ -1,4 +1,5 @@
 use core::{mem, slice};
+use core::fmt::Write as FmtWrite;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::vec::Vec;
@@ -81,6 +82,18 @@ impl Bootloader {
             .map_range(VirtualAddress(min_base as u32), core::cmp::max(image_size, 16 * 1024), Perms::rwx_kernel());
         self.memory
             .write_bytes(VirtualAddress(min_base as u32), &image);
+        // Start the heap after the loaded image to avoid overwriting kernel text/rodata
+        let heap_start = ((image_end + HEAP_PTR_OFFSET as usize + 7) & !7) as u32;
+        self.memory.set_next_heap(VirtualAddress(heap_start));
+        // Ensure the kernel has a mapped stack region near the top of memory.
+        let stack_bytes = 4 * PAGE_SIZE;
+        let stack_base = self
+            .memory
+            .stack_top()
+            .as_usize()
+            .saturating_sub(stack_bytes);
+        self.memory
+            .map_range(VirtualAddress(stack_base as u32), stack_bytes, Perms::rw_kernel());
         (entry_point, self.memory.clone() as MmuRef)
     }
 
@@ -91,11 +104,17 @@ impl Bootloader {
         kernel_elf: &[u8],
         bundle: &TransactionBundle,
         state: Rc<RefCell<State>>,
+        verbose: bool,
+        verbose_writer: Option<Rc<RefCell<dyn FmtWrite>>>,
     ) {
         let (entry_point, memory) = self.load_kernel(kernel_elf);
         let host: Box<dyn vm::host_interface::HostInterface> = Box::new(NoopHost);
 
         let mut vm = VM::new(memory.clone(), host, Box::new(DefaultSyscallHandler::new(state.clone())));
+        vm.cpu.verbose = verbose;
+        if let Some(writer) = verbose_writer {
+            vm.cpu.set_verbose_writer(writer);
+        }
         vm.cpu.pc = entry_point;
 
         self.place_bundle(&mut vm, bundle);

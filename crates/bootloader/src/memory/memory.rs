@@ -127,17 +127,16 @@ impl Memory {
 
     /// Map a contiguous virtual range page-by-page with the given permissions.
     pub fn map_range(&self, start: VirtualAddress, len: usize, perms: Perms) {
-        let mut page_start = start.align_down();
-        let mut remaining = len;
-        while remaining > 0 {
-            self.map_page(page_start, perms);
-            page_start =
-                VirtualAddress(page_start.as_u32().wrapping_add(self.page_size as u32));
-            if remaining > self.page_size {
-                remaining -= self.page_size;
-            } else {
-                remaining = 0;
-            }
+        if len == 0 {
+            return;
+        }
+        let start_addr = start.align_down().as_usize();
+        let end_addr = start.as_usize().saturating_add(len);
+
+        let mut page_start = start_addr;
+        while page_start < end_addr {
+            self.map_page(VirtualAddress(page_start as u32), perms);
+            page_start = page_start.saturating_add(self.page_size);
         }
     }
 
