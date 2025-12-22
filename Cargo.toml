@@ -4,6 +4,7 @@ members = [
     "crates/compiler",
     "crates/examples",
     "crates/bootloader",
+    "crates/kernel",
     "crates/program",
     "crates/state",
     "crates/storage",

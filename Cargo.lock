@@ -160,6 +160,7 @@ dependencies = [
  "bootloader",
  "compiler",
  "k256",
+ "kernel",
  "once_cell",
  "program",
  "serde_json",
@@ -242,6 +243,14 @@ dependencies = [
  "ecdsa",
  "elliptic-curve",
  "sha2",
+]
+
+[[package]]
+name = "kernel"
+version = "0.1.0"
+dependencies = [
+ "program",
+ "types",
 ]
 
 [[package]]

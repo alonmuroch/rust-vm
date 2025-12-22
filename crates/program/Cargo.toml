@@ -6,13 +6,7 @@ edition = "2024"
 [features]
 default = ["guest_handlers"]
 guest_handlers = []
-guest_kernel = []
 
 [dependencies]
 types = { path = "../types" }
 state = { path = "../state", default-features = false }
-
-[[bin]]
-name = "kernel"
-path = "src/kernel.rs"
-required-features = ["guest_kernel"]

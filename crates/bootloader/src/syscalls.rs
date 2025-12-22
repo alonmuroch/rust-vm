@@ -10,9 +10,9 @@ use vm::memory::{HEAP_PTR_OFFSET, Memory};
 use vm::metering::{MeterResult, Metering};
 use vm::registers::Register;
 use vm::sys_call::{
-    SYSCALL_ALLOC, SYSCALL_BALANCE, SYSCALL_CALL_PROGRAM, SYSCALL_DEALLOC, SYSCALL_FIRE_EVENT,
-    SYSCALL_LOG, SYSCALL_PANIC, SYSCALL_STORAGE_GET, SYSCALL_STORAGE_SET, SYSCALL_TRANSFER,
-    SYSCALL_COMMIT_STATE, SyscallHandler,
+    SYSCALL_ALLOC, SYSCALL_BALANCE, SYSCALL_CALL_PROGRAM, SYSCALL_CREATE_ACCOUNT,
+    SYSCALL_DEALLOC, SYSCALL_FIRE_EVENT, SYSCALL_LOG, SYSCALL_PANIC, SYSCALL_STORAGE_GET,
+    SYSCALL_STORAGE_SET, SYSCALL_TRANSFER, SYSCALL_COMMIT_STATE, SyscallHandler,
 };
 
 /// Represents different types of arguments that can be passed to system calls.
@@ -90,6 +90,7 @@ impl SyscallHandler for DefaultSyscallHandler {
             SYSCALL_TRANSFER => self.sys_transfer(args, memory, host, metering),
             SYSCALL_BALANCE => self.sys_balance(args, memory, host, metering),
             SYSCALL_COMMIT_STATE => self.sys_commit_state(args, memory, metering),
+            SYSCALL_CREATE_ACCOUNT => self.sys_create_account(args, memory, metering),
             _ => {
                 panic!("Unknown syscall: {}", call_id);
             }
@@ -807,6 +808,46 @@ impl DefaultSyscallHandler {
         }
 
         println!("commit state called (ptr=0x{:08x}, len={})", ptr, len);
+        0
+    }
+
+    fn sys_create_account(
+        &mut self,
+        args: [u32; 6],
+        memory: Memory,
+        metering: &mut dyn Metering,
+    ) -> u32 {
+        let addr_ptr = args[0] as usize;
+        let code_ptr = args[1] as usize;
+        let code_len = args[2] as usize;
+
+        let total_len = ADDRESS_LEN.saturating_add(code_len);
+        if matches!(
+            metering.on_syscall_data(SYSCALL_CREATE_ACCOUNT, total_len),
+            MeterResult::Halt
+        ) {
+            panic!("Metering halted SYSCALL_CREATE_ACCOUNT");
+        }
+
+        let borrowed = memory.as_ref();
+        let address_slice = match borrowed.mem_slice(addr_ptr, addr_ptr + ADDRESS_LEN) {
+            Some(r) => r,
+            None => return 1,
+        };
+        let mut addr_bytes = [0u8; ADDRESS_LEN];
+        addr_bytes.copy_from_slice(address_slice.as_ref());
+        let address = Address(addr_bytes);
+
+        let code_slice = match borrowed.mem_slice(code_ptr, code_ptr + code_len) {
+            Some(r) => r,
+            None => return 1,
+        };
+        let code = code_slice.to_vec();
+
+        let mut state = self.state.borrow_mut();
+        let account = state.get_account_mut(&address);
+        account.code = code;
+        account.is_contract = !account.code.is_empty();
         0
     }
 }

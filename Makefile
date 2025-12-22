@@ -13,7 +13,7 @@ run_examples:
 	RUSTFLAGS="-Awarnings" $(MAKE) -C crates/examples
 	@echo "=== Building kernel ELF ==="
 	@mkdir -p crates/bootloader/bin
-	@$(AVM32) all --bin kernel --manifest-path crates/program/Cargo.toml --features guest_kernel --out-dir crates/bootloader/bin
+	@$(AVM32) all --bin kernel --manifest-path crates/kernel/Cargo.toml --features guest_kernel --out-dir crates/bootloader/bin --src crates/kernel/src/main.rs
 	@echo "=== Running example crate tests ==="
 	cd crates/examples && RUSTFLAGS="-Awarnings" KERNEL_ELF="../bootloader/bin/kernel.elf" cargo test test_examples -- --nocapture
 	@echo "=== Example programs build and tests complete ==="

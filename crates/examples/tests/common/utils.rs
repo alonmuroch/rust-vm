@@ -1,4 +1,4 @@
-use program::Config;
+use kernel::Config;
 use compiler::elf::parse_elf_from_bytes;
 use compiler::{EventAbi, EventParam, ParamType};
 use serde_json::Value;
