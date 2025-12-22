@@ -1,16 +1,17 @@
+use core::{mem, slice};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::vec::Vec;
 
 use compiler::elf::parse_elf_from_bytes;
 use goblin::elf::Elf;
-use types::transaction::TransactionBundle;
+use types::{boot::BootInfo, transaction::TransactionBundle};
 
 use crate::DefaultSyscallHandler;
-use crate::memory::Memory;
+use crate::memory::{Memory, Perms};
 use state::State;
 use vm::host_interface::NoopHost;
-use vm::memory::{HEAP_PTR_OFFSET, Memory as MmuRef, VirtualAddress, PAGE_SIZE};
+use vm::memory::{Mmu, HEAP_PTR_OFFSET, Memory as MmuRef, VirtualAddress, PAGE_SIZE};
 use vm::registers::Register;
 use vm::vm::VM;
 
@@ -77,7 +78,9 @@ impl Bootloader {
         }
 
         self.memory
-            .write_code(VirtualAddress(min_base as u32), &image);
+            .map_range(VirtualAddress(min_base as u32), core::cmp::max(image_size, 16 * 1024), Perms::rwx_kernel());
+        self.memory
+            .write_bytes(VirtualAddress(min_base as u32), &image);
         (entry_point, self.memory.clone() as MmuRef)
     }
 
@@ -98,6 +101,7 @@ impl Bootloader {
         self.place_bundle(&mut vm, bundle);
         let encoded_state = state.borrow().encode();
         self.place_state(&mut vm, &encoded_state);
+        self.place_boot_info(&mut vm);
         vm.raw_run();
     }
 
@@ -119,6 +123,26 @@ impl Bootloader {
         vm.memory
             .set_next_heap(VirtualAddress(
                 (addr as usize + state.len() + HEAP_PTR_OFFSET as usize) as u32,
+            ));
+    }
+
+    fn place_boot_info(&mut self, vm: &mut VM) {
+        // For now the bootloader owns the page tables, so `root_ppn` is a placeholder (0).
+        let boot_info = BootInfo::new(
+            self.memory.current_root() as u32,
+            vm.memory.stack_top().as_u32(),
+            self.memory.size() as u32,
+        );
+        let bytes = unsafe {
+            slice::from_raw_parts(
+                &boot_info as *const BootInfo as *const u8,
+                mem::size_of::<BootInfo>(),
+            )
+        };
+        let addr = vm.set_reg_to_data(Register::A4, bytes);
+        vm.memory
+            .set_next_heap(VirtualAddress(
+                (addr as usize + bytes.len() + HEAP_PTR_OFFSET as usize) as u32,
             ));
     }
 }

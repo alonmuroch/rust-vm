@@ -3,5 +3,6 @@
 mod memory;
 mod pte;
 
-pub use memory::{Memory, Perms};
+pub use memory::Memory;
+pub use vm::memory::Perms;
 pub(crate) use pte::Pte;

@@ -18,6 +18,9 @@ pub use primitives::*;
 pub mod transaction;
 pub use transaction::*;
 
+pub mod boot;
+pub use boot::BootInfo;
+
 // used for serialization
 pub trait SerializeField {
     /// Appends `self` into `buf` at `*offset`, advancing the offset.

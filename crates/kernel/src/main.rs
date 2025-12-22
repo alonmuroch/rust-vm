@@ -6,23 +6,48 @@ extern crate alloc;
 use alloc::format;
 use core::mem::forget;
 use core::slice;
-use kernel::Config;
+use kernel::{BootInfo, Config, Task};
 use program::{log, logf};
 use types::transaction::{Transaction, TransactionBundle, TransactionType};
 
 const SYSCALL_CREATE_ACCOUNT: u32 = 12;
 
-/// Kernel entrypoint. Receives a pointer/length pair to an encoded `TransactionBundle`
-/// (produced by the bootloader) and walks each transaction. State is managed via host
-/// syscalls; no state blob is passed in.
+#[allow(dead_code)]
+static mut KERNEL_TASK: Option<Task> = None;
+
+/// Kernel entrypoint. Receives:
+/// - `bundle_ptr`/`bundle_len`: encoded `TransactionBundle` prepared by the bootloader.
+/// - `state_ptr`/`state_len`: optional state blob (currently unused).
+/// - `boot_info_ptr`: bootloader handoff with stack + page-table root info.
 #[unsafe(no_mangle)]
-pub extern "C" fn _start(bundle_ptr: *const u8, bundle_len: usize) {
+pub extern "C" fn _start(
+    bundle_ptr: *const u8,
+    bundle_len: usize,
+    _state_ptr: *const u8,
+    _state_len: usize,
+    boot_info_ptr: *const BootInfo,
+) {
     // Copy args to locals before any syscalls (ecall clobbers a0).
     let bundle_ptr = bundle_ptr;
     let bundle_len = bundle_len;
 
     log!("kernel boot");
     logf!("bundle_len=%d", bundle_len as u32);
+
+    if let Some(info) = unsafe { boot_info_ptr.as_ref() } {
+        let task = Task::kernel(info.root_ppn, info.kstack_top);
+        unsafe {
+            KERNEL_TASK = Some(task);
+        }
+        logf!(
+            "boot_info: root_ppn=0x%x kstack_top=0x%x mem_size=%d",
+            info.root_ppn,
+            info.kstack_top,
+            info.memory_size
+        );
+    } else {
+        log!("boot_info missing; kernel task not initialized");
+    }
 
     let encoded_bundle = unsafe { slice::from_raw_parts(bundle_ptr, bundle_len) };
 

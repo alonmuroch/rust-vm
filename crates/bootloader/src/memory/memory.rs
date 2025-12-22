@@ -1,42 +1,10 @@
 use std::cell::{Cell, Ref, RefCell};
 use std::rc::Rc;
 
-use vm::memory::{Mmu, VirtualAddress, HEAP_PTR_OFFSET, PAGE_SIZE, PAGE_SHIFT};
+use vm::memory::{Mmu, Perms, VirtualAddress, HEAP_PTR_OFFSET, PAGE_SHIFT};
 use vm::metering::{MeterResult, Metering, MemoryAccessKind};
 
 use crate::memory::pte::Pte;
-
-#[derive(Clone, Copy, Debug)]
-pub struct Perms {
-    /// Allow read access.
-    pub read: bool,
-    /// Allow write access.
-    pub write: bool,
-    /// Allow instruction fetch/execute.
-    pub exec: bool,
-    /// Mark page as user-accessible (false = kernel/supervisor-only).
-    pub user: bool,
-}
-
-impl Perms {
-    pub fn rwx_kernel() -> Self {
-        Self {
-            read: true,
-            write: true,
-            exec: true,
-            user: false,
-        }
-    }
-
-    pub fn rw_kernel() -> Self {
-        Self {
-            read: true,
-            write: true,
-            exec: false,
-            user: false,
-        }
-    }
-}
 
 /// Software Sv32 MMU backed by a contiguous physical buffer.
 ///
@@ -64,8 +32,10 @@ pub struct Memory {
     total_pages: usize,
     /// Contiguous physical backing store.
     backing: Rc<RefCell<Vec<u8>>>,
-    /// Root L1 table (VPN1 index).
-    root: RefCell<Box<[Pte; 1024]>>,
+    /// Collection of root L1 tables (VPN1 index), one per address space.
+    root_tables: RefCell<Vec<Box<[Pte; 1024]>>>,
+    /// Index of the active root in `root_tables`.
+    current_root: Cell<usize>,
     /// Pool of L2 tables (VPN0 index).
     l2_tables: RefCell<Vec<Box<[Pte; 1024]>>>,
     /// Bump allocator for guest heap pointer.
@@ -87,7 +57,8 @@ impl Memory {
             page_size,
             total_pages,
             backing: Rc::new(RefCell::new(vec![0u8; total])),
-            root: RefCell::new(Box::new([Pte::default(); 1024])),
+            root_tables: RefCell::new(vec![Box::new([Pte::default(); 1024])] ),
+            current_root: Cell::new(0),
             l2_tables: RefCell::new(Vec::new()),
             next_heap: Cell::new(VirtualAddress(0)),
             next_free_frame: Cell::new(0),
@@ -96,6 +67,13 @@ impl Memory {
 
     fn total_size(&self) -> usize {
         self.backing.borrow().len()
+    }
+
+    /// Allocate a fresh L1 root table and return its index.
+    pub fn allocate_root(&self) -> usize {
+        let mut roots = self.root_tables.borrow_mut();
+        roots.push(Box::new([Pte::default(); 1024]));
+        roots.len() - 1
     }
 
     /// Allocate a physical frame (4 KiB) and return its page number, or None if out of frames.
@@ -119,14 +97,18 @@ impl Memory {
     fn map_page(&self, va: VirtualAddress, perms: Perms) {
         let vpn1 = va.vpn1() as usize;
         let vpn0 = va.vpn0() as usize;
-        let mut root = self.root.borrow_mut();
+        let mut roots = self.root_tables.borrow_mut();
+        let current = self.current_root.get();
+        let root = roots
+            .get_mut(current)
+            .unwrap_or_else(|| panic!("invalid root index {}", current));
         if root[vpn1].next_l2.is_none() {
             let l2_idx = self.allocate_l2();
             root[vpn1].next_l2 = Some(l2_idx);
             root[vpn1].valid = true;
         }
         let l2_idx = root[vpn1].next_l2.expect("l2 table missing");
-        drop(root);
+        drop(roots);
 
         let mut l2s = self.l2_tables.borrow_mut();
         let l2 = &mut l2s[l2_idx];
@@ -149,9 +131,10 @@ impl Memory {
         let mut remaining = len;
         while remaining > 0 {
             self.map_page(page_start, perms);
-            page_start = VirtualAddress(page_start.as_u32().wrapping_add(PAGE_SIZE as u32));
-            if remaining > PAGE_SIZE {
-                remaining -= PAGE_SIZE;
+            page_start =
+                VirtualAddress(page_start.as_u32().wrapping_add(self.page_size as u32));
+            if remaining > self.page_size {
+                remaining -= self.page_size;
             } else {
                 remaining = 0;
             }
@@ -163,7 +146,10 @@ impl Memory {
         let vpn1 = va.vpn1() as usize;
         let vpn0 = va.vpn0() as usize;
         let offset = va.offset() as usize;
-        let root: Ref<'_, Box<[Pte; 1024]>> = self.root.borrow();
+        let roots = self.root_tables.borrow();
+        let root = roots
+            .get(self.current_root.get())
+            .unwrap_or_else(|| panic!("invalid root index {}", self.current_root.get()));
         let l2_idx = root.get(vpn1).and_then(|pte| pte.next_l2)?;
         let l2s = self.l2_tables.borrow();
         let l2 = l2s.get(l2_idx)?;
@@ -206,7 +192,7 @@ impl Memory {
             let phys = self
                 .translate(va, kind)
                 .expect("copy failed: unmapped virtual address");
-            let page_remaining = PAGE_SIZE - (va.offset() as usize);
+            let page_remaining = self.page_size - (va.offset() as usize);
             let to_copy = core::cmp::min(page_remaining, remaining);
             {
                 let mut backing = self.backing.borrow_mut();
@@ -220,11 +206,33 @@ impl Memory {
             va = VirtualAddress(va.as_u32().wrapping_add(to_copy as u32));
         }
     }
+
+    /// Write bytes to an already mapped virtual region without advancing the heap.
+    /// Callers must ensure the range is mapped and writable.
+    pub fn write_bytes(&self, start: VirtualAddress, data: &[u8]) {
+        self.copy_into_backing(start, data, MemoryAccessKind::Store);
+    }
 }
 
 impl Mmu for Memory {
     fn mem(&self) -> Ref<Vec<u8>> {
         self.backing.borrow()
+    }
+
+    fn map_range(&self, start: VirtualAddress, len: usize, perms: Perms) {
+        Memory::map_range(self, start, len, perms);
+    }
+
+    fn set_root(&self, root: usize) {
+        let roots = self.root_tables.borrow();
+        if root >= roots.len() {
+            panic!("set_root: invalid root index {}", root);
+        }
+        self.current_root.set(root);
+    }
+
+    fn current_root(&self) -> usize {
+        self.current_root.get()
     }
 
     fn mem_slice(
@@ -366,16 +374,6 @@ impl Mmu for Memory {
         Some(u32::from_le_bytes(
             backing[offset..offset + 4].try_into().unwrap(),
         ))
-    }
-
-    fn write_code(&self, start_addr: VirtualAddress, code: &[u8]) {
-        let end_addr = start_addr
-            .checked_add(code.len() as u32)
-            .expect("code write overflow");
-        self.map_range(start_addr, code.len(), Perms::rwx_kernel());
-        self.copy_into_backing(start_addr, code, MemoryAccessKind::Store);
-        self.next_heap
-            .set(VirtualAddress(end as u32 + HEAP_PTR_OFFSET));
     }
 
     fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress {

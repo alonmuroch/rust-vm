@@ -902,28 +902,32 @@ impl DefaultSyscallHandler {
         base.as_u32()
     }
 
+    /// Linux-like `munmap(2)` stub: accepts a VA/len pair and returns success.
+    /// Unmapping is not implemented yet, so this is a no-op placeholder.
     fn sys_munmap(
         &mut self,
         _args: [u32; 6],
         _memory: Memory,
         _metering: &mut dyn Metering,
     ) -> u32 {
-        // Not implemented yet; return success.
         0
     }
 
+    /// Linux-like `mprotect(2)` stub: ignores requested protections and returns success.
+    /// Permission changes are not tracked in this minimal MMU.
     fn sys_mprotect(
         &mut self,
         _args: [u32; 6],
         _memory: Memory,
         _metering: &mut dyn Metering,
     ) -> u32 {
-        // Not implemented yet; return success.
         0
     }
 
+    /// Minimal `brk(2)` implementation:
+    /// - a0 = new_break; if 0, return current break.
+    /// - Only moves the break forward; shrink requests are ignored.
     fn sys_brk(&mut self, _args: [u32; 6], _memory: Memory, _metering: &mut dyn Metering) -> u32 {
-        // a0 = new_break; if 0, return current break
         let new_brk = _args[0];
         let current = _memory.next_heap().as_u32();
         if new_brk == 0 {
@@ -933,7 +937,6 @@ impl DefaultSyscallHandler {
             _memory.set_next_heap(VirtualAddress(new_brk));
             new_brk
         } else {
-            // Do not shrink in this minimal implementation.
             current
         }
     }

@@ -9,6 +9,34 @@ pub const PAGE_SHIFT: u32 = 12;
 pub const VPN_MASK: u32 = 0x3ff;
 pub const PAGE_OFFSET_MASK: u32 = 0xfff;
 
+/// Simple permission bits for page mappings (mirrors Sv32 R/W/X/U).
+#[derive(Clone, Copy, Debug)]
+pub struct Perms {
+    pub read: bool,
+    pub write: bool,
+    pub exec: bool,
+    pub user: bool,
+}
+
+impl Perms {
+    pub const fn new(read: bool, write: bool, exec: bool, user: bool) -> Self {
+        Self {
+            read,
+            write,
+            exec,
+            user,
+        }
+    }
+
+    pub fn rwx_kernel() -> Self {
+        Self::new(true, true, true, false)
+    }
+
+    pub fn rw_kernel() -> Self {
+        Self::new(true, true, false, false)
+    }
+}
+
 /// Sv32 virtual address helper newtype.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct VirtualAddress(pub u32);
@@ -66,6 +94,7 @@ impl From<VirtualAddress> for usize {
 }
 
 pub trait Mmu: std::fmt::Debug {
+    // --- CPU-facing data access (loads/stores/fetches) ---
     fn mem(&self) -> Ref<Vec<u8>>;
     fn mem_slice(&self, start: VirtualAddress, end: VirtualAddress) -> Option<std::cell::Ref<[u8]>>;
     fn store_u16(&self, addr: VirtualAddress, val: u16, metering: &mut dyn Metering, kind: MemoryAccessKind) -> bool;
@@ -75,7 +104,10 @@ pub trait Mmu: std::fmt::Debug {
     fn load_byte(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u8>;
     fn load_halfword(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u16>;
     fn load_word(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u32>;
-    fn write_code(&self, start_addr: VirtualAddress, code: &[u8]);
+    /// Set the current page-table root (index/identifier) used for translation.
+    fn set_root(&self, root: usize);
+    /// Get the current page-table root (index/identifier).
+    fn current_root(&self) -> usize;
     fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress;
     fn stack_top(&self) -> VirtualAddress;
     fn size(&self) -> usize;
