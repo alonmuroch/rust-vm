@@ -16,6 +16,11 @@ pub const SYSCALL_TRANSFER: u32 = 9;
 pub const SYSCALL_BALANCE: u32 = 10;
 pub const SYSCALL_COMMIT_STATE: u32 = 11;
 pub const SYSCALL_CREATE_ACCOUNT: u32 = 12;
+// Linux/RISC-V memory management syscall numbers:
+pub const SYSCALL_MMAP: u32 = 222;      // mmap(2): map pages with PROT/FLAGS
+pub const SYSCALL_MUNMAP: u32 = 215;    // munmap(2): unmap a VA range
+pub const SYSCALL_MPROTECT: u32 = 226;  // mprotect(2): change page protections
+pub const SYSCALL_BRK: u32 = 214;       // brk(2): set program break (heap end)
 
 /// Trait implemented by syscall handlers consumed by the VM.
 pub trait SyscallHandler: std::fmt::Debug {

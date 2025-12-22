@@ -3,16 +3,18 @@ use core::fmt::Write;
 use std::any::Any;
 use std::rc::Rc;
 
+use crate::memory::Perms;
 use state::State;
 use types::{ADDRESS_LEN, address::Address, result::RESULT_SIZE};
 use vm::host_interface::HostInterface;
-use vm::memory::{HEAP_PTR_OFFSET, Memory, VirtualAddress};
+use vm::memory::{HEAP_PTR_OFFSET, Memory, VirtualAddress, PAGE_SIZE};
 use vm::metering::{MeterResult, Metering};
 use vm::registers::Register;
 use vm::sys_call::{
-    SYSCALL_ALLOC, SYSCALL_BALANCE, SYSCALL_CALL_PROGRAM, SYSCALL_CREATE_ACCOUNT,
-    SYSCALL_DEALLOC, SYSCALL_FIRE_EVENT, SYSCALL_LOG, SYSCALL_PANIC, SYSCALL_STORAGE_GET,
-    SYSCALL_STORAGE_SET, SYSCALL_TRANSFER, SYSCALL_COMMIT_STATE, SyscallHandler,
+    SYSCALL_ALLOC, SYSCALL_BALANCE, SYSCALL_BRK, SYSCALL_CALL_PROGRAM, SYSCALL_COMMIT_STATE,
+    SYSCALL_CREATE_ACCOUNT, SYSCALL_DEALLOC, SYSCALL_FIRE_EVENT, SYSCALL_LOG, SYSCALL_MMAP,
+    SYSCALL_MPROTECT, SYSCALL_MUNMAP, SYSCALL_PANIC, SYSCALL_STORAGE_GET, SYSCALL_STORAGE_SET,
+    SYSCALL_TRANSFER, SyscallHandler,
 };
 
 /// Represents different types of arguments that can be passed to system calls.
@@ -91,6 +93,10 @@ impl SyscallHandler for DefaultSyscallHandler {
             SYSCALL_BALANCE => self.sys_balance(args, memory, host, metering),
             SYSCALL_COMMIT_STATE => self.sys_commit_state(args, memory, metering),
             SYSCALL_CREATE_ACCOUNT => self.sys_create_account(args, memory, metering),
+            SYSCALL_MMAP => self.sys_mmap(args, memory, metering),
+            SYSCALL_MUNMAP => self.sys_munmap(args, memory, metering),
+            SYSCALL_MPROTECT => self.sys_mprotect(args, memory, metering),
+            SYSCALL_BRK => self.sys_brk(args, memory, metering),
             _ => {
                 panic!("Unknown syscall: {}", call_id);
             }
@@ -864,10 +870,90 @@ impl DefaultSyscallHandler {
         account.is_contract = !account.code.is_empty();
         0
     }
+
+    // ===== Linux-like memory syscalls (stubs) =====
+    fn sys_mmap(&mut self, args: [u32; 6], memory: Memory, _metering: &mut dyn Metering) -> u32 {
+        // a0=addr (hint), a1=len, a2=prot, a3=flags, a4=fd, a5=offset
+        let addr_hint = args[0];
+        let len = args[1] as usize;
+        let prot = args[2];
+        if len == 0 {
+            return 0;
+        }
+        // Align length to page size
+        let aligned_len = (len + (PAGE_SIZE - 1)) & !(PAGE_SIZE - 1);
+        let perms = prot_to_perms(prot);
+
+        // Choose base VA: use hint if provided, else bump next_heap.
+        let base = if addr_hint != 0 {
+            VirtualAddress(addr_hint)
+        } else {
+            let hint = memory.next_heap();
+            VirtualAddress((hint.as_u32() + (PAGE_SIZE as u32 - 1)) & !(PAGE_SIZE as u32 - 1))
+        };
+
+        memory.map_range(base, aligned_len, perms);
+        if addr_hint == 0 {
+            let new_break = base
+                .checked_add(aligned_len as u32)
+                .unwrap_or(VirtualAddress(0));
+            memory.set_next_heap(new_break);
+        }
+        base.as_u32()
+    }
+
+    fn sys_munmap(
+        &mut self,
+        _args: [u32; 6],
+        _memory: Memory,
+        _metering: &mut dyn Metering,
+    ) -> u32 {
+        // Not implemented yet; return success.
+        0
+    }
+
+    fn sys_mprotect(
+        &mut self,
+        _args: [u32; 6],
+        _memory: Memory,
+        _metering: &mut dyn Metering,
+    ) -> u32 {
+        // Not implemented yet; return success.
+        0
+    }
+
+    fn sys_brk(&mut self, _args: [u32; 6], _memory: Memory, _metering: &mut dyn Metering) -> u32 {
+        // a0 = new_break; if 0, return current break
+        let new_brk = _args[0];
+        let current = _memory.next_heap().as_u32();
+        if new_brk == 0 {
+            return current;
+        }
+        if new_brk >= current {
+            _memory.set_next_heap(VirtualAddress(new_brk));
+            new_brk
+        } else {
+            // Do not shrink in this minimal implementation.
+            current
+        }
+    }
 }
 
 fn va_range(ptr: usize, len: usize) -> (VirtualAddress, VirtualAddress) {
     let start = VirtualAddress(ptr as u32);
     let end = start.wrapping_add(len as u32);
     (start, end)
+}
+
+fn prot_to_perms(prot: u32) -> Perms {
+    // Map PROT_* bits (POSIX) to internal permission flags.
+    let read = prot & 0x1 != 0;
+    let write = prot & 0x2 != 0;
+    let exec = prot & 0x4 != 0;
+    Perms {
+        read,
+        write,
+        exec,
+        user: true,
+    }
 }
