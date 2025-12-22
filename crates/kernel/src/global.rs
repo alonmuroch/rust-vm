@@ -17,7 +17,7 @@ impl<T> Global<T> {
     /// # Safety
     /// Callers must ensure exclusive access or otherwise serialize mutations.
     pub unsafe fn get_mut(&self) -> &mut T {
-        &mut *self.inner.get()
+        unsafe { &mut *self.inner.get() }
     }
 }
 

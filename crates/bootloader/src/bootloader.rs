@@ -128,7 +128,7 @@ impl Bootloader {
 
     fn place_bundle(&mut self, vm: &mut VM, bundle: &TransactionBundle) {
         let encoded = bundle.encode();
-        let addr = vm.set_reg_to_data(Register::A0, &encoded);
+        let addr = self.place_data(vm, Register::A0, &encoded);
         // Register a length hint so the kernel can bounds-check the payload.
         vm.set_reg_u32(Register::A1, encoded.len() as u32);
         // Keep heap aligned after our write.
@@ -139,7 +139,7 @@ impl Bootloader {
     }
 
     fn place_state(&mut self, vm: &mut VM, state: &[u8]) {
-        let addr = vm.set_reg_to_data(Register::A2, state);
+        let addr = self.place_data(vm, Register::A2, state);
         vm.set_reg_u32(Register::A3, state.len() as u32);
         vm.memory
             .set_next_heap(VirtualAddress(
@@ -153,6 +153,7 @@ impl Bootloader {
             self.memory.current_root() as u32,
             vm.memory.stack_top().as_u32(),
             self.memory.size() as u32,
+            self.memory.next_free_ppn() as u32,
         );
         let bytes = unsafe {
             slice::from_raw_parts(
@@ -160,10 +161,16 @@ impl Bootloader {
                 mem::size_of::<BootInfo>(),
             )
         };
-        let addr = vm.set_reg_to_data(Register::A4, bytes);
+        let addr = self.place_data(vm, Register::A4, bytes);
         vm.memory
             .set_next_heap(VirtualAddress(
                 (addr as usize + bytes.len() + HEAP_PTR_OFFSET as usize) as u32,
             ));
+    }
+
+    fn place_data(&self, vm: &mut VM, reg: Register, data: &[u8]) -> u32 {
+        let addr = self.memory.alloc_on_heap(data).as_u32();
+        vm.cpu.regs[reg as usize] = addr;
+        addr
     }
 }

@@ -16,14 +16,17 @@ pub struct BootInfo {
     pub kstack_top: u32,
     /// Total physical memory size in bytes.
     pub memory_size: u32,
+    /// First free physical page number after bootloader allocations.
+    pub next_free_ppn: u32,
 }
 
 impl BootInfo {
-    pub const fn new(root_ppn: u32, kstack_top: u32, memory_size: u32) -> Self {
+    pub const fn new(root_ppn: u32, kstack_top: u32, memory_size: u32, next_free_ppn: u32) -> Self {
         Self {
             root_ppn,
             kstack_top,
             memory_size,
+            next_free_ppn,
         }
     }
 }

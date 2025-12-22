@@ -1,4 +1,4 @@
-use super::{Instruction, MemoryAccessKind, Memory, CPU};
+use super::{Instruction, MemoryAccessKind, Memory, CPU, CSR_SATP};
 use crate::memory::VirtualAddress;
 use crate::host_interface::HostInterface;
 use crate::instruction::CsrOp;
@@ -845,7 +845,11 @@ impl CPU {
                     }
                 }
 
-                if src != 0 || matches!(op, CsrOp::Csrrw) {
+                let will_write = src != 0 || matches!(op, CsrOp::Csrrw);
+                if will_write {
+                    if csr == CSR_SATP {
+                        memory.set_satp(new_val);
+                    }
                     if !self.write_csr(csr, new_val) {
                         return false;
                     }

@@ -1,23 +1,31 @@
 use std::cell::{Cell, Ref, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 
-use vm::memory::{Mmu, Perms, VirtualAddress, HEAP_PTR_OFFSET, PAGE_SHIFT};
+use vm::memory::{Mmu, Perms, VirtualAddress};
 use vm::metering::{MeterResult, Metering, MemoryAccessKind};
 
-use crate::memory::pte::Pte;
+// Minimal Sv32 bit layout for guest-visible PTEs.
+const PTE_V: u32 = 1 << 0;
+const PTE_R: u32 = 1 << 1;
+const PTE_W: u32 = 1 << 2;
+const PTE_X: u32 = 1 << 3;
+const PTE_U: u32 = 1 << 4;
+
+// Sv32 satp PPN mask (bits 21:0). Mode bits are ignored in this emulator.
+const SATP_PPN_MASK: u32 = 0x003f_ffff;
 
 /// Software Sv32 MMU backed by a contiguous physical buffer.
 ///
 /// Design at a glance:
 /// - Physical memory is a single `Vec<u8>` (`backing`). Frames are 4 KiB slices into it.
 /// - Virtual→physical is resolved with Sv32-style page tables: L1 root (VPN1) and L2 (VPN0).
-/// - Page tables themselves live in host memory (`root` + `l2_tables`) and store simple PTEs(page table entry).
+/// - Page tables live in guest memory; `translate` walks them using the satp root PPN.
 /// - A bump frame allocator hands out PPNs (physical page numbers) sequentially from the backing; no free list yet.
 /// - Mapping APIs (`map_page`/`map_range`) allocate tables/frames and set R/W/X/U bits.
 /// - `translate` walks VPN1→VPN0, checks permissions against the access kind, and returns a byte
 ///   offset into the backing. All loads/stores go through this path.
-/// - A guest heap bump pointer (`next_heap`) drives simple allocations; writes copy into backing
-///   via translation to respect page boundaries.
+/// - A guest heap bump pointer is tracked per-root.
 ///
 /// Limitations/assumptions:
 /// - No unmap or reuse of frames yet; the allocator only grows.
@@ -32,14 +40,10 @@ pub struct Memory {
     total_pages: usize,
     /// Contiguous physical backing store.
     backing: Rc<RefCell<Vec<u8>>>,
-    /// Collection of root L1 tables (VPN1 index), one per address space.
-    root_tables: RefCell<Vec<Box<[Pte; 1024]>>>,
-    /// Index of the active root in `root_tables`.
-    current_root: Cell<usize>,
-    /// Pool of L2 tables (VPN0 index).
-    l2_tables: RefCell<Vec<Box<[Pte; 1024]>>>,
-    /// Bump allocator for guest heap pointer.
-    next_heap: Cell<VirtualAddress>,
+    /// satp value that selects the active root PPN.
+    satp: Cell<u32>,
+    /// Per-root heap bump pointer (VA).
+    per_root_heap: RefCell<HashMap<u32, VirtualAddress>>,
     /// Next free physical frame index for frame allocation.
     next_free_frame: Cell<usize>,
 }
@@ -53,15 +57,15 @@ impl Memory {
         let total = total_pages
             .checked_mul(page_size)
             .expect("physical memory size overflow");
+        // Reserve frame 0 for the initial root page table.
+        let root_ppn: usize = 0;
         Self {
             page_size,
             total_pages,
             backing: Rc::new(RefCell::new(vec![0u8; total])),
-            root_tables: RefCell::new(vec![Box::new([Pte::default(); 1024])] ),
-            current_root: Cell::new(0),
-            l2_tables: RefCell::new(Vec::new()),
-            next_heap: Cell::new(VirtualAddress(0)),
-            next_free_frame: Cell::new(0),
+            satp: Cell::new(root_ppn as u32),
+            per_root_heap: RefCell::new(HashMap::new()),
+            next_free_frame: Cell::new(root_ppn + 1),
         }
     }
 
@@ -69,11 +73,17 @@ impl Memory {
         self.backing.borrow().len()
     }
 
-    /// Allocate a fresh L1 root table and return its index.
-    pub fn allocate_root(&self) -> usize {
-        let mut roots = self.root_tables.borrow_mut();
-        roots.push(Box::new([Pte::default(); 1024]));
-        roots.len() - 1
+    fn root_ppn(&self) -> usize {
+        (self.satp.get() & SATP_PPN_MASK) as usize
+    }
+
+    fn root_base(&self) -> Option<usize> {
+        let base = self.root_ppn().checked_mul(self.page_size)?;
+        if base + self.page_size > self.total_size() {
+            None
+        } else {
+            Some(base)
+        }
     }
 
     /// Allocate a physical frame (4 KiB) and return its page number, or None if out of frames.
@@ -86,43 +96,100 @@ impl Memory {
         Some(frame)
     }
 
-    /// Allocate a fresh L2 table and return its index in the L2 pool.
-    fn allocate_l2(&self) -> usize {
-        let mut l2s = self.l2_tables.borrow_mut();
-        l2s.push(Box::new([Pte::default(); 1024]));
-        l2s.len() - 1
+    pub fn next_free_ppn(&self) -> usize {
+        self.next_free_frame.get()
+    }
+
+    fn zero_frame(&self, ppn: usize) {
+        let mut backing = self.backing.borrow_mut();
+        let start = ppn
+            .checked_mul(self.page_size)
+            .expect("frame offset overflow");
+        let end = start + self.page_size;
+        backing[start..end].fill(0);
+    }
+
+    fn read_pte(&self, phys_addr: usize) -> Option<u32> {
+        let backing = self.backing.borrow();
+        let end = phys_addr.checked_add(4)?;
+        if end > backing.len() {
+            return None;
+        }
+        Some(u32::from_le_bytes(
+            backing[phys_addr..end].try_into().unwrap(),
+        ))
+    }
+
+    fn write_pte(&self, phys_addr: usize, val: u32) {
+        let mut backing = self.backing.borrow_mut();
+        let end = phys_addr
+            .checked_add(4)
+            .expect("pte write offset overflow");
+        if end > backing.len() {
+            panic!("pte write out of bounds");
+        }
+        backing[phys_addr..end].copy_from_slice(&val.to_le_bytes());
     }
 
     /// Map a single 4 KiB page at `va` with the given permissions, allocating tables/frames as needed.
     fn map_page(&self, va: VirtualAddress, perms: Perms) {
+        let root_base = self.root_base().expect("invalid root page table base");
         let vpn1 = va.vpn1() as usize;
         let vpn0 = va.vpn0() as usize;
-        let mut roots = self.root_tables.borrow_mut();
-        let current = self.current_root.get();
-        let root = roots
-            .get_mut(current)
-            .unwrap_or_else(|| panic!("invalid root index {}", current));
-        if root[vpn1].next_l2.is_none() {
-            let l2_idx = self.allocate_l2();
-            root[vpn1].next_l2 = Some(l2_idx);
-            root[vpn1].valid = true;
-        }
-        let l2_idx = root[vpn1].next_l2.expect("l2 table missing");
-        drop(roots);
 
-        let mut l2s = self.l2_tables.borrow_mut();
-        let l2 = &mut l2s[l2_idx];
-        if !l2[vpn0].valid {
-            let frame = self
-                .allocate_frame()
-                .expect("out of physical frames while mapping");
-            l2[vpn0].ppn = frame;
-            l2[vpn0].valid = true;
-            l2[vpn0].read = perms.read;
-            l2[vpn0].write = perms.write;
-            l2[vpn0].exec = perms.exec;
-            l2[vpn0].user = perms.user;
+        // Ensure L2 table exists.
+        let root_pte_addr = root_base + vpn1 * core::mem::size_of::<u32>();
+        let root_pte = self.read_pte(root_pte_addr).unwrap_or(0);
+        let root_is_valid = root_pte & PTE_V != 0;
+        let root_has_perms = root_pte & (PTE_R | PTE_W | PTE_X) != 0;
+
+        if root_is_valid && root_has_perms {
+            panic!("superpages not supported");
         }
+
+        let l2_ppn = if root_is_valid {
+            (root_pte >> 10) as usize
+        } else {
+            let l2_frame = self
+                .allocate_frame()
+                .expect("out of physical frames while mapping L2");
+            self.zero_frame(l2_frame);
+            let new_pte = ((l2_frame as u32) << 10) | PTE_V;
+            self.write_pte(root_pte_addr, new_pte);
+            l2_frame
+        };
+
+        let l2_base = l2_ppn
+            .checked_mul(self.page_size)
+            .expect("l2 base overflow");
+        let leaf_addr = l2_base + vpn0 * core::mem::size_of::<u32>();
+
+        if let Some(existing) = self.read_pte(leaf_addr) {
+            if existing & PTE_V != 0 {
+                return;
+            }
+        }
+
+        let frame = self
+            .allocate_frame()
+            .expect("out of physical frames while mapping leaf");
+        self.zero_frame(frame);
+
+        let mut flags = PTE_V;
+        if perms.read {
+            flags |= PTE_R;
+        }
+        if perms.write {
+            flags |= PTE_W;
+        }
+        if perms.exec {
+            flags |= PTE_X;
+        }
+        if perms.user {
+            flags |= PTE_U;
+        }
+        let leaf_pte = ((frame as u32) << 10) | flags;
+        self.write_pte(leaf_addr, leaf_pte);
     }
 
     /// Map a contiguous virtual range page-by-page with the given permissions.
@@ -141,33 +208,55 @@ impl Memory {
     }
 
     /// Translate a virtual address to a physical offset into `backing`, checking permissions.
+    ///
+    /// This emulates an Sv32 page-table walk driven by the current `satp`:
+    /// - `satp` PPN selects the root L1 page table (written by the kernel in guest memory).
+    /// - We read the L1 PTE at VPN1; it must be valid and non-leaf (no superpages here).
+    /// - From that PPN we read the L2 PTE at VPN0; it must be valid and carry R/W/X bits.
+    /// - Permissions are checked against the access kind; on success we return a byte offset
+    ///   into the physical backing buffer.
+    ///
+    /// All PTE bytes we read here are what the kernel previously wrote into guest memory;
+    /// the host MMU just interprets them to enforce translations.
     fn translate(&self, va: VirtualAddress, kind: MemoryAccessKind) -> Option<usize> {
+        let root_base = self.root_base()?;
         let vpn1 = va.vpn1() as usize;
         let vpn0 = va.vpn0() as usize;
         let offset = va.offset() as usize;
-        let roots = self.root_tables.borrow();
-        let root = roots
-            .get(self.current_root.get())
-            .unwrap_or_else(|| panic!("invalid root index {}", self.current_root.get()));
-        let l2_idx = root.get(vpn1).and_then(|pte| pte.next_l2)?;
-        let l2s = self.l2_tables.borrow();
-        let l2 = l2s.get(l2_idx)?;
-        let leaf = l2.get(vpn0)?;
-        if !leaf.valid || !leaf.is_leaf() {
+
+        let root_pte_addr = root_base + vpn1 * core::mem::size_of::<u32>();
+        let root_pte = self.read_pte(root_pte_addr)?;
+        if root_pte & PTE_V == 0 {
             return None;
         }
-        // Basic permission check: align MemoryAccessKind to R/W.
+
+        // We only support two-level translation; reject L1 leaf/superpages.
+        if root_pte & (PTE_R | PTE_W | PTE_X) != 0 {
+            return None;
+        }
+
+        let l2_ppn = (root_pte >> 10) as usize;
+        let l2_base = l2_ppn
+            .checked_mul(self.page_size)
+            .expect("l2 base overflow");
+        let l2_pte_addr = l2_base + vpn0 * core::mem::size_of::<u32>();
+        let l2_pte = self.read_pte(l2_pte_addr)?;
+        if l2_pte & PTE_V == 0 {
+            return None;
+        }
+
         let allowed = match kind {
-            MemoryAccessKind::Load | MemoryAccessKind::ReservationLoad => leaf.read || leaf.exec,
-            MemoryAccessKind::Store
-            | MemoryAccessKind::Atomic
-            | MemoryAccessKind::ReservationStore => leaf.write,
+            MemoryAccessKind::Load | MemoryAccessKind::ReservationLoad => l2_pte & (PTE_R | PTE_X) != 0,
+            MemoryAccessKind::Store | MemoryAccessKind::Atomic | MemoryAccessKind::ReservationStore => l2_pte & PTE_W != 0,
         };
         if !allowed {
             return None;
         }
-        let pa = (leaf.ppn << PAGE_SHIFT) + offset;
-        Some(pa)
+
+        let leaf_ppn = (l2_pte >> 10) as usize;
+        leaf_ppn
+            .checked_mul(self.page_size)
+            .and_then(|base| base.checked_add(offset))
     }
 
     fn meter_access(
@@ -180,6 +269,18 @@ impl Memory {
             metering.on_memory_access(kind, addr.as_usize(), bytes),
             MeterResult::Continue
         )
+    }
+
+    fn next_heap_for_root(&self) -> VirtualAddress {
+        let key = self.satp.get();
+        let mut heaps = self.per_root_heap.borrow_mut();
+        *heaps.entry(key).or_insert_with(|| VirtualAddress(0))
+    }
+
+    fn set_next_heap_for_root(&self, next: VirtualAddress) {
+        let key = self.satp.get();
+        let mut heaps = self.per_root_heap.borrow_mut();
+        heaps.insert(key, next);
     }
 
     /// Copy a slice into physical backing, honoring translation and page boundaries.
@@ -211,6 +312,29 @@ impl Memory {
     pub fn write_bytes(&self, start: VirtualAddress, data: &[u8]) {
         self.copy_into_backing(start, data, MemoryAccessKind::Store);
     }
+
+    /// Allocate space on the per-root heap, map it writable, and copy data.
+    pub fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress {
+        let mut addr = self.next_heap_for_root().as_u32();
+        let align = 8;
+        addr = (addr + (align - 1)) & !(align - 1);
+        let end = addr + data.len() as u32;
+        let start_va = VirtualAddress(addr);
+        self.map_range(start_va, data.len(), Perms::rw_kernel());
+
+        self.copy_into_backing(start_va, data, MemoryAccessKind::Store);
+        let end_va = VirtualAddress(end);
+        self.set_next_heap_for_root(end_va);
+        start_va
+    }
+
+    pub fn next_heap(&self) -> VirtualAddress {
+        self.next_heap_for_root()
+    }
+
+    pub fn set_next_heap(&self, next: VirtualAddress) {
+        self.set_next_heap_for_root(next);
+    }
 }
 
 impl Mmu for Memory {
@@ -222,16 +346,8 @@ impl Mmu for Memory {
         Memory::map_range(self, start, len, perms);
     }
 
-    fn set_root(&self, root: usize) {
-        let roots = self.root_tables.borrow();
-        if root >= roots.len() {
-            panic!("set_root: invalid root index {}", root);
-        }
-        self.current_root.set(root);
-    }
-
     fn current_root(&self) -> usize {
-        self.current_root.get()
+        self.root_ppn()
     }
 
     fn mem_slice(
@@ -375,24 +491,6 @@ impl Mmu for Memory {
         ))
     }
 
-    fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress {
-        let mut addr = self.next_heap.get().as_u32();
-        let align = 8;
-        addr = (addr + (align - 1)) & !(align - 1);
-        let end = addr + data.len() as u32;
-        let start_va = VirtualAddress(addr);
-        self.map_range(start_va, data.len(), Perms::rw_kernel());
-
-        self.copy_into_backing(start_va, data, MemoryAccessKind::Store);
-        let end_va = VirtualAddress(end);
-        self.next_heap.set(end_va);
-        start_va
-    }
-
-    fn stack_top(&self) -> VirtualAddress {
-        VirtualAddress(self.total_size() as u32)
-    }
-
     fn size(&self) -> usize {
         self.total_size()
     }
@@ -401,11 +499,27 @@ impl Mmu for Memory {
         addr.as_usize()
     }
 
+    fn set_satp(&self, satp: u32) {
+        self.satp.set(satp & SATP_PPN_MASK);
+    }
+
+    fn satp(&self) -> u32 {
+        self.satp.get()
+    }
+
+    fn stack_top(&self) -> VirtualAddress {
+        VirtualAddress(self.total_size() as u32)
+    }
+
+    fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress {
+        Memory::alloc_on_heap(self, data)
+    }
+
     fn next_heap(&self) -> VirtualAddress {
-        self.next_heap.get()
+        self.next_heap_for_root()
     }
 
     fn set_next_heap(&self, next: VirtualAddress) {
-        self.next_heap.set(next);
+        self.set_next_heap_for_root(next);
     }
 }

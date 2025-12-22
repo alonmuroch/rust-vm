@@ -104,14 +104,16 @@ pub trait Mmu: std::fmt::Debug {
     fn load_byte(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u8>;
     fn load_halfword(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u16>;
     fn load_word(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u32>;
-    /// Map a virtual range with the provided permissions.
     fn map_range(&self, start: VirtualAddress, len: usize, perms: Perms);
-    /// Set the current page-table root (index/identifier) used for translation.
-    fn set_root(&self, root: usize);
     /// Get the current page-table root (index/identifier).
     fn current_root(&self) -> usize;
-    fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress;
+    /// Read the current satp value.
+    fn satp(&self) -> u32;
+    /// Set satp (PPN field is used for the root in this emulator).
+    fn set_satp(&self, satp: u32);
+    /// Top of the stack for this memory layout.
     fn stack_top(&self) -> VirtualAddress;
+    fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress;
     fn size(&self) -> usize;
     fn offset(&self, addr: VirtualAddress) -> usize;
     fn next_heap(&self) -> VirtualAddress;

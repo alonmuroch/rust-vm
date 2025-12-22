@@ -1,6 +1,6 @@
-use crate::cpu::CPU;
+use crate::cpu::{CPU, CSR_SATP};
 use crate::host_interface::HostInterface;
-use crate::memory::{Memory, VirtualAddress};
+use crate::memory::Memory;
 use crate::metering::Metering;
 use crate::registers::Register;
 use crate::sys_call::SyscallHandler;
@@ -50,6 +50,7 @@ impl VM {
     ) -> Self {
         let mut cpu = CPU::new(syscall_handler);
         cpu.regs[Register::Sp as usize] = memory.stack_top().as_u32();
+        cpu.csrs.insert(CSR_SATP, memory.satp());
         Self {
             cpu,
             memory,
@@ -61,58 +62,6 @@ impl VM {
     pub fn set_metering(&mut self, metering: Box<dyn Metering>) {
         self.cpu.set_metering(metering);
     }
-
-    /// Allocates memory on the heap and writes data to it.
-    ///
-    /// EDUCATIONAL PURPOSE: This demonstrates dynamic memory allocation in a VM.
-    /// Programs need to allocate memory for variables, arrays, and other data
-    /// structures at runtime.
-    ///
-    /// HEAP MANAGEMENT: The VM maintains a heap pointer that moves forward
-    /// as memory is allocated. This is a simple but effective allocation strategy.
-    ///
-    /// RETURN VALUE: Returns the address where the data was written
-    pub fn alloc_and_write(&mut self, data: &[u8]) -> u32 {
-        self.memory.alloc_on_heap(data).as_u32()
-    }
-
-    /// Sets a register to point to data in memory.
-    ///
-    /// EDUCATIONAL PURPOSE: This demonstrates how to pass data to programs
-    /// running in the VM. Instead of copying data into registers (which are
-    /// limited in size), we store the data in memory and pass the address.
-    ///
-    /// PARAMETER PASSING: This is how we pass strings, arrays, and other
-    /// large data structures to programs. The register contains a pointer
-    /// to the actual data in memory.
-    ///
-    /// DEBUG OUTPUT: The function prints information about what it's doing,
-    /// which is helpful for understanding VM behavior during development.
-    pub fn set_reg_to_data(&mut self, reg: Register, data: &[u8]) -> u32 {
-        // EDUCATIONAL: Allocate memory and write the data
-        let addr = self.alloc_and_write(data);
-
-        // EDUCATIONAL: Set the register to point to the data
-        self.cpu.regs[reg as usize] = addr;
-
-        // EDUCATIONAL: Debug output to help understand what's happening
-        println!(
-            "📥 set reg x{} to addr 0x{:08x} (len = {})",
-            reg as u32,
-            addr,
-            data.len()
-        );
-
-        addr
-    }
-
-    /// Sets a register to a 32-bit value.
-    ///
-    /// EDUCATIONAL PURPOSE: This is used for passing small values (like
-    /// integers) directly to programs. For larger data, use set_reg_to_data.
-    ///
-    /// USAGE: Typically used for passing function parameters, flags, or
-    /// other small values that fit in a single register.
     pub fn set_reg_u32(&mut self, reg: Register, data: u32) {
         self.cpu.regs[reg as usize] = data;
     }

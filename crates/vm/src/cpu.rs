@@ -11,6 +11,8 @@ use std::rc::Rc;
 #[path = "exe.rs"]
 mod exec;
 
+pub const CSR_SATP: u16 = 0x180;
+
 /// Represents the Central Processing Unit (CPU) of our RISC-V virtual machine.
 /// 
 /// EDUCATIONAL PURPOSE: This struct models the core components of a real CPU:

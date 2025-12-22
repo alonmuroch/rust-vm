@@ -7,7 +7,7 @@ use alloc::{format, vec, vec::Vec};
 use core::mem::forget;
 use core::ptr;
 use core::slice;
-use kernel::{BootInfo, Config, Task, launch_program, PROGRAM_WINDOW_BYTES};
+use kernel::{BootInfo, Config, Task, launch_program, mmu, PROGRAM_WINDOW_BYTES};
 use program::{log, logf};
 use state::State;
 use types::transaction::{Transaction, TransactionBundle, TransactionType};
@@ -22,6 +22,7 @@ const KERNEL_TASK_IDX: usize = 0;
 static TASKS: Global<Option<Vec<Task>>> = Global::new(None);
 static STATE: Global<Option<State>> = Global::new(None);
 static BOOT_INFO: Global<Option<BootInfo>> = Global::new(None);
+static PAGE_ALLOC_INIT: Global<bool> = Global::new(false);
 
 /// Kernel entrypoint. Receives:
 /// - `bundle_ptr`/`bundle_len`: encoded `TransactionBundle` prepared by the bootloader.
@@ -58,6 +59,12 @@ pub extern "C" fn _start(
     if let Some(info) = unsafe { boot_info_ptr.as_ref() } {
         unsafe {
             *BOOT_INFO.get_mut() = Some(*info);
+        }
+        unsafe {
+            if !*PAGE_ALLOC_INIT.get_mut() {
+                mmu::init(info);
+                *PAGE_ALLOC_INIT.get_mut() = true;
+            }
         }
         let task = Task::kernel(info.root_ppn, info.kstack_top);
         unsafe {

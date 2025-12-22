@@ -1,5 +1,3 @@
-#![no_std]
-
 pub struct Config;
 
 impl Config {
