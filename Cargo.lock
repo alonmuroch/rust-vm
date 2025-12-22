@@ -160,7 +160,6 @@ dependencies = [
  "bootloader",
  "compiler",
  "k256",
- "kernel",
  "once_cell",
  "program",
  "serde_json",

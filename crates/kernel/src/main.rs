@@ -5,21 +5,23 @@ extern crate alloc;
 
 use alloc::{format, vec, vec::Vec};
 use core::mem::forget;
+use core::ptr;
 use core::slice;
-use kernel::{BootInfo, Config, Task};
+use kernel::{BootInfo, Config, Task, launch_program, PROGRAM_WINDOW_BYTES};
 use program::{log, logf};
 use state::State;
 use types::transaction::{Transaction, TransactionBundle, TransactionType};
 
+mod global;
+use crate::global::Global;
+
 #[allow(dead_code)]
 const KERNEL_TASK_IDX: usize = 0;
-
-mod global;
-use global::Global;
 
 #[allow(dead_code)]
 static TASKS: Global<Option<Vec<Task>>> = Global::new(None);
 static STATE: Global<Option<State>> = Global::new(None);
+static BOOT_INFO: Global<Option<BootInfo>> = Global::new(None);
 
 /// Kernel entrypoint. Receives:
 /// - `bundle_ptr`/`bundle_len`: encoded `TransactionBundle` prepared by the bootloader.
@@ -54,6 +56,9 @@ pub extern "C" fn _start(
     }
 
     if let Some(info) = unsafe { boot_info_ptr.as_ref() } {
+        unsafe {
+            *BOOT_INFO.get_mut() = Some(*info);
+        }
         let task = Task::kernel(info.root_ppn, info.kstack_top);
         unsafe {
             let tasks_slot = TASKS.get_mut();
@@ -98,6 +103,7 @@ pub extern "C" fn _start(
 fn execute_transaction(tx: &Transaction) {
     match tx.tx_type {
         TransactionType::CreateAccount => create_account(tx),
+        TransactionType::ProgramCall => program_call(tx),
         _ => log!("executing transaction"),
     }
 }
@@ -131,6 +137,71 @@ fn create_account(tx: &Transaction) {
     );
     let msg_ref: &str = msg.as_str();
     log!(msg_ref);
+}
+
+fn program_call(tx: &Transaction) {
+    let state = unsafe { STATE.get_mut().get_or_insert_with(State::new) };
+    let account = match state.get_account(&tx.to) {
+        Some(acc) => acc,
+        None => {
+            logf!(
+                "%s",
+                display: format!("Program call failed: account {} does not exist", tx.to)
+            );
+            return;
+        }
+    };
+
+    if !account.is_contract {
+        logf!(
+            "%s",
+            display: format!(
+                "Program call failed: target {} is not a contract (code_len={})",
+                tx.to,
+                account.code.len()
+            )
+        );
+        return;
+    }
+
+    let code_len = account.code.len();
+    let max = Config::CODE_SIZE_LIMIT + Config::RO_DATA_SIZE_LIMIT;
+    if code_len > max {
+        panic!(
+            "❌ Program call rejected: code size ({}) exceeds limit ({})",
+            code_len, max
+        );
+    }
+
+    logf!(
+        "%s",
+        display: format!(
+            "Program call: from={} to={} input_len={} code_len={}",
+            tx.from,
+            tx.to,
+            tx.data.len(),
+            code_len
+        )
+    );
+
+    let kstack_top = unsafe { BOOT_INFO.get_mut().as_ref().map(|b| b.kstack_top).unwrap_or(0) };
+
+    if let Some(task) = launch_program(0, kstack_top) {
+        logf!(
+            "Program task created: root=0x%x window_size=%d",
+            task.addr_space.root_ppn,
+            PROGRAM_WINDOW_BYTES as u32
+        );
+        unsafe {
+            let tasks_slot = TASKS.get_mut();
+            match tasks_slot {
+                Some(tasks) => tasks.push(task),
+                None => *tasks_slot = Some(vec![task]),
+            }
+        }
+    } else {
+        log!("Program call skipped: no memory manager installed");
+    }
 }
 
 #[inline(never)]

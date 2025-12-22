@@ -1,4 +1,3 @@
-use kernel::Config;
 use compiler::elf::parse_elf_from_bytes;
 use compiler::{EventAbi, EventParam, ParamType};
 use serde_json::Value;
@@ -127,16 +126,6 @@ pub fn get_program_code(name: &str) -> Vec<u8> {
     let (rodata, rodata_start) = elf
         .get_flat_rodata()
         .unwrap_or_else(|| (vec![], usize::MAX as u64));
-
-    // assert sizes
-    assert!(
-        code.len() <= Config::CODE_SIZE_LIMIT,
-        "code size exceeds limit"
-    );
-    assert!(
-        rodata.len() <= Config::RO_DATA_SIZE_LIMIT,
-        "read only data size exceeds limit"
-    );
 
     let mut total_len = code_start + code.len() as u64; // assumes rodata is after code
     if rodata.len() > 0 {
