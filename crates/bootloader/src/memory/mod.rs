@@ -1,7 +1,7 @@
 //! Simple in-memory pages for the OS boot/runtime layers.
 
-mod memory_page;
-mod stacked_memory;
+mod memory;
+mod pte;
 
-pub use memory_page::MemoryPage;
-pub use stacked_memory::StackedMemory;
+pub use memory::Memory;
+pub(crate) use pte::Pte;

@@ -7,10 +7,10 @@ use goblin::elf::Elf;
 use types::transaction::TransactionBundle;
 
 use crate::DefaultSyscallHandler;
-use crate::memory::StackedMemory;
+use crate::memory::Memory;
 use state::State;
 use vm::host_interface::NoopHost;
-use vm::memory::{HEAP_PTR_OFFSET, Memory};
+use vm::memory::{HEAP_PTR_OFFSET, Memory as MmuRef, VirtualAddress, PAGE_SIZE};
 use vm::registers::Register;
 use vm::vm::VM;
 
@@ -33,19 +33,19 @@ impl Default for BootConfig {
 #[derive(Debug)]
 pub struct Bootloader {
     pub config: BootConfig,
-    memory: StackedMemory,
+    memory: Rc<Memory>,
 }
 
 impl Bootloader {
-    pub fn new(max_pages: usize, page_size: usize) -> Self {
+    pub fn new(total_size_bytes: usize) -> Self {
         Self {
             config: BootConfig::default(),
-            memory: StackedMemory::new(max_pages, page_size),
+            memory: Rc::new(Memory::new(total_size_bytes, PAGE_SIZE)),
         }
     }
 
     /// Load an ELF kernel image into a fresh page and return its entry point + backing memory.
-    pub fn load_kernel(&mut self, elf_bytes: &[u8]) -> (u32, Memory) {
+    pub fn load_kernel(&mut self, elf_bytes: &[u8]) -> (u32, MmuRef) {
         let elf = parse_elf_from_bytes(elf_bytes).expect("failed to parse kernel ELF");
         let entry_point = Elf::parse(elf_bytes)
             .expect("failed to parse entry point")
@@ -60,12 +60,11 @@ impl Bootloader {
         let image_end = core::cmp::max(code_end, ro_end);
         let image_size = image_end.checked_sub(min_base).expect("invalid image size");
 
-        let page = self.memory.new_page();
         assert!(
-            image_end <= page.size(),
-            "ELF image does not fit in a single page (need {}, have {})",
+            image_end <= self.memory.size(),
+            "ELF image does not fit in mapped memory (need {}, have {})",
             image_end,
-            page.size()
+            self.memory.size()
         );
 
         // Flatten code + rodata into a single buffer and write once to set heap pointer properly.
@@ -77,8 +76,9 @@ impl Bootloader {
             image[ro_off..ro_off + rodata.len()].copy_from_slice(&rodata);
         }
 
-        page.write_code(min_base, &image);
-        (entry_point, page)
+        self.memory
+            .write_code(VirtualAddress(min_base as u32), &image);
+        (entry_point, self.memory.clone() as MmuRef)
     }
 
     /// Execute a transaction bundle by delegating to the kernel. This mirrors the
@@ -108,13 +108,17 @@ impl Bootloader {
         vm.set_reg_u32(Register::A1, encoded.len() as u32);
         // Keep heap aligned after our write.
         vm.memory
-            .set_next_heap((addr as usize + encoded.len() + HEAP_PTR_OFFSET as usize) as u32);
+            .set_next_heap(VirtualAddress(
+                (addr as usize + encoded.len() + HEAP_PTR_OFFSET as usize) as u32,
+            ));
     }
 
     fn place_state(&mut self, vm: &mut VM, state: &[u8]) {
         let addr = vm.set_reg_to_data(Register::A2, state);
         vm.set_reg_u32(Register::A3, state.len() as u32);
         vm.memory
-            .set_next_heap((addr as usize + state.len() + HEAP_PTR_OFFSET as usize) as u32);
+            .set_next_heap(VirtualAddress(
+                (addr as usize + state.len() + HEAP_PTR_OFFSET as usize) as u32,
+            ));
     }
 }

@@ -6,7 +6,7 @@ use std::rc::Rc;
 use state::State;
 use types::{ADDRESS_LEN, address::Address, result::RESULT_SIZE};
 use vm::host_interface::HostInterface;
-use vm::memory::{HEAP_PTR_OFFSET, Memory};
+use vm::memory::{HEAP_PTR_OFFSET, Memory, VirtualAddress};
 use vm::metering::{MeterResult, Metering};
 use vm::registers::Register;
 use vm::sys_call::{
@@ -125,7 +125,8 @@ impl DefaultSyscallHandler {
 
         // EDUCATIONAL: Safely read the key from memory
         // EDUCATIONAL: Create a limited scope to avoid borrow checker issues
-        let event_bytes = match borrowed_memory.mem_slice(ptr, ptr + len) {
+        let (start, end) = va_range(ptr, len);
+        let event_bytes = match borrowed_memory.mem_slice(start, end) {
             Some(r) => r,
             None => panic!("invalid memory access"), // Invalid memory access
         };
@@ -160,17 +161,17 @@ impl DefaultSyscallHandler {
         let borrowed_memory = memory.as_ref();
 
         // Parse address
-        let address_slice_ref =
-            match borrowed_memory.mem_slice(address_ptr, address_ptr + ADDRESS_LEN) {
-                Some(r) => r,
-                None => {
-                    println!(
-                        "❌ Storage GET - Invalid address memory access: ptr={}, len={}",
-                        address_ptr, ADDRESS_LEN
-                    );
-                    return 0;
-                }
-            };
+        let (address_start, address_end) = va_range(address_ptr, ADDRESS_LEN);
+        let address_slice_ref = match borrowed_memory.mem_slice(address_start, address_end) {
+            Some(r) => r,
+            None => {
+                println!(
+                    "❌ Storage GET - Invalid address memory access: ptr={}, len={}",
+                    address_ptr, ADDRESS_LEN
+                );
+                return 0;
+            }
+        };
         let address_bytes = address_slice_ref.as_ref();
         let address_hex = address_bytes
             .iter()
@@ -183,17 +184,17 @@ impl DefaultSyscallHandler {
 
         // Parse domain
         let domain_slice = {
-            let domain_slice_ref =
-                match borrowed_memory.mem_slice(domain_ptr, domain_ptr + domain_len) {
-                    Some(r) => r,
-                    None => {
-                        println!(
-                            "❌ Storage GET - Invalid domain memory access: ptr={}, len={}",
-                            domain_ptr, domain_len
-                        );
-                        return 0;
-                    }
-                };
+            let (domain_start, domain_end) = va_range(domain_ptr, domain_len);
+            let domain_slice_ref = match borrowed_memory.mem_slice(domain_start, domain_end) {
+                Some(r) => r,
+                None => {
+                    println!(
+                        "❌ Storage GET - Invalid domain memory access: ptr={}, len={}",
+                        domain_ptr, domain_len
+                    );
+                    return 0;
+                }
+            };
             domain_slice_ref.as_ref().to_vec()
         };
         let domain = match core::str::from_utf8(&domain_slice) {
@@ -209,7 +210,8 @@ impl DefaultSyscallHandler {
 
         // Parse key
         let key_slice = {
-            let key_slice_ref = match borrowed_memory.mem_slice(key_ptr, key_ptr + key_len) {
+            let (key_start, key_end) = va_range(key_ptr, key_len);
+            let key_slice_ref = match borrowed_memory.mem_slice(key_start, key_end) {
                 Some(r) => r,
                 None => {
                     println!(
@@ -258,7 +260,7 @@ impl DefaultSyscallHandler {
                 "✅ Found value for address: '{}', domain: '{}', Key: '{}'",
                 address_hex, domain, display_key
             );
-            return addr;
+            return addr.as_u32();
         } else {
             println!(
                 "❌ No value found for address: '{}', domain: '{}', key: '{}'",
@@ -298,17 +300,17 @@ impl DefaultSyscallHandler {
         let borrowed_memory = memory.as_ref();
 
         // Parse address
-        let address_slice_ref =
-            match borrowed_memory.mem_slice(address_ptr, address_ptr + ADDRESS_LEN) {
-                Some(r) => r,
-                None => {
-                    println!(
-                        "❌ Storage SET - Invalid address memory access: ptr={}, len={}",
-                        address_ptr, ADDRESS_LEN
-                    );
-                    return 0;
-                }
-            };
+        let (address_start, address_end) = va_range(address_ptr, ADDRESS_LEN);
+        let address_slice_ref = match borrowed_memory.mem_slice(address_start, address_end) {
+            Some(r) => r,
+            None => {
+                println!(
+                    "❌ Storage SET - Invalid address memory access: ptr={}, len={}",
+                    address_ptr, ADDRESS_LEN
+                );
+                return 0;
+            }
+        };
         let address_bytes = address_slice_ref.as_ref();
         let address_hex = address_bytes
             .iter()
@@ -320,8 +322,8 @@ impl DefaultSyscallHandler {
         let address = Address(addr_arr);
 
         // Parse domain
-        let domain_slice_ref = match borrowed_memory.mem_slice(domain_ptr, domain_ptr + domain_len)
-        {
+        let (domain_start, domain_end) = va_range(domain_ptr, domain_len);
+        let domain_slice_ref = match borrowed_memory.mem_slice(domain_start, domain_end) {
             Some(r) => r,
             None => {
                 println!(
@@ -344,7 +346,8 @@ impl DefaultSyscallHandler {
         };
 
         // Parse key
-        let key_slice_ref = match borrowed_memory.mem_slice(key_ptr, key_ptr + key_len) {
+        let (key_start, key_end) = va_range(key_ptr, key_len);
+        let key_slice_ref = match borrowed_memory.mem_slice(key_start, key_end) {
             Some(r) => r,
             None => {
                 println!(
@@ -375,7 +378,8 @@ impl DefaultSyscallHandler {
         };
 
         // Parse value
-        let value_slice_ref = match borrowed_memory.mem_slice(val_ptr, val_ptr + val_len) {
+        let (val_start, val_end) = va_range(val_ptr, val_len);
+        let value_slice_ref = match borrowed_memory.mem_slice(val_start, val_end) {
             Some(r) => r,
             None => {
                 println!(
@@ -407,8 +411,9 @@ impl DefaultSyscallHandler {
     fn sys_panic_with_message(&mut self, regs: &mut [u32; 32], memory: Memory) -> u32 {
         let msg_ptr = regs[Register::A0 as usize] as usize;
         let msg_len = regs[Register::A1 as usize] as usize;
+        let (msg_start, msg_end) = va_range(msg_ptr, msg_len);
         let msg = memory
-            .mem_slice(msg_ptr, msg_ptr + msg_len)
+            .mem_slice(msg_start, msg_end)
             .map(|bytes| String::from_utf8_lossy(bytes.as_ref()).into_owned())
             .unwrap_or_else(|| "<invalid memory access>".to_string());
         panic!("🔥 Guest panic: {}", msg);
@@ -424,14 +429,14 @@ impl DefaultSyscallHandler {
             panic!("Metering halted SYSCALL_LOG");
         }
         let borrowed_memory = memory.as_ref();
-        let fmt_slice =
-            match borrowed_memory.mem_slice(fmt_ptr as usize, (fmt_ptr + fmt_len) as usize) {
-                Some(s) => s,
-                None => {
-                    println!("⚠️ invalid format string @ 0x{:08x}", fmt_ptr);
-                    return 0;
-                }
-            };
+        let (fmt_start, fmt_end) = va_range(fmt_ptr as usize, fmt_len as usize);
+        let fmt_slice = match borrowed_memory.mem_slice(fmt_start, fmt_end) {
+            Some(s) => s,
+            None => {
+                println!("⚠️ invalid format string @ 0x{:08x}", fmt_ptr);
+                return 0;
+            }
+        };
         let fmt_bytes = fmt_slice.as_ref();
         let fmt = match core::str::from_utf8(fmt_bytes) {
             Ok(s) => s,
@@ -442,8 +447,8 @@ impl DefaultSyscallHandler {
                 return 0;
             }
         };
-        let args_bytes_slice =
-            borrowed_memory.mem_slice(arg_ptr as usize, (arg_ptr + arg_len) as usize);
+        let (args_start, args_end) = va_range(arg_ptr as usize, arg_len as usize);
+        let args_bytes_slice = borrowed_memory.mem_slice(args_start, args_end);
         let args_bytes_holder;
         let args_bytes: &[u8] = if let Some(slice) = args_bytes_slice {
             args_bytes_holder = slice;
@@ -471,7 +476,8 @@ impl DefaultSyscallHandler {
                 's' => {
                     let ptr = next() as usize;
                     let len = next() as usize;
-                    match borrowed_memory.mem_slice(ptr, ptr + len) {
+                    let (start, end) = va_range(ptr, len);
+                    match borrowed_memory.mem_slice(start, end) {
                         Some(slice) => {
                             let s_ptr = core::str::from_utf8(slice.as_ref());
                             args.push(match s_ptr {
@@ -487,7 +493,8 @@ impl DefaultSyscallHandler {
                 'b' => {
                     let ptr = next() as usize;
                     let len = next() as usize;
-                    match borrowed_memory.mem_slice(ptr, ptr + len) {
+                    let (start, end) = va_range(ptr, len);
+                    match borrowed_memory.mem_slice(start, end) {
                         Some(slice) => {
                             args.push(Arg::Bytes(slice.to_vec()));
                         }
@@ -501,7 +508,8 @@ impl DefaultSyscallHandler {
                     let ptr = next() as usize;
                     let len = next() as usize;
                     let byte_len = len * 4; // u32 is 4 bytes
-                    match borrowed_memory.mem_slice(ptr, ptr + byte_len) {
+                    let (start, end) = va_range(ptr, byte_len);
+                    match borrowed_memory.mem_slice(start, end) {
                         Some(slice) => {
                             args.push(Arg::Bytes(slice.to_vec()));
                         }
@@ -514,7 +522,8 @@ impl DefaultSyscallHandler {
                     // Array of u8s
                     let ptr = next() as usize;
                     let len = next() as usize;
-                    match borrowed_memory.mem_slice(ptr, ptr + len) {
+                    let (start, end) = va_range(ptr, len);
+                    match borrowed_memory.mem_slice(start, end) {
                         Some(slice) => {
                             args.push(Arg::Bytes(slice.to_vec()));
                         }
@@ -632,15 +641,18 @@ impl DefaultSyscallHandler {
         }
         {
             let borrowed_memory = memory.as_ref();
-            let to_slice = match borrowed_memory.mem_slice(to_ptr, to_ptr + 20) {
+            let (to_start, to_end) = va_range(to_ptr, 20);
+            let to_slice = match borrowed_memory.mem_slice(to_start, to_end) {
                 Some(r) => r,
                 None => return 0,
             };
-            let from_slice = match borrowed_memory.mem_slice(from_ptr, from_ptr + 20) {
+            let (from_start, from_end) = va_range(from_ptr, 20);
+            let from_slice = match borrowed_memory.mem_slice(from_start, from_end) {
                 Some(r) => r,
                 None => return 0,
             };
-            let input_slice = match borrowed_memory.mem_slice(input_ptr, input_ptr + input_len) {
+            let (input_start, input_end) = va_range(input_ptr, input_len);
+            let input_slice = match borrowed_memory.mem_slice(input_start, input_end) {
                 Some(r) => r,
                 None => return 0,
             };
@@ -660,7 +672,7 @@ impl DefaultSyscallHandler {
             if matches!(metering.on_alloc(result_bytes.len()), MeterResult::Halt) {
                 panic!("Metering halted alloc for call_program result");
             }
-            borrowed_memory.alloc_on_heap(&result_bytes)
+            borrowed_memory.alloc_on_heap(&result_bytes).as_u32()
         }
     }
 
@@ -686,26 +698,26 @@ impl DefaultSyscallHandler {
         let current_heap = memory.next_heap();
 
         // Initialize heap pointer if not set (no code has been written)
-        if current_heap == 0 {
-            memory.set_next_heap(HEAP_PTR_OFFSET);
+        if current_heap.as_u32() == 0 {
+            memory.set_next_heap(VirtualAddress(HEAP_PTR_OFFSET));
         }
 
         // Allocate aligned memory on heap
         let data = vec![0u8; size];
         let ptr = memory.alloc_on_heap(&data);
 
-        if ptr == 0 {
+        if ptr.as_u32() == 0 {
             println!("VM Alloc: Out of memory, failed to allocate {} bytes", size);
             return 0;
         }
 
         // Check if allocated address meets alignment requirements
-        if (ptr as usize) % align != 0 {
+        if ptr.as_usize() % align != 0 {
             // Re-allocate with enough space for alignment
             let total_size = size + align - 1;
             let padded_data = vec![0u8; total_size];
             let padded_ptr = memory.alloc_on_heap(&padded_data);
-            if padded_ptr == 0 {
+            if padded_ptr.as_u32() == 0 {
                 println!(
                     "VM Alloc: Out of memory, failed to allocate {} bytes for alignment",
                     total_size
@@ -713,11 +725,11 @@ impl DefaultSyscallHandler {
                 return 0;
             }
             // Return properly aligned pointer within the allocated region
-            let aligned_ptr = ((padded_ptr as usize + align - 1) & !(align - 1)) as u32;
+            let aligned_ptr = ((padded_ptr.as_usize() + align - 1) & !(align - 1)) as u32;
             return aligned_ptr;
         }
 
-        ptr
+        ptr.as_u32()
     }
 
     fn sys_dealloc(&mut self, args: [u32; 6], _memory: Memory, metering: &mut dyn Metering) -> u32 {
@@ -752,9 +764,8 @@ impl DefaultSyscallHandler {
         }
 
         let borrowed = memory.as_ref();
-        let to_slice = borrowed
-            .mem_slice(to_ptr, to_ptr + 20)
-            .expect("invalid to ptr");
+        let (to_start, to_end) = va_range(to_ptr, 20);
+        let to_slice = borrowed.mem_slice(to_start, to_end).expect("invalid to ptr");
 
         let mut to = [0u8; 20];
         to.copy_from_slice(to_slice.as_ref());
@@ -779,8 +790,9 @@ impl DefaultSyscallHandler {
         }
         let addr = {
             let borrowed = memory.as_ref();
+            let (addr_start, addr_end) = va_range(addr_ptr, 20);
             let addr_slice = borrowed
-                .mem_slice(addr_ptr, addr_ptr + 20)
+                .mem_slice(addr_start, addr_end)
                 .expect("invalid addr ptr");
             let mut addr = [0u8; 20];
             addr.copy_from_slice(addr_slice.as_ref());
@@ -788,7 +800,7 @@ impl DefaultSyscallHandler {
         };
 
         let bal = host.balance(addr);
-        memory.alloc_on_heap(&bal.to_le_bytes())
+        memory.alloc_on_heap(&bal.to_le_bytes()).as_u32()
     }
 
     fn sys_commit_state(
@@ -830,7 +842,8 @@ impl DefaultSyscallHandler {
         }
 
         let borrowed = memory.as_ref();
-        let address_slice = match borrowed.mem_slice(addr_ptr, addr_ptr + ADDRESS_LEN) {
+        let (addr_start, addr_end) = va_range(addr_ptr, ADDRESS_LEN);
+        let address_slice = match borrowed.mem_slice(addr_start, addr_end) {
             Some(r) => r,
             None => return 1,
         };
@@ -838,7 +851,8 @@ impl DefaultSyscallHandler {
         addr_bytes.copy_from_slice(address_slice.as_ref());
         let address = Address(addr_bytes);
 
-        let code_slice = match borrowed.mem_slice(code_ptr, code_ptr + code_len) {
+        let (code_start, code_end) = va_range(code_ptr, code_len);
+        let code_slice = match borrowed.mem_slice(code_start, code_end) {
             Some(r) => r,
             None => return 1,
         };
@@ -850,4 +864,10 @@ impl DefaultSyscallHandler {
         account.is_contract = !account.code.is_empty();
         0
     }
+}
+
+fn va_range(ptr: usize, len: usize) -> (VirtualAddress, VirtualAddress) {
+    let start = VirtualAddress(ptr as u32);
+    let end = start.wrapping_add(len as u32);
+    (start, end)
 }

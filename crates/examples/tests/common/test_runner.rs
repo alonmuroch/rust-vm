@@ -49,7 +49,6 @@ pub struct TestRunner {
     writer: Rc<RefCell<dyn Write>>,
     verbose: bool,
     vm_memory_size: usize,
-    max_memory_pages: usize,
     kernel_bytes: Option<Vec<u8>>,
     kernel_path: Option<String>,
 }
@@ -63,12 +62,6 @@ impl TestRunner {
     /// Set VM memory size
     pub fn with_memory_size(mut self, size: usize) -> Self {
         self.vm_memory_size = size;
-        self
-    }
-
-    /// Set max memory pages
-    pub fn with_max_pages(mut self, pages: usize) -> Self {
-        self.max_memory_pages = pages;
         self
     }
 
@@ -90,7 +83,6 @@ impl TestRunner {
             writer,
             verbose: false,
             vm_memory_size: 512 * 1024, // larger default to accommodate bigger binaries without RVC
-            max_memory_pages: 128,      // allow more pages for larger programs
             kernel_bytes: Self::load_kernel_from_env(),
             kernel_path: env::var("KERNEL_ELF").ok(),
         }
@@ -126,7 +118,7 @@ impl TestRunner {
 
     /// Run a single test case
     fn run_test_case(&self, case: &super::TestCase) -> Result<(), String> {
-        let mut bootloader = Bootloader::new(self.max_memory_pages, self.vm_memory_size);
+        let mut bootloader = Bootloader::new(self.vm_memory_size);
         let state = Rc::new(RefCell::new(State::new()));
 
         // Write test case header

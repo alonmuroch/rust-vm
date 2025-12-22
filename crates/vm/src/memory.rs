@@ -4,23 +4,84 @@ use crate::metering::{Metering, MemoryAccessKind};
 
 pub const HEAP_PTR_OFFSET: u32 = 0x100;
 
-pub trait memory: std::fmt::Debug {
-    fn mem(&self) -> Ref<Vec<u8>>;
-    fn mem_slice(&self, start: usize, end: usize) -> Option<std::cell::Ref<[u8]>>;
-    fn store_u16(&self, addr: usize, val: u16, metering: &mut dyn Metering, kind: MemoryAccessKind) -> bool;
-    fn store_u32(&self, addr: usize, val: u32, metering: &mut dyn Metering, kind: MemoryAccessKind) -> bool;
-    fn store_u8(&self, addr: usize, val: u8, metering: &mut dyn Metering, kind: MemoryAccessKind) -> bool;
-    fn load_u32(&self, addr: usize, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u32>;
-    fn load_byte(&self, addr: usize, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u8>;
-    fn load_halfword(&self, addr: usize, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u16>;
-    fn load_word(&self, addr: usize, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u32>;
-    fn write_code(&self, start_addr: usize, code: &[u8]);
-    fn alloc_on_heap(&self, data: &[u8]) -> u32;
-    fn stack_top(&self) -> u32;
-    fn size(&self) -> usize;
-    fn offset(&self, addr: usize) -> usize;
-    fn next_heap(&self) -> u32;
-    fn set_next_heap(&self, next: u32);
+pub const PAGE_SIZE: usize = 4096;
+pub const PAGE_SHIFT: u32 = 12;
+pub const VPN_MASK: u32 = 0x3ff;
+pub const PAGE_OFFSET_MASK: u32 = 0xfff;
+
+/// Sv32 virtual address helper newtype.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct VirtualAddress(pub u32);
+
+impl VirtualAddress {
+    pub fn as_u32(self) -> u32 {
+        self.0
+    }
+
+    pub fn as_usize(self) -> usize {
+        self.0 as usize
+    }
+
+    pub fn offset(self) -> u32 {
+        self.0 & PAGE_OFFSET_MASK
+    }
+
+    pub fn vpn0(self) -> u32 {
+        (self.0 >> PAGE_SHIFT) & VPN_MASK
+    }
+
+    pub fn vpn1(self) -> u32 {
+        (self.0 >> (PAGE_SHIFT + 10)) & VPN_MASK
+    }
+
+    pub fn align_down(self) -> Self {
+        VirtualAddress(self.0 & !(PAGE_OFFSET_MASK))
+    }
+
+    pub fn wrapping_add(self, value: u32) -> Self {
+        VirtualAddress(self.0.wrapping_add(value))
+    }
+
+    pub fn checked_add(self, value: u32) -> Option<Self> {
+        self.0.checked_add(value).map(VirtualAddress)
+    }
 }
 
-pub type Memory = Rc<dyn memory>;
+impl From<u32> for VirtualAddress {
+    fn from(value: u32) -> Self {
+        VirtualAddress(value)
+    }
+}
+
+impl From<usize> for VirtualAddress {
+    fn from(value: usize) -> Self {
+        VirtualAddress(value as u32)
+    }
+}
+
+impl From<VirtualAddress> for usize {
+    fn from(value: VirtualAddress) -> Self {
+        value.as_usize()
+    }
+}
+
+pub trait Mmu: std::fmt::Debug {
+    fn mem(&self) -> Ref<Vec<u8>>;
+    fn mem_slice(&self, start: VirtualAddress, end: VirtualAddress) -> Option<std::cell::Ref<[u8]>>;
+    fn store_u16(&self, addr: VirtualAddress, val: u16, metering: &mut dyn Metering, kind: MemoryAccessKind) -> bool;
+    fn store_u32(&self, addr: VirtualAddress, val: u32, metering: &mut dyn Metering, kind: MemoryAccessKind) -> bool;
+    fn store_u8(&self, addr: VirtualAddress, val: u8, metering: &mut dyn Metering, kind: MemoryAccessKind) -> bool;
+    fn load_u32(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u32>;
+    fn load_byte(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u8>;
+    fn load_halfword(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u16>;
+    fn load_word(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u32>;
+    fn write_code(&self, start_addr: VirtualAddress, code: &[u8]);
+    fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress;
+    fn stack_top(&self) -> VirtualAddress;
+    fn size(&self) -> usize;
+    fn offset(&self, addr: VirtualAddress) -> usize;
+    fn next_heap(&self) -> VirtualAddress;
+    fn set_next_heap(&self, next: VirtualAddress);
+}
+
+pub type Memory = Rc<dyn Mmu>;

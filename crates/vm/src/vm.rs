@@ -1,6 +1,6 @@
 use crate::cpu::CPU;
 use crate::host_interface::HostInterface;
-use crate::memory::Memory;
+use crate::memory::{Memory, VirtualAddress};
 use crate::metering::Metering;
 use crate::registers::Register;
 use crate::sys_call::SyscallHandler;
@@ -49,7 +49,7 @@ impl VM {
         syscall_handler: Box<dyn SyscallHandler>,
     ) -> Self {
         let mut cpu = CPU::new(syscall_handler);
-        cpu.regs[Register::Sp as usize] = memory.stack_top();
+        cpu.regs[Register::Sp as usize] = memory.stack_top().as_u32();
         Self {
             cpu,
             memory,
@@ -77,7 +77,7 @@ impl VM {
     /// to ensure proper alignment and to avoid conflicts with system memory.
     pub fn set_code(&mut self, alloc_add: u32, start_addr: u32, code: &[u8]) {
         // EDUCATIONAL: Write the program code to memory starting at address 0
-        self.memory.write_code(alloc_add as usize, code);
+        self.memory.write_code(VirtualAddress(alloc_add), code);
 
         // EDUCATIONAL: Set the program counter to the starting address
         self.cpu.pc = start_addr;
@@ -94,7 +94,7 @@ impl VM {
     ///
     /// RETURN VALUE: Returns the address where the data was written
     pub fn alloc_and_write(&mut self, data: &[u8]) -> u32 {
-        self.memory.alloc_on_heap(data)
+        self.memory.alloc_on_heap(data).as_u32()
     }
 
     /// Sets a register to point to data in memory.
@@ -174,7 +174,7 @@ impl VM {
         // EDUCATIONAL: Show heap pointer for context
         let next_heap = borrowed_memory.next_heap();
         println!("--- Memory Dump ---");
-        println!("Next heap pointer: 0x{:08x}", next_heap);
+        println!("Next heap pointer: 0x{:08x}", next_heap.as_u32());
 
         // EDUCATIONAL: Display memory in 16-byte lines
         for addr in (start..end).step_by(16) {

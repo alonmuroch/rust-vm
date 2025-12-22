@@ -1,7 +1,7 @@
 use crate::decoder::{decode_compressed, decode_full};
 use crate::host_interface::HostInterface;
 use crate::instruction::Instruction;
-use crate::memory::Memory;
+use crate::memory::{Memory, VirtualAddress};
 use crate::metering::{MemoryAccessKind, MeterResult, Metering, NoopMeter};
 use crate::sys_call::SyscallHandler;
 use core::cell::RefCell;
@@ -66,7 +66,7 @@ pub struct CPU {
     /// Reservation address for LR/SC atomic operations
     /// EDUCATIONAL: This implements the Load-Reserved/Store-Conditional
     /// mechanism for atomic memory operations in RISC-V
-    pub reservation_addr: Option<usize>,
+    pub reservation_addr: Option<VirtualAddress>,
     
     /// Optional writer for verbose output
     /// If None, uses println! to console
@@ -248,7 +248,9 @@ impl CPU {
     ) -> bool {
         // EDUCATIONAL: Debug output to help understand what's happening
         // Get the actual instruction bytes for debugging
-        if let Some(bytes) = memory.mem_slice(self.pc as usize, self.pc as usize + size as usize) {
+        let pc_va = VirtualAddress(self.pc);
+        let end_va = VirtualAddress(self.pc.wrapping_add(size as u32));
+        if let Some(bytes) = memory.mem_slice(pc_va, end_va) {
             let hex_bytes = bytes
                 .iter()
                 .map(|b| format!("{:02x}", b))
@@ -302,7 +304,8 @@ impl CPU {
     /// RETURN VALUE: Returns false to halt execution on invalid instructions
     fn unknown_instruction(&mut self, memory: Memory) -> bool {
         // EDUCATIONAL: Try to read the invalid instruction bytes for debugging
-        if let Some(slice_ref) = memory.mem_slice(self.pc as usize, self.pc as usize + 4) {
+        if let Some(slice_ref) = memory.mem_slice(VirtualAddress(self.pc), VirtualAddress(self.pc.wrapping_add(4)))
+        {
             // EDUCATIONAL: Convert bytes to hex for human-readable debugging
             let hex_dump = slice_ref
                 .iter()
@@ -335,10 +338,10 @@ impl CPU {
     ///
     /// RETURN VALUE: Returns Some((instruction, size)) if successful, None if invalid
     pub fn next_instruction(&mut self, memory: Memory) -> Option<(Instruction, u8)> {
-        let pc = self.pc as usize;
+        let pc = VirtualAddress(self.pc);
 
         // EDUCATIONAL: Read 4 bytes from memory (enough for any instruction)
-        let bytes = memory.mem_slice(pc, pc + 4)?;
+        let bytes = memory.mem_slice(pc, VirtualAddress(self.pc.wrapping_add(4)))?;
 
         // EDUCATIONAL: Need at least 2 bytes for any instruction
         if bytes.len() < 2 {

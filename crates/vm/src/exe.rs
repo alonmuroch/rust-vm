@@ -1,4 +1,5 @@
 use super::{Instruction, MemoryAccessKind, Memory, CPU};
+use crate::memory::VirtualAddress;
 use crate::host_interface::HostInterface;
 use crate::instruction::CsrOp;
 use crate::registers::Register;
@@ -266,7 +267,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base.wrapping_add(offset as u32) as usize;
+                let addr = VirtualAddress(base.wrapping_add(offset as u32));
                 let val =
                     match memory.load_u32(addr, self.metering.as_mut(), MemoryAccessKind::Load) {
                         Some(v) => v,
@@ -283,7 +284,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base.wrapping_add(offset as u32) as usize;
+                let addr = VirtualAddress(base.wrapping_add(offset as u32));
                 let val =
                     match memory.load_u32(addr, self.metering.as_mut(), MemoryAccessKind::Load) {
                         Some(v) => v,
@@ -299,7 +300,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base.wrapping_add(offset as u32) as usize;
+                let addr = VirtualAddress(base.wrapping_add(offset as u32));
                 let byte =
                     match memory.load_byte(addr, self.metering.as_mut(), MemoryAccessKind::Load) {
                         Some(v) => v,
@@ -316,7 +317,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base.wrapping_add(offset as u32) as usize;
+                let addr = VirtualAddress(base.wrapping_add(offset as u32));
                 let byte =
                     match memory.load_byte(addr, self.metering.as_mut(), MemoryAccessKind::Load) {
                         Some(v) => v,
@@ -332,7 +333,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base.wrapping_add(offset as u32) as usize;
+                let addr = VirtualAddress(base.wrapping_add(offset as u32));
                 let halfword = match memory.load_halfword(
                     addr,
                     self.metering.as_mut(),
@@ -352,7 +353,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base.wrapping_add(offset as u32) as usize;
+                let addr = VirtualAddress(base.wrapping_add(offset as u32));
                 let halfword = match memory.load_halfword(
                     addr,
                     self.metering.as_mut(),
@@ -373,7 +374,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base.wrapping_add(offset as u32) as usize;
+                let addr = VirtualAddress(base.wrapping_add(offset as u32));
                 let src = match self.read_reg(rs2) {
                     Some(v) => v,
                     None => return false,
@@ -393,7 +394,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base.wrapping_add(offset as u32) as usize;
+                let addr = VirtualAddress(base.wrapping_add(offset as u32));
                 let src = match self.read_reg(rs2) {
                     Some(v) => v,
                     None => return false,
@@ -408,7 +409,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base.wrapping_add(offset as u32) as usize;
+                let addr = VirtualAddress(base.wrapping_add(offset as u32));
                 let src = match self.read_reg(rs2) {
                     Some(v) => v,
                     None => return false,
@@ -1028,7 +1029,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base as usize;
+                let addr = VirtualAddress(base);
                 let orig =
                     match memory.load_u32(addr, self.metering.as_mut(), MemoryAccessKind::Atomic) {
                         Some(v) => v,
@@ -1050,7 +1051,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base as usize;
+                let addr = VirtualAddress(base);
                 let orig =
                     match memory.load_u32(addr, self.metering.as_mut(), MemoryAccessKind::Atomic) {
                         Some(v) => v,
@@ -1078,7 +1079,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base as usize;
+                let addr = VirtualAddress(base);
                 let orig =
                     match memory.load_u32(addr, self.metering.as_mut(), MemoryAccessKind::Atomic) {
                         Some(v) => v,
@@ -1106,7 +1107,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base as usize;
+                let addr = VirtualAddress(base);
                 let orig =
                     match memory.load_u32(addr, self.metering.as_mut(), MemoryAccessKind::Atomic) {
                         Some(v) => v,
@@ -1134,7 +1135,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base as usize;
+                let addr = VirtualAddress(base);
                 let orig =
                     match memory.load_u32(addr, self.metering.as_mut(), MemoryAccessKind::Atomic) {
                         Some(v) => v,
@@ -1162,7 +1163,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base as usize;
+                let addr = VirtualAddress(base);
                 let orig =
                     match memory.load_u32(addr, self.metering.as_mut(), MemoryAccessKind::Atomic) {
                         Some(v) => v,
@@ -1194,7 +1195,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base as usize;
+                let addr = VirtualAddress(base);
                 let orig =
                     match memory.load_u32(addr, self.metering.as_mut(), MemoryAccessKind::Atomic) {
                         Some(v) => v,
@@ -1226,7 +1227,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base as usize;
+                let addr = VirtualAddress(base);
                 let orig =
                     match memory.load_u32(addr, self.metering.as_mut(), MemoryAccessKind::Atomic) {
                         Some(v) => v,
@@ -1254,7 +1255,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base as usize;
+                let addr = VirtualAddress(base);
                 let orig =
                     match memory.load_u32(addr, self.metering.as_mut(), MemoryAccessKind::Atomic) {
                         Some(v) => v,
@@ -1279,7 +1280,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base as usize;
+                let addr = VirtualAddress(base);
                 let value = match memory.load_u32(
                     addr,
                     self.metering.as_mut(),
@@ -1299,7 +1300,7 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
-                let addr = base as usize;
+                let addr = VirtualAddress(base);
                 let value_to_store = match self.read_reg(rs2) {
                     Some(v) => v,
                     None => return false,

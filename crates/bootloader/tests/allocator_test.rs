@@ -1,16 +1,16 @@
-use bootloader::memory::MemoryPage;
+use bootloader::memory::Memory as BootMemory;
 use bootloader::DefaultSyscallHandler;
 use state::State;
 use std::cell::RefCell;
 use std::rc::Rc;
 use vm::host_interface;
-use vm::memory::Memory;
+use vm::memory::{Memory, PAGE_SIZE};
 use vm::metering::NoopMeter;
 use vm::sys_call::{SyscallHandler, SYSCALL_ALLOC, SYSCALL_DEALLOC};
 
 #[test]
 fn test_allocator_syscalls() {
-    let memory: Memory = Rc::new(MemoryPage::new(8192));
+    let memory: Memory = Rc::new(BootMemory::new(8192, PAGE_SIZE));
     let state = Rc::new(RefCell::new(State::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
@@ -46,7 +46,7 @@ fn test_allocator_syscalls() {
 
 #[test]
 fn test_multiple_allocations() {
-    let memory: Memory = Rc::new(MemoryPage::new(8192));
+    let memory: Memory = Rc::new(BootMemory::new(8192, PAGE_SIZE));
     let state = Rc::new(RefCell::new(State::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
@@ -88,7 +88,7 @@ fn test_multiple_allocations() {
 
 #[test]
 fn test_alignment_requirements() {
-    let memory: Memory = Rc::new(MemoryPage::new(8192));
+    let memory: Memory = Rc::new(BootMemory::new(8192, PAGE_SIZE));
     let state = Rc::new(RefCell::new(State::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
@@ -116,7 +116,7 @@ fn test_alignment_requirements() {
 
 #[test]
 fn test_invalid_alignment() {
-    let memory: Memory = Rc::new(MemoryPage::new(8192));
+    let memory: Memory = Rc::new(BootMemory::new(8192, PAGE_SIZE));
     let state = Rc::new(RefCell::new(State::new()));
     let mut host: Box<dyn host_interface::HostInterface> = Box::new(host_interface::NoopHost);
     let mut syscall_handler = DefaultSyscallHandler::new(state.clone());
