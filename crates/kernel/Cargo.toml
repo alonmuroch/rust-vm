@@ -13,6 +13,7 @@ guest_kernel = []
 [dependencies]
 program = { path = "../program" }
 types = { path = "../types" }
+state = { path = "../state" }
 
 [[bin]]
 name = "kernel"

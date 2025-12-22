@@ -3,17 +3,23 @@
 
 extern crate alloc;
 
-use alloc::format;
+use alloc::{format, vec, vec::Vec};
 use core::mem::forget;
 use core::slice;
 use kernel::{BootInfo, Config, Task};
 use program::{log, logf};
+use state::State;
 use types::transaction::{Transaction, TransactionBundle, TransactionType};
 
-const SYSCALL_CREATE_ACCOUNT: u32 = 12;
+#[allow(dead_code)]
+const KERNEL_TASK_IDX: usize = 0;
+
+mod global;
+use global::Global;
 
 #[allow(dead_code)]
-static mut KERNEL_TASK: Option<Task> = None;
+static TASKS: Global<Option<Vec<Task>>> = Global::new(None);
+static STATE: Global<Option<State>> = Global::new(None);
 
 /// Kernel entrypoint. Receives:
 /// - `bundle_ptr`/`bundle_len`: encoded `TransactionBundle` prepared by the bootloader.
@@ -23,21 +29,38 @@ static mut KERNEL_TASK: Option<Task> = None;
 pub extern "C" fn _start(
     bundle_ptr: *const u8,
     bundle_len: usize,
-    _state_ptr: *const u8,
-    _state_len: usize,
+    state_ptr: *const u8,
+    state_len: usize,
     boot_info_ptr: *const BootInfo,
 ) {
-    // Copy args to locals before any syscalls (ecall clobbers a0).
-    let bundle_ptr = bundle_ptr;
-    let bundle_len = bundle_len;
-
     log!("kernel boot");
     logf!("bundle_len=%d", bundle_len as u32);
+
+    // Initialize state from provided blob if present.
+    unsafe {
+        let state_slot = STATE.get_mut();
+        if !state_ptr.is_null() && state_len > 0 {
+            let bytes = slice::from_raw_parts(state_ptr, state_len);
+            *state_slot = State::decode(bytes).or_else(|| {
+                log!("state decode failed; starting empty state");
+                Some(State::new())
+            });
+            if state_slot.is_some() {
+                logf!("state initialized (len=%d)", state_len as u32);
+            }
+        } else {
+            *state_slot = Some(State::new());
+        }
+    }
 
     if let Some(info) = unsafe { boot_info_ptr.as_ref() } {
         let task = Task::kernel(info.root_ppn, info.kstack_top);
         unsafe {
-            KERNEL_TASK = Some(task);
+            let tasks_slot = TASKS.get_mut();
+            match tasks_slot {
+                Some(tasks) => tasks.push(task),
+                None => *tasks_slot = Some(vec![task]),
+            }
         }
         logf!(
             "boot_info: root_ppn=0x%x kstack_top=0x%x mem_size=%d",
@@ -98,36 +121,16 @@ fn create_account(tx: &Transaction) {
         );
     }
 
-    let addr_ptr = tx.to.0.as_ptr();
-    let code_ptr = tx.data.as_ptr();
-    let code_len = tx.data.len();
-
-    #[cfg(target_arch = "riscv32")]
-    unsafe {
-        let mut result: u32;
-        core::arch::asm!(
-            "li a7, {create}",
-            "mv a1, {addr}",
-            "mv a2, {code_ptr}",
-            "mv a3, {code_len}",
-            "ecall",
-            "mv {out}, a0",
-            create = const SYSCALL_CREATE_ACCOUNT,
-            addr = in(reg) addr_ptr,
-            code_ptr = in(reg) code_ptr,
-            code_len = in(reg) code_len,
-            out = lateout(reg) result,
-        );
-        if result == 0 {
-            log!("account created via syscall");
-        } else {
-            log!("account creation failed via syscall");
-        }
-    }
-    #[cfg(not(target_arch = "riscv32"))]
-    {
-        log!("(host) account creation syscall skipped (not riscv32)");
-    }
+    let state = unsafe { STATE.get_mut().get_or_insert_with(State::new) };
+    let account = state.get_account_mut(&tx.to);
+    account.code = tx.data.clone();
+    account.is_contract = is_contract;
+    let msg = format!(
+        "account created in kernel state: addr={} is_contract={} code_len={}",
+        tx.to, is_contract, code_size
+    );
+    let msg_ref: &str = msg.as_str();
+    log!(msg_ref);
 }
 
 #[inline(never)]

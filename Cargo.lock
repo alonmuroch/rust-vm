@@ -250,6 +250,7 @@ name = "kernel"
 version = "0.1.0"
 dependencies = [
  "program",
+ "state",
  "types",
 ]
 

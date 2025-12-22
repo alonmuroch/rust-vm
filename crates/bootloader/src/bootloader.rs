@@ -16,6 +16,9 @@ use vm::memory::{Mmu, HEAP_PTR_OFFSET, Memory as MmuRef, VirtualAddress, PAGE_SI
 use vm::registers::Register;
 use vm::vm::VM;
 
+const MIN_KERNEL_MAP_BYTES: usize = 16 * 1024;
+const KERNEL_STACK_BYTES: usize = 4 * PAGE_SIZE;
+
 /// Boot configuration options consumed by the loader.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BootConfig {
@@ -79,21 +82,20 @@ impl Bootloader {
         }
 
         self.memory
-            .map_range(VirtualAddress(min_base as u32), core::cmp::max(image_size, 16 * 1024), Perms::rwx_kernel());
+            .map_range(VirtualAddress(min_base as u32), core::cmp::max(image_size, MIN_KERNEL_MAP_BYTES), Perms::rwx_kernel());
         self.memory
             .write_bytes(VirtualAddress(min_base as u32), &image);
         // Start the heap after the loaded image to avoid overwriting kernel text/rodata
         let heap_start = ((image_end + HEAP_PTR_OFFSET as usize + 7) & !7) as u32;
         self.memory.set_next_heap(VirtualAddress(heap_start));
         // Ensure the kernel has a mapped stack region near the top of memory.
-        let stack_bytes = 4 * PAGE_SIZE;
         let stack_base = self
             .memory
             .stack_top()
             .as_usize()
-            .saturating_sub(stack_bytes);
+            .saturating_sub(KERNEL_STACK_BYTES);
         self.memory
-            .map_range(VirtualAddress(stack_base as u32), stack_bytes, Perms::rw_kernel());
+            .map_range(VirtualAddress(stack_base as u32), KERNEL_STACK_BYTES, Perms::rw_kernel());
         (entry_point, self.memory.clone() as MmuRef)
     }
 
