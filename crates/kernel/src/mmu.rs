@@ -1,32 +1,17 @@
-use crate::global::Global;
+use core::{cmp, marker::PhantomData, ptr};
+
+use crate::global::{PAGE_ALLOC, ROOT_PPN};
 use crate::BootInfo;
+use types::{
+    Sv32PagePerms, Sv32PageTable, SV32_DIRECT_MAP_BASE, SV32_PAGE_SIZE, SV32_VPN_MASK, map_allocating,
+    SV32_PTE_R, SV32_PTE_W, SV32_PTE_X, SV32_PTE_V,
+};
 
-const PAGE_SIZE: usize = 4096;
-const VPN_MASK: u32 = 0x3ff;
-const PTE_V: u32 = 1 << 0;
-const PTE_R: u32 = 1 << 1;
-const PTE_W: u32 = 1 << 2;
-const PTE_X: u32 = 1 << 3;
-const PTE_U: u32 = 1 << 4;
+const PAGE_SIZE: usize = SV32_PAGE_SIZE;
+const DIRECT_MAP_BASE: usize = SV32_DIRECT_MAP_BASE as usize;
 
-#[derive(Clone, Copy)]
-pub struct PagePerms {
-    pub read: bool,
-    pub write: bool,
-    pub exec: bool,
-    pub user: bool,
-}
-
-impl PagePerms {
-    pub const fn user_rwx() -> Self {
-        Self {
-            read: true,
-            write: true,
-            exec: true,
-            user: true,
-        }
-    }
-}
+/// Permissions used by the kernel/user mapping helpers.
+pub type PagePerms = Sv32PagePerms;
 
 #[derive(Debug, Clone, Copy)]
 pub struct PageAllocator {
@@ -53,17 +38,22 @@ impl PageAllocator {
         Some(ppn)
     }
 
-    /// Zero a 4 KiB page in guest physical memory.
+    /// Zero a 4 KiB page in guest physical memory via the direct map.
     fn zero_page(ppn: u32) {
-        let base = (ppn as usize) * PAGE_SIZE;
+        let base = (ppn as usize)
+            .checked_mul(PAGE_SIZE)
+            .expect("page offset overflow");
+        let virt = direct_map_addr(base).expect("direct map overflow while zeroing page");
         unsafe {
-            core::ptr::write_bytes(base as *mut u8, 0, PAGE_SIZE);
+            ptr::write_bytes(virt as *mut u8, 0, PAGE_SIZE);
         }
     }
 }
 
-static ROOT_PPN: Global<u32> = Global::new(0);
-static PAGE_ALLOC: Global<Option<PageAllocator>> = Global::new(None);
+/// Return the kernel's current root PPN (satp PPN field).
+pub fn current_root() -> u32 {
+    unsafe { *ROOT_PPN.get_mut() }
+}
 
 /// Initialize the kernel MMU allocator state from bootloader handoff.
 pub fn init(boot_info: &BootInfo) {
@@ -74,97 +64,142 @@ pub fn init(boot_info: &BootInfo) {
     }
 }
 
-/// Map a user-visible virtual range with the provided permissions into the current root.
-pub fn map_user_range(va_start: u32, len: usize, perms: PagePerms) -> bool {
-    let root = unsafe { *ROOT_PPN.get_mut() };
+/// Allocate and zero a fresh L1 root page table. Returns None if out of frames.
+pub fn alloc_root() -> Option<u32> {
     let alloc = unsafe { PAGE_ALLOC.get_mut() };
     match alloc {
-        Some(alloc) => map_range(root, va_start, len, perms, alloc),
+        Some(alloc) => {
+            let root = alloc.alloc()?;
+            PageAllocator::zero_page(root);
+            Some(root)
+        }
+        None => None,
+    }
+}
+
+/// Map a user-visible virtual range with the provided permissions into a specific root.
+pub fn map_user_range_for_root(root_ppn: u32, va_start: u32, len: usize, perms: PagePerms) -> bool {
+    let alloc = unsafe { PAGE_ALLOC.get_mut() };
+    match alloc {
+        Some(alloc) => {
+            let mapper = KernelMapper::new(alloc);
+            map_allocating(&mapper, root_ppn, va_start, len, perms)
+        }
         None => false,
     }
 }
 
-fn map_range(root_ppn: u32, va_start: u32, len: usize, perms: PagePerms, alloc: &mut PageAllocator) -> bool {
-    if len == 0 {
-        return true;
-    }
-    let start = align_down(va_start as usize, PAGE_SIZE) as u32;
-    let end = (va_start as usize).saturating_add(len);
-    let end_aligned = align_up(end, PAGE_SIZE) as u32;
-
-    let mut va = start;
-    while va < end_aligned {
-        if !map_page(root_ppn, va, perms, alloc) {
-            return false;
-        }
-        va = va.wrapping_add(PAGE_SIZE as u32);
-    }
-    true
+/// Map a user-visible virtual range with the provided permissions into the current root.
+pub fn map_user_range(va_start: u32, len: usize, perms: PagePerms) -> bool {
+    let root = unsafe { *ROOT_PPN.get_mut() };
+    map_user_range_for_root(root, va_start, len, perms)
 }
 
-/// Map a single 4 KiB page at `va` into the two-level Sv32 page tables rooted at `root_ppn`.
-/// Allocates an L2 table if the L1 entry is absent; refuses superpages; fills in a leaf PTE
-/// with the requested permissions after zeroing the backing frame.
-fn map_page(root_ppn: u32, va: u32, perms: PagePerms, alloc: &mut PageAllocator) -> bool {
-    let vpn1 = (va >> 22) & VPN_MASK;
-    let vpn0 = (va >> 12) & VPN_MASK;
+/// Walk Sv32 to translate a VA in the given root to a physical address.
+pub fn translate_user_va(root_ppn: u32, va: u32) -> Option<usize> {
+    let vpn1 = (va >> 22) & SV32_VPN_MASK;
+    let vpn0 = (va >> 12) & SV32_VPN_MASK;
+    let offset = (va & 0xfff) as usize;
 
-    // L1 lookup
-    let root_base = (root_ppn as usize) * PAGE_SIZE;
-    let l1_entry_addr = root_base + vpn1 as usize * core::mem::size_of::<u32>();
-    let mut l1_pte = unsafe { (l1_entry_addr as *const u32).read_volatile() };
+    let l1_base = (root_ppn as usize)
+        .checked_mul(PAGE_SIZE)?;
+    let l1_addr = l1_base + vpn1 as usize * core::mem::size_of::<u32>();
+    let l1_pte = read_pte(l1_addr)?;
+    if l1_pte & SV32_PTE_V == 0 || l1_pte & (SV32_PTE_R | SV32_PTE_W | SV32_PTE_X) != 0 {
+        return None;
+    }
 
-    if l1_pte & PTE_V == 0 {
-        let l2 = match alloc.alloc() {
-            Some(ppn) => ppn,
+    let l2_base = ((l1_pte >> 10) as usize)
+        .checked_mul(PAGE_SIZE)?;
+    let l2_addr = l2_base + vpn0 as usize * core::mem::size_of::<u32>();
+    let l2_pte = read_pte(l2_addr)?;
+    if l2_pte & SV32_PTE_V == 0 {
+        return None;
+    }
+
+    let ppn = (l2_pte >> 10) as usize;
+    ppn.checked_mul(PAGE_SIZE)?.checked_add(offset)
+}
+
+/// Copy data into a user VA range for a specific root using the direct-map window.
+pub fn copy_into_user(root_ppn: u32, va_start: u32, data: &[u8]) -> bool {
+    if data.is_empty() {
+        return true;
+    }
+    let mut remaining = data.len();
+    let mut src_off = 0usize;
+    let mut va = va_start;
+    while remaining > 0 {
+        let phys = match translate_user_va(root_ppn, va) {
+            Some(p) => p,
             None => return false,
         };
-        PageAllocator::zero_page(l2);
-        l1_pte = ((l2 as u32) << 10) | PTE_V;
-        unsafe { (l1_entry_addr as *mut u32).write_volatile(l1_pte) };
-    } else if l1_pte & (PTE_R | PTE_W | PTE_X) != 0 {
-        // Superpages not supported.
-        return false;
+        let page_off = (va as usize) & (PAGE_SIZE - 1);
+        let to_copy = cmp::min(remaining, PAGE_SIZE - page_off);
+        let dst = match direct_map_addr(phys) {
+            Some(v) => v,
+            None => return false,
+        };
+        unsafe {
+            ptr::copy_nonoverlapping(
+                data.as_ptr().add(src_off),
+                dst as *mut u8,
+                to_copy,
+            );
+        }
+        remaining -= to_copy;
+        src_off += to_copy;
+        va = va.wrapping_add(to_copy as u32);
     }
-
-    let l2_ppn = l1_pte >> 10;
-    let l2_base = (l2_ppn as usize) * PAGE_SIZE;
-    let l2_entry_addr = l2_base + vpn0 as usize * core::mem::size_of::<u32>();
-
-    let existing = unsafe { (l2_entry_addr as *const u32).read_volatile() };
-    if existing & PTE_V != 0 {
-        // Already mapped.
-        return true;
-    }
-
-    let frame = match alloc.alloc() {
-        Some(ppn) => ppn,
-        None => return false,
-    };
-    PageAllocator::zero_page(frame);
-
-    let mut flags = PTE_V;
-    if perms.read {
-        flags |= PTE_R;
-    }
-    if perms.write {
-        flags |= PTE_W;
-    }
-    if perms.exec {
-        flags |= PTE_X;
-    }
-    if perms.user {
-        flags |= PTE_U;
-    }
-    let leaf = ((frame as u32) << 10) | flags;
-    unsafe { (l2_entry_addr as *mut u32).write_volatile(leaf) };
     true
 }
 
-const fn align_up(val: usize, align: usize) -> usize {
-    (val + (align - 1)) & !(align - 1)
+/// Sv32 page-table accessor that routes PTE traffic through the kernel's direct map.
+struct KernelMapper<'a> {
+    alloc: *mut PageAllocator,
+    _marker: PhantomData<&'a mut PageAllocator>,
 }
 
-const fn align_down(val: usize, align: usize) -> usize {
-    val & !(align - 1)
+impl<'a> KernelMapper<'a> {
+    fn new(alloc: &'a mut PageAllocator) -> Self {
+        Self {
+            alloc: alloc as *mut PageAllocator,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a> Sv32PageTable for KernelMapper<'a> {
+    fn page_size(&self) -> usize {
+        PAGE_SIZE
+    }
+
+    fn read_pte(&self, phys_addr: usize) -> Option<u32> {
+        let va = direct_map_addr(phys_addr)?;
+        Some(unsafe { (va as *const u32).read_volatile() })
+    }
+
+    fn write_pte(&self, phys_addr: usize, val: u32) {
+        if let Some(va) = direct_map_addr(phys_addr) {
+            unsafe { (va as *mut u32).write_volatile(val) };
+        }
+    }
+
+    fn alloc_frame(&self) -> Option<u32> {
+        let alloc = unsafe { &mut *self.alloc };
+        alloc.alloc()
+    }
+
+    fn zero_frame(&self, ppn: u32) {
+        PageAllocator::zero_page(ppn);
+    }
+}
+
+fn direct_map_addr(phys: usize) -> Option<usize> {
+    DIRECT_MAP_BASE.checked_add(phys)
+}
+
+fn read_pte(phys_addr: usize) -> Option<u32> {
+    let va = direct_map_addr(phys_addr)?;
+    Some(unsafe { (va as *const u32).read_volatile() })
 }

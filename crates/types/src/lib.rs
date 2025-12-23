@@ -21,6 +21,9 @@ pub use transaction::*;
 pub mod boot;
 pub use boot::BootInfo;
 
+pub mod mmu;
+pub use mmu::*;
+
 // used for serialization
 pub trait SerializeField {
     /// Appends `self` into `buf` at `*offset`, advancing the offset.

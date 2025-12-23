@@ -2,18 +2,12 @@ use std::cell::{Cell, Ref, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use types::{
+    Sv32PagePerms, Sv32PageTable, SV32_PTE_R, SV32_PTE_V, SV32_PTE_W, SV32_PTE_X,
+    SV32_SATP_PPN_MASK, map_allocating, map_to_physical,
+};
 use vm::memory::{Mmu, Perms, VirtualAddress};
 use vm::metering::{MeterResult, Metering, MemoryAccessKind};
-
-// Minimal Sv32 bit layout for guest-visible PTEs.
-const PTE_V: u32 = 1 << 0;
-const PTE_R: u32 = 1 << 1;
-const PTE_W: u32 = 1 << 2;
-const PTE_X: u32 = 1 << 3;
-const PTE_U: u32 = 1 << 4;
-
-// Sv32 satp PPN mask (bits 21:0). Mode bits are ignored in this emulator.
-const SATP_PPN_MASK: u32 = 0x003f_ffff;
 
 /// Software Sv32 MMU backed by a contiguous physical buffer.
 ///
@@ -48,6 +42,15 @@ pub struct Memory {
     next_free_frame: Cell<usize>,
 }
 
+fn perms_to_sv32(perms: Perms) -> Sv32PagePerms {
+    Sv32PagePerms {
+        read: perms.read,
+        write: perms.write,
+        exec: perms.exec,
+        user: perms.user,
+    }
+}
+
 impl Memory {
     pub fn new(total_size_bytes: usize, page_size: usize) -> Self {
         assert!(page_size != 0, "page_size must be > 0");
@@ -57,16 +60,19 @@ impl Memory {
         let total = total_pages
             .checked_mul(page_size)
             .expect("physical memory size overflow");
-        // Reserve frame 0 for the initial root page table.
-        let root_ppn: usize = 0;
-        Self {
+        // Reserve frame 0; place the initial root page table at frame 1.
+        let root_ppn: usize = 1;
+        let mem = Self {
             page_size,
             total_pages,
             backing: Rc::new(RefCell::new(vec![0u8; total])),
             satp: Cell::new(root_ppn as u32),
             per_root_heap: RefCell::new(HashMap::new()),
             next_free_frame: Cell::new(root_ppn + 1),
-        }
+        };
+        // Zero the root page table frame so we can immediately populate it.
+        mem.zero_frame(root_ppn);
+        mem
     }
 
     fn total_size(&self) -> usize {
@@ -74,7 +80,7 @@ impl Memory {
     }
 
     fn root_ppn(&self) -> usize {
-        (self.satp.get() & SATP_PPN_MASK) as usize
+        (self.satp.get() & SV32_SATP_PPN_MASK) as usize
     }
 
     fn root_base(&self) -> Option<usize> {
@@ -131,80 +137,29 @@ impl Memory {
         backing[phys_addr..end].copy_from_slice(&val.to_le_bytes());
     }
 
-    /// Map a single 4 KiB page at `va` with the given permissions, allocating tables/frames as needed.
-    fn map_page(&self, va: VirtualAddress, perms: Perms) {
-        let root_base = self.root_base().expect("invalid root page table base");
-        let vpn1 = va.vpn1() as usize;
-        let vpn0 = va.vpn0() as usize;
-
-        // Ensure L2 table exists.
-        let root_pte_addr = root_base + vpn1 * core::mem::size_of::<u32>();
-        let root_pte = self.read_pte(root_pte_addr).unwrap_or(0);
-        let root_is_valid = root_pte & PTE_V != 0;
-        let root_has_perms = root_pte & (PTE_R | PTE_W | PTE_X) != 0;
-
-        if root_is_valid && root_has_perms {
-            panic!("superpages not supported");
-        }
-
-        let l2_ppn = if root_is_valid {
-            (root_pte >> 10) as usize
-        } else {
-            let l2_frame = self
-                .allocate_frame()
-                .expect("out of physical frames while mapping L2");
-            self.zero_frame(l2_frame);
-            let new_pte = ((l2_frame as u32) << 10) | PTE_V;
-            self.write_pte(root_pte_addr, new_pte);
-            l2_frame
-        };
-
-        let l2_base = l2_ppn
-            .checked_mul(self.page_size)
-            .expect("l2 base overflow");
-        let leaf_addr = l2_base + vpn0 * core::mem::size_of::<u32>();
-
-        if let Some(existing) = self.read_pte(leaf_addr) {
-            if existing & PTE_V != 0 {
-                return;
-            }
-        }
-
-        let frame = self
-            .allocate_frame()
-            .expect("out of physical frames while mapping leaf");
-        self.zero_frame(frame);
-
-        let mut flags = PTE_V;
-        if perms.read {
-            flags |= PTE_R;
-        }
-        if perms.write {
-            flags |= PTE_W;
-        }
-        if perms.exec {
-            flags |= PTE_X;
-        }
-        if perms.user {
-            flags |= PTE_U;
-        }
-        let leaf_pte = ((frame as u32) << 10) | flags;
-        self.write_pte(leaf_addr, leaf_pte);
-    }
-
     /// Map a contiguous virtual range page-by-page with the given permissions.
     pub fn map_range(&self, start: VirtualAddress, len: usize, perms: Perms) {
-        if len == 0 {
-            return;
-        }
-        let start_addr = start.align_down().as_usize();
-        let end_addr = start.as_usize().saturating_add(len);
+        let root = self.root_ppn() as u32;
+        let ok = map_allocating(self, root, start.as_u32(), len, perms_to_sv32(perms));
+        assert!(ok, "map_range failed");
+    }
 
-        let mut page_start = start_addr;
-        while page_start < end_addr {
-            self.map_page(VirtualAddress(page_start as u32), perms);
-            page_start = page_start.saturating_add(self.page_size);
-        }
+    /// Map a virtual range to a specific physical range without allocating new leaf frames.
+    pub fn map_physical_range(
+        &self,
+        va_start: VirtualAddress,
+        phys_start: u32,
+        len: usize,
+        perms: Perms,
+    ) -> bool {
+        map_to_physical(
+            self,
+            self.root_ppn() as u32,
+            va_start.as_u32(),
+            phys_start,
+            len,
+            perms_to_sv32(perms),
+        )
     }
 
     /// Translate a virtual address to a physical offset into `backing`, checking permissions.
@@ -226,12 +181,12 @@ impl Memory {
 
         let root_pte_addr = root_base + vpn1 * core::mem::size_of::<u32>();
         let root_pte = self.read_pte(root_pte_addr)?;
-        if root_pte & PTE_V == 0 {
+        if root_pte & SV32_PTE_V == 0 {
             return None;
         }
 
         // We only support two-level translation; reject L1 leaf/superpages.
-        if root_pte & (PTE_R | PTE_W | PTE_X) != 0 {
+        if root_pte & (SV32_PTE_R | SV32_PTE_W | SV32_PTE_X) != 0 {
             return None;
         }
 
@@ -241,13 +196,17 @@ impl Memory {
             .expect("l2 base overflow");
         let l2_pte_addr = l2_base + vpn0 * core::mem::size_of::<u32>();
         let l2_pte = self.read_pte(l2_pte_addr)?;
-        if l2_pte & PTE_V == 0 {
+        if l2_pte & SV32_PTE_V == 0 {
             return None;
         }
 
         let allowed = match kind {
-            MemoryAccessKind::Load | MemoryAccessKind::ReservationLoad => l2_pte & (PTE_R | PTE_X) != 0,
-            MemoryAccessKind::Store | MemoryAccessKind::Atomic | MemoryAccessKind::ReservationStore => l2_pte & PTE_W != 0,
+            MemoryAccessKind::Load | MemoryAccessKind::ReservationLoad => {
+                l2_pte & (SV32_PTE_R | SV32_PTE_X) != 0
+            }
+            MemoryAccessKind::Store | MemoryAccessKind::Atomic | MemoryAccessKind::ReservationStore => {
+                l2_pte & SV32_PTE_W != 0
+            }
         };
         if !allowed {
             return None;
@@ -334,6 +293,28 @@ impl Memory {
 
     pub fn set_next_heap(&self, next: VirtualAddress) {
         self.set_next_heap_for_root(next);
+    }
+}
+
+impl Sv32PageTable for Memory {
+    fn page_size(&self) -> usize {
+        self.page_size
+    }
+
+    fn read_pte(&self, phys_addr: usize) -> Option<u32> {
+        self.read_pte(phys_addr)
+    }
+
+    fn write_pte(&self, phys_addr: usize, val: u32) {
+        self.write_pte(phys_addr, val);
+    }
+
+    fn alloc_frame(&self) -> Option<u32> {
+        self.allocate_frame().map(|ppn| ppn as u32)
+    }
+
+    fn zero_frame(&self, ppn: u32) {
+        self.zero_frame(ppn as usize);
     }
 }
 
@@ -500,7 +481,7 @@ impl Mmu for Memory {
     }
 
     fn set_satp(&self, satp: u32) {
-        self.satp.set(satp & SATP_PPN_MASK);
+        self.satp.set(satp & SV32_SATP_PPN_MASK);
     }
 
     fn satp(&self) -> u32 {

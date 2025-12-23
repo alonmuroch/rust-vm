@@ -6,7 +6,7 @@ use std::vec::Vec;
 
 use compiler::elf::parse_elf_from_bytes;
 use goblin::elf::Elf;
-use types::{boot::BootInfo, transaction::TransactionBundle};
+use types::{boot::BootInfo, transaction::TransactionBundle, SV32_DIRECT_MAP_BASE};
 
 use crate::DefaultSyscallHandler;
 use crate::memory::{Memory, Perms};
@@ -96,6 +96,15 @@ impl Bootloader {
             .saturating_sub(KERNEL_STACK_BYTES);
         self.memory
             .map_range(VirtualAddress(stack_base as u32), KERNEL_STACK_BYTES, Perms::rw_kernel());
+        // Map a direct window over all physical memory so the kernel can touch
+        // page tables after paging is enabled.
+        let mapped = self.memory.map_physical_range(
+            VirtualAddress(SV32_DIRECT_MAP_BASE),
+            0,
+            self.memory.size(),
+            Perms::rw_kernel(),
+        );
+        assert!(mapped, "failed to map kernel direct physical window");
         (entry_point, self.memory.clone() as MmuRef)
     }
 

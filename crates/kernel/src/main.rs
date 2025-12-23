@@ -3,26 +3,20 @@
 
 extern crate alloc;
 
-use alloc::{format, vec, vec::Vec};
+use alloc::{format, vec};
 use core::mem::forget;
-use core::ptr;
 use core::slice;
-use kernel::{BootInfo, Config, Task, launch_program, mmu, PROGRAM_WINDOW_BYTES};
+use kernel::{BootInfo, Config, launch_program, PROGRAM_WINDOW_BYTES};
 use program::{log, logf};
 use state::State;
 use types::transaction::{Transaction, TransactionBundle, TransactionType};
 
-mod global;
-use crate::global::Global;
+mod init;
+use kernel::global::{BOOT_INFO, STATE, TASKS};
+use crate::init::init_kernel;
 
 #[allow(dead_code)]
 const KERNEL_TASK_IDX: usize = 0;
-
-#[allow(dead_code)]
-static TASKS: Global<Option<Vec<Task>>> = Global::new(None);
-static STATE: Global<Option<State>> = Global::new(None);
-static BOOT_INFO: Global<Option<BootInfo>> = Global::new(None);
-static PAGE_ALLOC_INIT: Global<bool> = Global::new(false);
 
 /// Kernel entrypoint. Receives:
 /// - `bundle_ptr`/`bundle_len`: encoded `TransactionBundle` prepared by the bootloader.
@@ -39,50 +33,7 @@ pub extern "C" fn _start(
     log!("kernel boot");
     logf!("bundle_len=%d", bundle_len as u32);
 
-    // Initialize state from provided blob if present.
-    unsafe {
-        let state_slot = STATE.get_mut();
-        if !state_ptr.is_null() && state_len > 0 {
-            let bytes = slice::from_raw_parts(state_ptr, state_len);
-            *state_slot = State::decode(bytes).or_else(|| {
-                log!("state decode failed; starting empty state");
-                Some(State::new())
-            });
-            if state_slot.is_some() {
-                logf!("state initialized (len=%d)", state_len as u32);
-            }
-        } else {
-            *state_slot = Some(State::new());
-        }
-    }
-
-    if let Some(info) = unsafe { boot_info_ptr.as_ref() } {
-        unsafe {
-            *BOOT_INFO.get_mut() = Some(*info);
-        }
-        unsafe {
-            if !*PAGE_ALLOC_INIT.get_mut() {
-                mmu::init(info);
-                *PAGE_ALLOC_INIT.get_mut() = true;
-            }
-        }
-        let task = Task::kernel(info.root_ppn, info.kstack_top);
-        unsafe {
-            let tasks_slot = TASKS.get_mut();
-            match tasks_slot {
-                Some(tasks) => tasks.push(task),
-                None => *tasks_slot = Some(vec![task]),
-            }
-        }
-        logf!(
-            "boot_info: root_ppn=0x%x kstack_top=0x%x mem_size=%d",
-            info.root_ppn,
-            info.kstack_top,
-            info.memory_size
-        );
-    } else {
-        log!("boot_info missing; kernel task not initialized");
-    }
+    init_kernel(state_ptr, state_len, boot_info_ptr);
 
     let encoded_bundle = unsafe { slice::from_raw_parts(bundle_ptr, bundle_len) };
 
@@ -193,10 +144,11 @@ fn program_call(tx: &Transaction) {
 
     let kstack_top = unsafe { BOOT_INFO.get_mut().as_ref().map(|b| b.kstack_top).unwrap_or(0) };
 
-    if let Some(task) = launch_program(0, kstack_top) {
+    if let Some(task) = launch_program(kstack_top, &tx.to, &tx.from, &account.code, &tx.data) {
         logf!(
-            "Program task created: root=0x%x window_size=%d",
+            "Program task created: root=0x%x asid=%d window_size=%d",
             task.addr_space.root_ppn,
+            task.addr_space.asid as u32,
             PROGRAM_WINDOW_BYTES as u32
         );
         unsafe {
