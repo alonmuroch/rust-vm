@@ -6,7 +6,7 @@ extern crate alloc;
 use alloc::{format, vec};
 use core::mem::forget;
 use core::slice;
-use kernel::{BootInfo, Config, launch_program, PROGRAM_WINDOW_BYTES};
+use kernel::{BootInfo, Config, prep_program_task, run_task, PROGRAM_WINDOW_BYTES};
 use program::{log, logf};
 use state::State;
 use types::transaction::{Transaction, TransactionBundle, TransactionType};
@@ -122,6 +122,22 @@ fn program_call(tx: &Transaction) {
         return;
     }
 
+    let first_nz = account
+        .code
+        .iter()
+        .position(|&b| b != 0)
+        .unwrap_or(account.code.len());
+    let nz_count = account.code.iter().filter(|&&b| b != 0).count();
+    logf!(
+        "%s",
+        display: format!(
+            "Program code stats: len={} first_nz={} nz_count={}",
+            account.code.len(),
+            first_nz,
+            nz_count
+        )
+    );
+
     let code_len = account.code.len();
     let max = Config::CODE_SIZE_LIMIT + Config::RO_DATA_SIZE_LIMIT;
     if code_len > max {
@@ -144,7 +160,11 @@ fn program_call(tx: &Transaction) {
 
     let kstack_top = unsafe { BOOT_INFO.get_mut().as_ref().map(|b| b.kstack_top).unwrap_or(0) };
 
-    if let Some(task) = launch_program(kstack_top, &tx.to, &tx.from, &account.code, &tx.data) {
+    let entry_off = first_nz as u32;
+
+    if let Some(task) =
+        prep_program_task(kstack_top, &tx.to, &tx.from, &account.code, &tx.data, entry_off)
+    {
         logf!(
             "Program task created: root=0x%x asid=%d window_size=%d",
             task.addr_space.root_ppn,
@@ -156,6 +176,11 @@ fn program_call(tx: &Transaction) {
             match tasks_slot {
                 Some(tasks) => tasks.push(task),
                 None => *tasks_slot = Some(vec![task]),
+            }
+            if let Some(tasks) = tasks_slot {
+                if let Some(last) = tasks.last() {
+                    run_task(last);
+                }
             }
         }
     } else {

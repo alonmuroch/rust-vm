@@ -4,7 +4,7 @@ use crate::global::{PAGE_ALLOC, ROOT_PPN};
 use crate::BootInfo;
 use types::{
     Sv32PagePerms, Sv32PageTable, SV32_DIRECT_MAP_BASE, SV32_PAGE_SIZE, SV32_VPN_MASK, map_allocating,
-    SV32_PTE_R, SV32_PTE_W, SV32_PTE_X, SV32_PTE_V,
+    SV32_PTE_R, SV32_PTE_W, SV32_PTE_X, SV32_PTE_V, SV32_PTE_U, map_to_physical,
 };
 
 const PAGE_SIZE: usize = SV32_PAGE_SIZE;
@@ -48,11 +48,25 @@ impl PageAllocator {
             ptr::write_bytes(virt as *mut u8, 0, PAGE_SIZE);
         }
     }
+
+    /// Advance the allocator so it will not hand out frames below `min_ppn`.
+    pub fn bump_to(&mut self, min_ppn: u32) {
+        if self.next_ppn < min_ppn {
+            self.next_ppn = min_ppn;
+        }
+    }
 }
 
 /// Return the kernel's current root PPN (satp PPN field).
 pub fn current_root() -> u32 {
     unsafe { *ROOT_PPN.get_mut() }
+}
+
+/// Update the current root PPN used by kernel helpers.
+pub fn set_current_root(root_ppn: u32) {
+    unsafe {
+        *ROOT_PPN.get_mut() = root_ppn;
+    }
 }
 
 /// Initialize the kernel MMU allocator state from bootloader handoff.
@@ -77,6 +91,15 @@ pub fn alloc_root() -> Option<u32> {
     }
 }
 
+/// Ensure the page allocator will not hand out frames below `min_ppn`.
+pub fn bump_page_allocator(min_ppn: u32) {
+    unsafe {
+        if let Some(alloc) = PAGE_ALLOC.get_mut() {
+            alloc.bump_to(min_ppn);
+        }
+    }
+}
+
 /// Map a user-visible virtual range with the provided permissions into a specific root.
 pub fn map_user_range_for_root(root_ppn: u32, va_start: u32, len: usize, perms: PagePerms) -> bool {
     let alloc = unsafe { PAGE_ALLOC.get_mut() };
@@ -93,6 +116,56 @@ pub fn map_user_range_for_root(root_ppn: u32, va_start: u32, len: usize, perms: 
 pub fn map_user_range(va_start: u32, len: usize, perms: PagePerms) -> bool {
     let root = unsafe { *ROOT_PPN.get_mut() };
     map_user_range_for_root(root, va_start, len, perms)
+}
+
+/// Map a VA range in `root_ppn` to an explicit physical range (no allocation).
+pub fn map_physical_range_for_root(
+    root_ppn: u32,
+    va_start: u32,
+    phys_start: u32,
+    len: usize,
+    perms: PagePerms,
+) -> bool {
+    let alloc = unsafe { PAGE_ALLOC.get_mut() };
+    match alloc {
+        Some(alloc) => {
+            let mapper = KernelMapper::new(alloc);
+            map_to_physical(&mapper, root_ppn, va_start, phys_start, len, perms)
+        }
+        None => false,
+    }
+}
+
+/// Mirror a mapped user range from `user_root` into the current kernel root so the
+/// kernel can execute the user program without switching satp.
+pub fn mirror_user_range_into_kernel(user_root: u32, va_start: u32, len: usize, perms: PagePerms) -> bool {
+    if len == 0 {
+        return true;
+    }
+    let page_size = PAGE_SIZE;
+    let start = align_down_local(va_start as usize, page_size) as u32;
+    let end = match (va_start as usize).checked_add(len) {
+        Some(v) => align_up_local(v, page_size) as u32,
+        None => return false,
+    };
+    let kernel_root = current_root();
+    let alloc = unsafe { PAGE_ALLOC.get_mut() };
+    let mapper_alloc = match alloc {
+        Some(a) => a,
+        None => return false,
+    };
+    let mut va = start;
+    while va < end {
+        let phys = match translate_user_va(user_root, va) {
+            Some(p) => p as u32,
+            None => return false,
+        };
+        if !overwrite_map_page(kernel_root, va, phys, perms, mapper_alloc) {
+            return false;
+        }
+        va = va.wrapping_add(page_size as u32);
+    }
+    true
 }
 
 /// Walk Sv32 to translate a VA in the given root to a physical address.
@@ -119,6 +192,13 @@ pub fn translate_user_va(root_ppn: u32, va: u32) -> Option<usize> {
 
     let ppn = (l2_pte >> 10) as usize;
     ppn.checked_mul(PAGE_SIZE)?.checked_add(offset)
+}
+
+/// Peek a 32-bit value at a VA in a given root using the direct-map window.
+pub fn peek_word(root_ppn: u32, va: u32) -> Option<u32> {
+    let phys = translate_user_va(root_ppn, va)?;
+    let va_ptr = direct_map_addr(phys)?;
+    Some(unsafe { (va_ptr as *const u32).read_volatile() })
 }
 
 /// Copy data into a user VA range for a specific root using the direct-map window.
@@ -202,4 +282,70 @@ fn direct_map_addr(phys: usize) -> Option<usize> {
 fn read_pte(phys_addr: usize) -> Option<u32> {
     let va = direct_map_addr(phys_addr)?;
     Some(unsafe { (va as *const u32).read_volatile() })
+}
+
+fn write_pte(phys_addr: usize, val: u32) {
+    if let Some(va) = direct_map_addr(phys_addr) {
+        unsafe { (va as *mut u32).write_volatile(val) };
+    }
+}
+
+const fn align_up_local(val: usize, align: usize) -> usize {
+    (val + (align - 1)) & !(align - 1)
+}
+
+const fn align_down_local(val: usize, align: usize) -> usize {
+    val & !(align - 1)
+}
+
+fn overwrite_map_page(
+    root_ppn: u32,
+    va: u32,
+    phys_start: u32,
+    perms: PagePerms,
+    alloc: &mut PageAllocator,
+) -> bool {
+    let page_size = PAGE_SIZE;
+    let vpn1 = (va >> 22) & SV32_VPN_MASK;
+    let vpn0 = (va >> 12) & SV32_VPN_MASK;
+
+    let root_base = (root_ppn as usize)
+        .checked_mul(page_size)
+        .unwrap();
+    let l1_addr = root_base + vpn1 as usize * core::mem::size_of::<u32>();
+    let mut l1_pte = read_pte(l1_addr).unwrap_or(0);
+    if l1_pte & SV32_PTE_V == 0 {
+        let l2 = match alloc.alloc() {
+            Some(ppn) => ppn,
+            None => return false,
+        };
+        PageAllocator::zero_page(l2);
+        l1_pte = (l2 << 10) | SV32_PTE_V;
+        write_pte(l1_addr, l1_pte);
+    } else if l1_pte & (SV32_PTE_R | SV32_PTE_W | SV32_PTE_X) != 0 {
+        return false;
+    }
+
+    let l2_base = ((l1_pte >> 10) as usize)
+        .checked_mul(page_size)
+        .unwrap();
+    let l2_addr = l2_base + vpn0 as usize * core::mem::size_of::<u32>();
+
+    let leaf_ppn = phys_start / page_size as u32;
+    let mut flags = SV32_PTE_V;
+    if perms.read {
+        flags |= SV32_PTE_R;
+    }
+    if perms.write {
+        flags |= SV32_PTE_W;
+    }
+    if perms.exec {
+        flags |= SV32_PTE_X;
+    }
+    if perms.user {
+        flags |= types::SV32_PTE_U;
+    }
+    let leaf = (leaf_ppn << 10) | flags;
+    write_pte(l2_addr, leaf);
+    true
 }
