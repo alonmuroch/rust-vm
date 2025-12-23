@@ -53,7 +53,6 @@ const PAGE_SIZE: usize = 4096;
 const STACK_BYTES: usize = 0x4000; // 16 KiB user stack
 const HEAP_BYTES: usize = 0x8000; // 32 KiB user heap
 pub const PROGRAM_VA_BASE: u32 = 0x0;
-const SYSCALL_BRK: u32 = 214;
 // Location of the page that hosts the satp-switch trampoline. Kept just past
 // the user window so it does not collide with program text/stack/heap. This VA
 // is mapped into both roots so the satp write does not invalidate the
@@ -112,39 +111,25 @@ pub fn prep_program_task(
     }
 
     // Make sure the kernel page allocator does not hand out frames that the
-    // kernel heap already consumed (account code lives there). We query the
-    // current program break via brk(0) and bump the allocator past that PPN.
-    let heap_brk = current_heap_break();
-    if let Some(heap_phys) = mmu::translate_user_va(mmu::current_root(), heap_brk.saturating_sub(1)) {
-        let min_ppn = ((heap_phys / PAGE_SIZE) as u32).saturating_add(1);
+    // kernel heap already consumed (account code lives there). We conservatively
+    // push the allocator toward the top of memory so new user roots/tables
+    // don't overlap heap-backed data.
+    let total_ppn = unsafe {
+        BOOT_INFO
+            .get_mut()
+            .as_ref()
+            .map(|b| b.memory_size / PAGE_SIZE as u32)
+            .unwrap_or(0)
+    };
+    let reserve = (PROGRAM_WINDOW_BYTES / PAGE_SIZE) as u32 + 4; // user window + a few tables
+    if total_ppn > reserve {
+        let min_ppn = total_ppn - reserve;
         mmu::bump_page_allocator(min_ppn);
         logf!(
-            "prep_program_task: bump page alloc to ppn=0x%x from heap_brk=0x%x phys=0x%x",
+            "prep_program_task: bump page alloc to ppn=0x%x (total_ppn=0x%x)",
             min_ppn,
-            heap_brk,
-            heap_phys as u32
+            total_ppn
         );
-    } else {
-        // Fallback: push the allocator toward the top of memory so we avoid heap overlap.
-        let total_ppn = unsafe {
-            BOOT_INFO
-                .get_mut()
-                .as_ref()
-                .map(|b| b.memory_size / PAGE_SIZE as u32)
-                .unwrap_or(0)
-        };
-        let reserve = (PROGRAM_WINDOW_BYTES / PAGE_SIZE) as u32 + 4; // user window + a few tables
-        if total_ppn > reserve {
-            let min_ppn = total_ppn - reserve;
-            mmu::bump_page_allocator(min_ppn);
-            logf!(
-                "prep_program_task: fallback bump page alloc to ppn=0x%x (total_ppn=0x%x)",
-                min_ppn,
-                total_ppn
-            );
-        } else {
-            logf!("prep_program_task: could not translate heap_brk=0x%x", heap_brk);
-        }
     }
 
     let asid = alloc_asid();
@@ -402,22 +387,4 @@ fn alloc_asid() -> u16 {
         *counter = asid.wrapping_add(1);
         asid
     }
-}
-
-/// Query the current heap break via the `brk(2)` syscall (a7 = 214).
-fn current_heap_break() -> u32 {
-    let mut brk: u32;
-    unsafe {
-        core::arch::asm!(
-            "mv a0, zero",
-            "li a7, {sys_brk}",
-            "ecall",
-            out("a0") brk,
-            sys_brk = const SYSCALL_BRK,
-            out("a1") _, out("a2") _, out("a3") _, out("a4") _, out("a5") _, out("a6") _,
-            out("t0") _, out("t1") _, out("t2") _,
-            options(nostack)
-        );
-    }
-    brk
 }
