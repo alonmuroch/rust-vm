@@ -411,7 +411,7 @@ pub fn decode_full(word: u32) -> Option<Instruction> {
                     match funct12 {
                         0 => Some(Instruction::Ecall),
                         1 => Some(Instruction::Ebreak),
-                        0x302 => Some(Instruction::Mret),
+                        0x302 | 0x102 => Some(Instruction::Mret),
                         _ => None,
                     }
                 }

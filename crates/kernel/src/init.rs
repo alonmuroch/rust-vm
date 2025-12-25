@@ -5,15 +5,23 @@ use program::{log, logf};
 use state::State;
 
 use kernel::global::{BOOT_INFO, PAGE_ALLOC_INIT, STATE, TASKS};
-use kernel::{mmu, BootInfo, Task};
+use kernel::{mmu, BootInfo, Task, trap};
 
 /// Initialize kernel state from the bootloader handoff and optional state blob.
 pub fn init_kernel(state_ptr: *const u8, state_len: usize, boot_info_ptr: *const BootInfo) {
+    if let Some(info) = unsafe { boot_info_ptr.as_ref() } {
+        trap::init_trap_vector(info.kstack_top);
+    }
     init_state(state_ptr, state_len);
     init_boot_info(boot_info_ptr);
 }
 
 fn init_state(state_ptr: *const u8, state_len: usize) {
+    logf!(
+        "init_state: state_ptr=0x%x state_len=%d",
+        state_ptr as usize as u32,
+        state_len as u32
+    );
     unsafe {
         let state_slot = STATE.get_mut();
         if !state_ptr.is_null() && state_len > 0 {
@@ -32,6 +40,10 @@ fn init_state(state_ptr: *const u8, state_len: usize) {
 }
 
 fn init_boot_info(boot_info_ptr: *const BootInfo) {
+    logf!(
+        "init_boot_info: boot_info_ptr=0x%x",
+        boot_info_ptr as usize as u32
+    );
     if let Some(info) = unsafe { boot_info_ptr.as_ref() } {
         unsafe {
             *BOOT_INFO.get_mut() = Some(*info);

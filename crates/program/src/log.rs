@@ -4,7 +4,7 @@ macro_rules! logf_syscall {
         #[cfg(target_arch = "riscv32")]
         unsafe {
             core::arch::asm!(
-                "li a7, 4",  // syscall_log
+                "li a7, 100",  // syscall_log
                 "ecall",
                 in("a1") $fmt_ptr,
                 in("a2") $fmt_len,

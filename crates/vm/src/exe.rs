@@ -1,4 +1,5 @@
-use super::{Instruction, MemoryAccessKind, Memory, CPU, CSR_SATP};
+use super::{Instruction, MemoryAccessKind, Memory, CPU, CSR_SATP, CSR_SEPC, SCAUSE_ECALL_FROM_U};
+use crate::sys_call::SYSCALL_LOG;
 use crate::memory::VirtualAddress;
 use crate::host_interface::HostInterface;
 use crate::instruction::CsrOp;
@@ -792,6 +793,18 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
+                if self.has_trap_vector() {
+                    // Bypass trap for logging syscalls so they execute directly.
+                    if call_id != SYSCALL_LOG {
+                        if !self.trap_to_vector(SCAUSE_ECALL_FROM_U, 0, Some(call_id)) {
+                            panic!(
+                                "trap_to_vector returned false for ecall id={} pc=0x{:08x}",
+                                call_id, self.pc
+                            );
+                        }
+                        return true;
+                    }
+                }
                 let (result, cont) = self.syscall_handler.handle_syscall(
                     call_id,
                     args,
@@ -865,8 +878,14 @@ impl CPU {
                 return false;
             }
             Instruction::Mret => {
-                // Treat MRET as a simple return/halt in this VM
-                return false;
+                let target = match self.read_csr(CSR_SEPC) {
+                    Some(v) => v,
+                    None => return false,
+                };
+                if !self.set_pc(target) {
+                    return false;
+                }
+                return true;
             }
 
             // EDUCATIONAL: Compressed instruction set (RV32C) - space-saving instructions

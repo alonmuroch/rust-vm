@@ -12,6 +12,11 @@ use std::rc::Rc;
 mod exec;
 
 pub const CSR_SATP: u16 = 0x180;
+pub const CSR_STVEC: u16 = 0x105;
+pub const CSR_SEPC: u16 = 0x141;
+pub const CSR_SCAUSE: u16 = 0x142;
+pub const CSR_STVAL: u16 = 0x143;
+const SCAUSE_ECALL_FROM_U: u32 = 8;
 
 /// Represents the Central Processing Unit (CPU) of our RISC-V virtual machine.
 /// 
@@ -182,6 +187,44 @@ impl CPU {
         true
     }
 
+    fn trap_to_vector(&mut self, cause: u32, trap_value: u32, syscall_id: Option<u32>) -> bool {
+        if !self.write_csr(CSR_SEPC, self.pc) {
+            panic!("trap_to_vector: failed to write sepc");
+        }
+        if !self.write_csr(CSR_SCAUSE, cause) {
+            panic!("trap_to_vector: failed to write scause");
+        }
+        if !self.write_csr(CSR_STVAL, trap_value) {
+            panic!("trap_to_vector: failed to write stval");
+        }
+        let stvec = match self.read_csr(CSR_STVEC) {
+            Some(val) => val & !0x3,
+            None => return false,
+        };
+        if let Some(syscall_id) = syscall_id {
+            self.log(
+                &format!(
+                    "trap_to_vector: pc=0x{:08x} -> stvec=0x{:08x} cause=0x{:x} stval=0x{:x} syscall=0x{:x}",
+                    self.pc, stvec, cause, trap_value, syscall_id
+                ),
+                false,
+            );
+        } else {
+            self.log(
+                &format!(
+                    "trap_to_vector: pc=0x{:08x} -> stvec=0x{:08x} cause=0x{:x} stval=0x{:x}",
+                    self.pc, stvec, cause, trap_value
+                ),
+                false,
+            );
+        }
+        self.set_pc(stvec)
+    }
+
+    fn has_trap_vector(&self) -> bool {
+        self.csrs.contains_key(&CSR_STVEC)
+    }
+
     /// Executes a single instruction cycle (fetch, decode, execute).
     /// 
     /// EDUCATIONAL PURPOSE: This is the heart of the CPU - the instruction cycle.
@@ -282,7 +325,17 @@ impl CPU {
         let old_pc = self.pc;
 
         // EDUCATIONAL: Execute the instruction
-        let result = self.execute(instr, memory, host);
+        let result = self.execute(instr.clone(), memory, host);
+        if !result {
+            self.log(
+                &format!(
+                    "Execution halted at PC=0x{:08x} on instr={}",
+                    self.pc,
+                    instr.pretty_print()
+                ),
+                false,
+            );
+        }
 
         // EDUCATIONAL: Only increment PC if the instruction didn't change it
         // This handles branches, jumps, and calls correctly

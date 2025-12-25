@@ -30,7 +30,6 @@ pub extern "C" fn _start(
     boot_info_ptr: *const BootInfo,
 ) {
     log!("kernel boot");
-    logf!("bundle_len=%d", bundle_len as u32);
 
     init_kernel(state_ptr, state_len, boot_info_ptr);
 
