@@ -1,4 +1,4 @@
-use crate::cpu::{CPU, CSR_SATP};
+use crate::cpu::CPU;
 use crate::host_interface::HostInterface;
 use crate::memory::Memory;
 use crate::metering::Metering;
@@ -50,7 +50,8 @@ impl VM {
     ) -> Self {
         let mut cpu = CPU::new(syscall_handler);
         cpu.regs[Register::Sp as usize] = memory.stack_top().as_u32();
-        cpu.csrs.insert(CSR_SATP, memory.satp());
+        let satp = memory.satp();
+        cpu.set_satp(&memory, satp);
         Self {
             cpu,
             memory,

@@ -187,6 +187,11 @@ impl CPU {
         true
     }
 
+    pub fn set_satp(&mut self, memory: &Memory, value: u32) -> bool {
+        memory.set_satp(value);
+        self.write_csr(CSR_SATP, value)
+    }
+
     fn trap_to_vector(&mut self, cause: u32, trap_value: u32, syscall_id: Option<u32>) -> bool {
         if !self.write_csr(CSR_SEPC, self.pc) {
             panic!("trap_to_vector: failed to write sepc");

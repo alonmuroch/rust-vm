@@ -861,10 +861,11 @@ impl CPU {
                 let will_write = src != 0 || matches!(op, CsrOp::Csrrw);
                 if will_write {
                     if csr == CSR_SATP {
-                        memory.set_satp(new_val);
-                    }
-                    if !self.write_csr(csr, new_val) {
-                        return false;
+                        if !self.set_satp(&memory, new_val) {
+                            panic!("failed to update satp");
+                        }
+                    } else if !self.write_csr(csr, new_val) {
+                        panic!("failed to write csr 0x{:03x}", csr);
                     }
                 }
 

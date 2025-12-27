@@ -1,6 +1,11 @@
 use std::cell::Ref;
 use std::rc::Rc;
-use crate::metering::{Metering, MemoryAccessKind};
+
+use crate::metering::{MemoryAccessKind, Metering};
+
+mod sv32;
+
+pub use sv32::Sv32Memory;
 
 pub const HEAP_PTR_OFFSET: u32 = 0x100;
 
@@ -93,7 +98,7 @@ impl From<VirtualAddress> for usize {
     }
 }
 
-pub trait Mmu: std::fmt::Debug {
+pub trait MMU: std::fmt::Debug {
     // --- CPU-facing data access (loads/stores/fetches) ---
     fn mem(&self) -> Ref<Vec<u8>>;
     fn mem_slice(&self, start: VirtualAddress, end: VirtualAddress) -> Option<std::cell::Ref<[u8]>>;
@@ -104,6 +109,9 @@ pub trait Mmu: std::fmt::Debug {
     fn load_byte(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u8>;
     fn load_halfword(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u16>;
     fn load_word(&self, addr: VirtualAddress, metering: &mut dyn Metering, kind: MemoryAccessKind) -> Option<u32>;
+}
+
+pub trait API: std::fmt::Debug {
     fn map_range(&self, start: VirtualAddress, len: usize, perms: Perms);
     /// Get the current page-table root (index/identifier).
     fn current_root(&self) -> usize;
@@ -119,5 +127,9 @@ pub trait Mmu: std::fmt::Debug {
     fn next_heap(&self) -> VirtualAddress;
     fn set_next_heap(&self, next: VirtualAddress);
 }
+
+pub trait Mmu: MMU + API {}
+
+impl<T: MMU + API> Mmu for T {}
 
 pub type Memory = Rc<dyn Mmu>;

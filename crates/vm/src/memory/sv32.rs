@@ -3,11 +3,13 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use types::{
-    Sv32PagePerms, Sv32PageTable, SV32_PTE_R, SV32_PTE_V, SV32_PTE_W, SV32_PTE_X,
-    SV32_SATP_PPN_MASK, map_allocating, map_to_physical,
+    map_allocating, map_to_physical, Sv32PagePerms, Sv32PageTable, SV32_PTE_R, SV32_PTE_V,
+    SV32_PTE_W, SV32_PTE_X, SV32_SATP_PPN_MASK,
 };
-use vm::memory::{Mmu, Perms, VirtualAddress};
-use vm::metering::{MeterResult, Metering, MemoryAccessKind};
+
+use crate::metering::{MemoryAccessKind, MeterResult, Metering};
+
+use super::{API, MMU, Perms, VirtualAddress};
 
 /// Software Sv32 MMU backed by a contiguous physical buffer.
 ///
@@ -27,7 +29,7 @@ use vm::metering::{MeterResult, Metering, MemoryAccessKind};
 /// - `mem_slice` only returns contiguous slices when the mapped physical pages are contiguous.
 /// - Identity mapping is not assumed; everything uses page tables even for kernel.
 #[derive(Debug)]
-pub struct Memory {
+pub struct Sv32Memory {
     /// Page size in bytes (Sv32: 4 KiB).
     page_size: usize,
     /// Total number of physical frames available.
@@ -51,7 +53,7 @@ fn perms_to_sv32(perms: Perms) -> Sv32PagePerms {
     }
 }
 
-impl Memory {
+impl Sv32Memory {
     pub fn new(total_size_bytes: usize, page_size: usize) -> Self {
         assert!(page_size != 0, "page_size must be > 0");
         assert!(total_size_bytes != 0, "total_size_bytes must be > 0");
@@ -296,7 +298,7 @@ impl Memory {
     }
 }
 
-impl Sv32PageTable for Memory {
+impl Sv32PageTable for Sv32Memory {
     fn page_size(&self) -> usize {
         self.page_size
     }
@@ -318,17 +320,9 @@ impl Sv32PageTable for Memory {
     }
 }
 
-impl Mmu for Memory {
+impl MMU for Sv32Memory {
     fn mem(&self) -> Ref<Vec<u8>> {
         self.backing.borrow()
-    }
-
-    fn map_range(&self, start: VirtualAddress, len: usize, perms: Perms) {
-        Memory::map_range(self, start, len, perms);
-    }
-
-    fn current_root(&self) -> usize {
-        self.root_ppn()
     }
 
     fn mem_slice(
@@ -471,6 +465,16 @@ impl Mmu for Memory {
             backing[offset..offset + 4].try_into().unwrap(),
         ))
     }
+}
+
+impl API for Sv32Memory {
+    fn map_range(&self, start: VirtualAddress, len: usize, perms: Perms) {
+        Sv32Memory::map_range(self, start, len, perms);
+    }
+
+    fn current_root(&self) -> usize {
+        self.root_ppn()
+    }
 
     fn size(&self) -> usize {
         self.total_size()
@@ -493,7 +497,7 @@ impl Mmu for Memory {
     }
 
     fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress {
-        Memory::alloc_on_heap(self, data)
+        Sv32Memory::alloc_on_heap(self, data)
     }
 
     fn next_heap(&self) -> VirtualAddress {

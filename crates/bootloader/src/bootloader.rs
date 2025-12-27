@@ -9,10 +9,9 @@ use goblin::elf::Elf;
 use types::{boot::BootInfo, transaction::TransactionBundle, SV32_DIRECT_MAP_BASE};
 
 use crate::DefaultSyscallHandler;
-use crate::memory::{Memory, Perms};
 use state::State;
 use vm::host_interface::NoopHost;
-use vm::memory::{Mmu, HEAP_PTR_OFFSET, Memory as MmuRef, VirtualAddress, PAGE_SIZE};
+use vm::memory::{API, Mmu, Perms, Sv32Memory, HEAP_PTR_OFFSET, Memory as MmuRef, VirtualAddress, PAGE_SIZE};
 use vm::registers::Register;
 use vm::vm::VM;
 
@@ -38,14 +37,14 @@ impl Default for BootConfig {
 #[derive(Debug)]
 pub struct Bootloader {
     pub config: BootConfig,
-    memory: Rc<Memory>,
+    memory: Rc<Sv32Memory>,
 }
 
 impl Bootloader {
     pub fn new(total_size_bytes: usize) -> Self {
         Self {
             config: BootConfig::default(),
-            memory: Rc::new(Memory::new(total_size_bytes, PAGE_SIZE)),
+            memory: Rc::new(Sv32Memory::new(total_size_bytes, PAGE_SIZE)),
         }
     }
 
@@ -105,7 +104,8 @@ impl Bootloader {
             Perms::rw_kernel(),
         );
         assert!(mapped, "failed to map kernel direct physical window");
-        (entry_point, self.memory.clone() as MmuRef)
+        let memory: MmuRef = self.memory.clone();
+        (entry_point, memory)
     }
 
     /// Execute a transaction bundle by delegating to the kernel. This mirrors the
