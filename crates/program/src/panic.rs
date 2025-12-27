@@ -8,8 +8,8 @@ pub fn vm_panic(msg: &[u8]) -> ! {
         core::arch::asm!(
             "li a7, 3", // SYSCALL_PANIC
             "ecall",
-            in("a0") msg.as_ptr(),
-            in("a1") msg.len(),
+            in("a1") msg.as_ptr(),
+            in("a2") msg.len(),
             options(noreturn),
         );
     }
