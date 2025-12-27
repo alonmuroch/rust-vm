@@ -72,23 +72,17 @@ pub fn run_task(task_idx: usize) {
     // control to the user PC.
     unsafe {
         core::arch::asm!(
-            "mv t0, {satp}",   // satp to write
-            "mv t1, {pc}",     // user PC
             "mv ra, zero",
-            "mv sp, {sp}",
-            "mv a0, {a0}",
-            "mv a1, {a1}",
-            "mv a2, {a2}",
-            "mv a3, {a3}",
-            "jr {tramp}",
-            satp = in(reg) target_root,
-            pc = in(reg) pc,
-            sp = in(reg) sp,
-            a0 = in(reg) a0,
-            a1 = in(reg) a1,
-            a2 = in(reg) a2,
-            a3 = in(reg) a3,
-            tramp = in(reg) TRAMPOLINE_VA,
+            "mv sp, t2",
+            "jr t3",
+            in("t0") target_root,
+            in("t1") pc,
+            in("a0") a0,
+            in("a1") a1,
+            in("a2") a2,
+            in("a3") a3,
+            in("t2") sp,
+            in("t3") TRAMPOLINE_VA,
             options(noreturn)
         );
     }

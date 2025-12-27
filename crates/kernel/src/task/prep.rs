@@ -149,13 +149,7 @@ pub fn prep_program_task(
             return None;
         }
     };
-    if !mmu::map_physical_range_for_root(
-        mmu::current_root(),
-        TRAMPOLINE_VA,
-        tramp_phys,
-        PAGE_SIZE,
-        tramp_perms,
-    ) {
+    if !mmu::mirror_user_range_into_kernel(root_ppn, TRAMPOLINE_VA, PAGE_SIZE, tramp_perms) {
         log!("prep_program_task: failed to mirror trampoline into kernel root");
         return None;
     }
