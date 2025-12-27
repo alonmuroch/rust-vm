@@ -6,6 +6,7 @@ use crate::metering::{MemoryAccessKind, Metering};
 mod sv32;
 
 pub use sv32::Sv32Memory;
+pub use types::mmu::*;
 
 pub const HEAP_PTR_OFFSET: u32 = 0x100;
 
@@ -121,11 +122,8 @@ pub trait API: std::fmt::Debug {
     fn set_satp(&self, satp: u32);
     /// Top of the stack for this memory layout.
     fn stack_top(&self) -> VirtualAddress;
-    fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress;
     fn size(&self) -> usize;
     fn offset(&self, addr: VirtualAddress) -> usize;
-    fn next_heap(&self) -> VirtualAddress;
-    fn set_next_heap(&self, next: VirtualAddress);
 }
 
 pub trait Mmu: MMU + API {}

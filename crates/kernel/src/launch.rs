@@ -280,7 +280,11 @@ pub fn prep_program_task(
         tramp_phys_2 as u32
     );
 
-    let mut task = Task::new(AddressSpace::new(root_ppn, asid), kstack_top);
+    let mut task = Task::new(
+        AddressSpace::new(root_ppn, asid),
+        kstack_top,
+        Config::HEAP_START_ADDR as u32,
+    );
     // Set up initial trapframe.
     let stack_top = PROGRAM_VA_BASE
         .wrapping_add((Config::CODE_SIZE_LIMIT + Config::RO_DATA_SIZE_LIMIT + STACK_BYTES) as u32);

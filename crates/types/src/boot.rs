@@ -14,6 +14,8 @@ pub struct BootInfo {
     pub root_ppn: u32,
     /// Top of the kernel stack.
     pub kstack_top: u32,
+    /// Next heap pointer for kernel allocations (virtual address).
+    pub heap_ptr: u32,
     /// Total physical memory size in bytes.
     pub memory_size: u32,
     /// First free physical page number after bootloader allocations.
@@ -21,10 +23,17 @@ pub struct BootInfo {
 }
 
 impl BootInfo {
-    pub const fn new(root_ppn: u32, kstack_top: u32, memory_size: u32, next_free_ppn: u32) -> Self {
+    pub const fn new(
+        root_ppn: u32,
+        kstack_top: u32,
+        heap_ptr: u32,
+        memory_size: u32,
+        next_free_ppn: u32,
+    ) -> Self {
         Self {
             root_ppn,
             kstack_top,
+            heap_ptr,
             memory_size,
             next_free_ppn,
         }

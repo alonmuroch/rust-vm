@@ -1,6 +1,6 @@
 use crate::cpu::CPU;
 use crate::host_interface::HostInterface;
-use crate::memory::Memory;
+use crate::memory::{API, Memory};
 use crate::metering::Metering;
 use crate::registers::Register;
 use crate::sys_call::SyscallHandler;
@@ -67,6 +67,10 @@ impl VM {
         self.cpu.regs[reg as usize] = data;
     }
 
+    pub fn memory_api(&self) -> Rc<dyn API> {
+        self.memory.clone() as Rc<dyn API>
+    }
+
     /// Dumps the entire memory contents for debugging.
     ///
     /// EDUCATIONAL PURPOSE: This demonstrates memory inspection tools that
@@ -100,10 +104,7 @@ impl VM {
         assert!(start < end, "invalid memory range");
         assert!(end <= borrowed_memory.mem().len(), "range out of bounds");
 
-        // EDUCATIONAL: Show heap pointer for context
-        let next_heap = borrowed_memory.next_heap();
         println!("--- Memory Dump ---");
-        println!("Next heap pointer: 0x{:08x}", next_heap.as_u32());
 
         // EDUCATIONAL: Display memory in 16-byte lines
         for addr in (start..end).step_by(16) {

@@ -1,6 +1,6 @@
 use core::{mem, slice};
 use core::fmt::Write as FmtWrite;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::vec::Vec;
 
@@ -11,7 +11,7 @@ use types::{boot::BootInfo, transaction::TransactionBundle, SV32_DIRECT_MAP_BASE
 use crate::DefaultSyscallHandler;
 use state::State;
 use vm::host_interface::NoopHost;
-use vm::memory::{API, Mmu, Perms, Sv32Memory, HEAP_PTR_OFFSET, Memory as MmuRef, VirtualAddress, PAGE_SIZE};
+use vm::memory::{API, Perms, Sv32Memory, HEAP_PTR_OFFSET, Memory as MmuRef, VirtualAddress, PAGE_SIZE};
 use vm::registers::Register;
 use vm::vm::VM;
 
@@ -38,6 +38,7 @@ impl Default for BootConfig {
 pub struct Bootloader {
     pub config: BootConfig,
     memory: Rc<Sv32Memory>,
+    heap_ptr: Rc<Cell<u32>>,
 }
 
 impl Bootloader {
@@ -45,6 +46,7 @@ impl Bootloader {
         Self {
             config: BootConfig::default(),
             memory: Rc::new(Sv32Memory::new(total_size_bytes, PAGE_SIZE)),
+            heap_ptr: Rc::new(Cell::new(0)),
         }
     }
 
@@ -86,7 +88,7 @@ impl Bootloader {
             .write_bytes(VirtualAddress(min_base as u32), &image);
         // Start the heap after the loaded image to avoid overwriting kernel text/rodata
         let heap_start = ((image_end + HEAP_PTR_OFFSET as usize + 7) & !7) as u32;
-        self.memory.set_next_heap(VirtualAddress(heap_start));
+        self.set_next_heap(heap_start);
         // Ensure the kernel has a mapped stack region near the top of memory.
         let stack_base = self
             .memory
@@ -121,7 +123,14 @@ impl Bootloader {
         let (entry_point, memory) = self.load_kernel(kernel_elf);
         let host: Box<dyn vm::host_interface::HostInterface> = Box::new(NoopHost);
 
-        let mut vm = VM::new(memory.clone(), host, Box::new(DefaultSyscallHandler::new(state.clone())));
+        let mut vm = VM::new(
+            memory.clone(),
+            host,
+            Box::new(DefaultSyscallHandler::with_heap(
+                state.clone(),
+                Rc::clone(&self.heap_ptr),
+            )),
+        );
         vm.cpu.verbose = verbose;
         if let Some(writer) = verbose_writer {
             vm.cpu.set_verbose_writer(writer);
@@ -141,26 +150,32 @@ impl Bootloader {
         // Register a length hint so the kernel can bounds-check the payload.
         vm.set_reg_u32(Register::A1, encoded.len() as u32);
         // Keep heap aligned after our write.
-        vm.memory
-            .set_next_heap(VirtualAddress(
-                (addr as usize + encoded.len() + HEAP_PTR_OFFSET as usize) as u32,
-            ));
+        self.set_next_heap(
+            (addr as usize + encoded.len() + HEAP_PTR_OFFSET as usize) as u32,
+        );
     }
 
     fn place_state(&mut self, vm: &mut VM, state: &[u8]) {
         let addr = self.place_data(vm, Register::A2, state);
         vm.set_reg_u32(Register::A3, state.len() as u32);
-        vm.memory
-            .set_next_heap(VirtualAddress(
-                (addr as usize + state.len() + HEAP_PTR_OFFSET as usize) as u32,
-            ));
+        self.set_next_heap(
+            (addr as usize + state.len() + HEAP_PTR_OFFSET as usize) as u32,
+        );
     }
 
     fn place_boot_info(&mut self, vm: &mut VM) {
         // For now the bootloader owns the page tables, so `root_ppn` is a placeholder (0).
+        let heap_start = self.ensure_heap_ptr();
+        let aligned_heap = (heap_start + 7) & !7;
+        let boot_info_size = mem::size_of::<BootInfo>() as u32;
+        let next_heap = aligned_heap
+            .checked_add(boot_info_size)
+            .and_then(|v| v.checked_add(HEAP_PTR_OFFSET))
+            .expect("boot info heap pointer overflow");
         let boot_info = BootInfo::new(
             self.memory.current_root() as u32,
-            vm.memory.stack_top().as_u32(),
+            vm.memory_api().stack_top().as_u32(),
+            next_heap,
             self.memory.size() as u32,
             self.memory.next_free_ppn() as u32,
         );
@@ -170,16 +185,41 @@ impl Bootloader {
                 mem::size_of::<BootInfo>(),
             )
         };
-        let addr = self.place_data(vm, Register::A4, bytes);
-        vm.memory
-            .set_next_heap(VirtualAddress(
-                (addr as usize + bytes.len() + HEAP_PTR_OFFSET as usize) as u32,
-            ));
+        let _addr = self.place_data(vm, Register::A4, bytes);
+        self.set_next_heap(next_heap);
     }
 
     fn place_data(&self, vm: &mut VM, reg: Register, data: &[u8]) -> u32 {
-        let addr = self.memory.alloc_on_heap(data).as_u32();
+        let addr = self.alloc_on_heap(data).as_u32();
         vm.cpu.regs[reg as usize] = addr;
         addr
+    }
+
+    fn ensure_heap_ptr(&self) -> u32 {
+        let current = self.heap_ptr.get();
+        if current == 0 {
+            self.heap_ptr.set(HEAP_PTR_OFFSET);
+            HEAP_PTR_OFFSET
+        } else {
+            current
+        }
+    }
+
+    fn set_next_heap(&self, next: u32) {
+        self.heap_ptr.set(next);
+    }
+
+    fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress {
+        let mut addr = self.ensure_heap_ptr();
+        let align = 8u32;
+        addr = (addr + (align - 1)) & !(align - 1);
+        let end = addr
+            .checked_add(data.len() as u32)
+            .expect("heap allocation overflow");
+        let start = VirtualAddress(addr);
+        self.memory.map_range(start, data.len(), Perms::rw_kernel());
+        self.memory.write_bytes(start, data);
+        self.heap_ptr.set(end);
+        start
     }
 }

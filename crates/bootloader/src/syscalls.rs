@@ -1,4 +1,4 @@
-use core::cell::RefCell;
+use core::cell::{Cell, RefCell};
 use core::fmt::Write;
 use std::any::Any;
 use std::rc::Rc;
@@ -6,8 +6,8 @@ use std::rc::Rc;
 use state::State;
 use types::{ADDRESS_LEN, address::Address, result::RESULT_SIZE};
 use vm::host_interface::HostInterface;
-use vm::memory::{HEAP_PTR_OFFSET, Memory, VirtualAddress};
-use vm::metering::{MeterResult, Metering};
+use vm::memory::{API, MMU, HEAP_PTR_OFFSET, Memory, Perms, VirtualAddress};
+use vm::metering::{MemoryAccessKind, MeterResult, Metering, NoopMeter};
 use vm::registers::Register;
 use vm::sys_call::{
     SYSCALL_ALLOC, SYSCALL_BALANCE, SYSCALL_BRK, SYSCALL_CALL_PROGRAM, SYSCALL_DEALLOC,
@@ -32,6 +32,7 @@ enum Arg {
 pub struct DefaultSyscallHandler {
     verbose_writer: Option<Rc<RefCell<dyn Write>>>,
     state: Rc<RefCell<State>>,
+    heap_ptr: Rc<Cell<u32>>,
 }
 
 impl std::fmt::Debug for DefaultSyscallHandler {
@@ -47,20 +48,73 @@ impl std::fmt::Debug for DefaultSyscallHandler {
 }
 
 impl DefaultSyscallHandler {
-    pub fn new(state: Rc<RefCell<State>>) -> Self {
-        Self {
-            verbose_writer: None,
-            state,
+    fn ensure_heap_ptr(&self) -> u32 {
+        let current = self.heap_ptr.get();
+        if current == 0 {
+            self.heap_ptr.set(HEAP_PTR_OFFSET);
+            HEAP_PTR_OFFSET
+        } else {
+            current
         }
+    }
+
+    fn set_heap_ptr(&self, next: u32) {
+        self.heap_ptr.set(next);
+    }
+
+    fn write_bytes(&self, memory: &Memory, start: VirtualAddress, data: &[u8]) -> bool {
+        let mut meter = NoopMeter::default();
+        for (idx, byte) in data.iter().enumerate() {
+            let addr = start.wrapping_add(idx as u32);
+            if !memory.store_u8(addr, *byte, &mut meter, MemoryAccessKind::Store) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn alloc_on_heap(
+        &self,
+        memory: &Memory,
+        data: &[u8],
+        align: u32,
+    ) -> Option<VirtualAddress> {
+        let mut addr = self.ensure_heap_ptr();
+        let mask = align.checked_sub(1)?;
+        addr = addr.checked_add(mask)? & !mask;
+        let end = addr.checked_add(data.len() as u32)?;
+        let start = VirtualAddress(addr);
+        memory.map_range(start, data.len(), Perms::rw_kernel());
+        if !data.is_empty() && !self.write_bytes(memory, start, data) {
+            return None;
+        }
+        self.set_heap_ptr(end);
+        Some(start)
+    }
+    pub fn new(state: Rc<RefCell<State>>) -> Self {
+        Self::with_writer_and_heap(state, None, Rc::new(Cell::new(0)))
+    }
+
+    pub fn with_heap(state: Rc<RefCell<State>>, heap_ptr: Rc<Cell<u32>>) -> Self {
+        Self::with_writer_and_heap(state, None, heap_ptr)
     }
 
     pub fn with_writer(
         state: Rc<RefCell<State>>,
         writer: Option<Rc<RefCell<dyn Write>>>,
     ) -> Self {
+        Self::with_writer_and_heap(state, writer, Rc::new(Cell::new(0)))
+    }
+
+    fn with_writer_and_heap(
+        state: Rc<RefCell<State>>,
+        writer: Option<Rc<RefCell<dyn Write>>>,
+        heap_ptr: Rc<Cell<u32>>,
+    ) -> Self {
         Self {
             verbose_writer: writer,
             state,
+            heap_ptr,
         }
     }
 }
@@ -254,7 +308,10 @@ impl DefaultSyscallHandler {
             if matches!(metering.on_alloc(buf.len()), MeterResult::Halt) {
                 panic!("Metering halted alloc during storage_get");
             }
-            let addr = borrowed_memory.alloc_on_heap(&buf);
+            let addr = match self.alloc_on_heap(&memory, &buf, 8) {
+                Some(ptr) => ptr,
+                None => return 0,
+            };
             println!(
                 "✅ Found value for address: '{}', domain: '{}', Key: '{}'",
                 address_hex, domain, display_key
@@ -671,7 +728,10 @@ impl DefaultSyscallHandler {
             if matches!(metering.on_alloc(result_bytes.len()), MeterResult::Halt) {
                 panic!("Metering halted alloc for call_program result");
             }
-            borrowed_memory.alloc_on_heap(&result_bytes).as_u32()
+            match self.alloc_on_heap(&memory, &result_bytes, 8) {
+                Some(ptr) => ptr.as_u32(),
+                None => 0,
+            }
         }
     }
 
@@ -694,39 +754,15 @@ impl DefaultSyscallHandler {
             return 0;
         }
 
-        let current_heap = memory.next_heap();
-
-        // Initialize heap pointer if not set (no code has been written)
-        if current_heap.as_u32() == 0 {
-            memory.set_next_heap(VirtualAddress(HEAP_PTR_OFFSET));
-        }
-
         // Allocate aligned memory on heap
         let data = vec![0u8; size];
-        let ptr = memory.alloc_on_heap(&data);
-
-        if ptr.as_u32() == 0 {
-            println!("VM Alloc: Out of memory, failed to allocate {} bytes", size);
-            return 0;
-        }
-
-        // Check if allocated address meets alignment requirements
-        if ptr.as_usize() % align != 0 {
-            // Re-allocate with enough space for alignment
-            let total_size = size + align - 1;
-            let padded_data = vec![0u8; total_size];
-            let padded_ptr = memory.alloc_on_heap(&padded_data);
-            if padded_ptr.as_u32() == 0 {
-                println!(
-                    "VM Alloc: Out of memory, failed to allocate {} bytes for alignment",
-                    total_size
-                );
+        let ptr = match self.alloc_on_heap(&memory, &data, align as u32) {
+            Some(ptr) => ptr,
+            None => {
+                println!("VM Alloc: Out of memory, failed to allocate {} bytes", size);
                 return 0;
             }
-            // Return properly aligned pointer within the allocated region
-            let aligned_ptr = ((padded_ptr.as_usize() + align - 1) & !(align - 1)) as u32;
-            return aligned_ptr;
-        }
+        };
 
         ptr.as_u32()
     }
@@ -799,7 +835,10 @@ impl DefaultSyscallHandler {
         };
 
         let bal = host.balance(addr);
-        memory.alloc_on_heap(&bal.to_le_bytes()).as_u32()
+        match self.alloc_on_heap(&memory, &bal.to_le_bytes(), 8) {
+            Some(ptr) => ptr.as_u32(),
+            None => 0,
+        }
     }
 
     /// Minimal `brk(2)` implementation:
@@ -807,12 +846,12 @@ impl DefaultSyscallHandler {
     /// - Only moves the break forward; shrink requests are ignored.
     fn sys_brk(&mut self, args: [u32; 6], memory: Memory, _metering: &mut dyn Metering) -> u32 {
         let new_brk = args[0];
-        let current = memory.next_heap().as_u32();
+        let current = self.ensure_heap_ptr();
         if new_brk == 0 {
             return current;
         }
         if new_brk >= current {
-            memory.set_next_heap(VirtualAddress(new_brk));
+            self.set_heap_ptr(new_brk);
             new_brk
         } else {
             current

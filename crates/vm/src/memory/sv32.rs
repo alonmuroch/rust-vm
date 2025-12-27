@@ -1,13 +1,12 @@
 use std::cell::{Cell, Ref, RefCell};
-use std::collections::HashMap;
 use std::rc::Rc;
+
+use crate::metering::{MemoryAccessKind, MeterResult, Metering};
 
 use types::{
     map_allocating, map_to_physical, Sv32PagePerms, Sv32PageTable, SV32_PTE_R, SV32_PTE_V,
     SV32_PTE_W, SV32_PTE_X, SV32_SATP_PPN_MASK,
 };
-
-use crate::metering::{MemoryAccessKind, MeterResult, Metering};
 
 use super::{API, MMU, Perms, VirtualAddress};
 
@@ -21,7 +20,7 @@ use super::{API, MMU, Perms, VirtualAddress};
 /// - Mapping APIs (`map_page`/`map_range`) allocate tables/frames and set R/W/X/U bits.
 /// - `translate` walks VPN1→VPN0, checks permissions against the access kind, and returns a byte
 ///   offset into the backing. All loads/stores go through this path.
-/// - A guest heap bump pointer is tracked per-root.
+/// - Heap management is handled outside the MMU.
 ///
 /// Limitations/assumptions:
 /// - No unmap or reuse of frames yet; the allocator only grows.
@@ -38,8 +37,6 @@ pub struct Sv32Memory {
     backing: Rc<RefCell<Vec<u8>>>,
     /// satp value that selects the active root PPN.
     satp: Cell<u32>,
-    /// Per-root heap bump pointer (VA).
-    per_root_heap: RefCell<HashMap<u32, VirtualAddress>>,
     /// Next free physical frame index for frame allocation.
     next_free_frame: Cell<usize>,
 }
@@ -69,7 +66,6 @@ impl Sv32Memory {
             total_pages,
             backing: Rc::new(RefCell::new(vec![0u8; total])),
             satp: Cell::new(root_ppn as u32),
-            per_root_heap: RefCell::new(HashMap::new()),
             next_free_frame: Cell::new(root_ppn + 1),
         };
         // Zero the root page table frame so we can immediately populate it.
@@ -232,18 +228,6 @@ impl Sv32Memory {
         )
     }
 
-    fn next_heap_for_root(&self) -> VirtualAddress {
-        let key = self.satp.get();
-        let mut heaps = self.per_root_heap.borrow_mut();
-        *heaps.entry(key).or_insert_with(|| VirtualAddress(0))
-    }
-
-    fn set_next_heap_for_root(&self, next: VirtualAddress) {
-        let key = self.satp.get();
-        let mut heaps = self.per_root_heap.borrow_mut();
-        heaps.insert(key, next);
-    }
-
     /// Copy a slice into physical backing, honoring translation and page boundaries.
     fn copy_into_backing(&self, start: VirtualAddress, data: &[u8], kind: MemoryAccessKind) {
         let mut remaining = data.len();
@@ -272,29 +256,6 @@ impl Sv32Memory {
     /// Callers must ensure the range is mapped and writable.
     pub fn write_bytes(&self, start: VirtualAddress, data: &[u8]) {
         self.copy_into_backing(start, data, MemoryAccessKind::Store);
-    }
-
-    /// Allocate space on the per-root heap, map it writable, and copy data.
-    pub fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress {
-        let mut addr = self.next_heap_for_root().as_u32();
-        let align = 8;
-        addr = (addr + (align - 1)) & !(align - 1);
-        let end = addr + data.len() as u32;
-        let start_va = VirtualAddress(addr);
-        self.map_range(start_va, data.len(), Perms::rw_kernel());
-
-        self.copy_into_backing(start_va, data, MemoryAccessKind::Store);
-        let end_va = VirtualAddress(end);
-        self.set_next_heap_for_root(end_va);
-        start_va
-    }
-
-    pub fn next_heap(&self) -> VirtualAddress {
-        self.next_heap_for_root()
-    }
-
-    pub fn set_next_heap(&self, next: VirtualAddress) {
-        self.set_next_heap_for_root(next);
     }
 }
 
@@ -494,17 +455,5 @@ impl API for Sv32Memory {
 
     fn stack_top(&self) -> VirtualAddress {
         VirtualAddress(self.total_size() as u32)
-    }
-
-    fn alloc_on_heap(&self, data: &[u8]) -> VirtualAddress {
-        Sv32Memory::alloc_on_heap(self, data)
-    }
-
-    fn next_heap(&self) -> VirtualAddress {
-        self.next_heap_for_root()
-    }
-
-    fn set_next_heap(&self, next: VirtualAddress) {
-        self.set_next_heap_for_root(next);
     }
 }

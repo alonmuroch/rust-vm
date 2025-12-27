@@ -54,7 +54,7 @@ fn init_boot_info(boot_info_ptr: *const BootInfo) {
                 *PAGE_ALLOC_INIT.get_mut() = true;
             }
         }
-        let task = Task::kernel(info.root_ppn, info.kstack_top);
+        let task = Task::kernel(info.root_ppn, info.kstack_top, info.heap_ptr);
         unsafe {
             let tasks_slot = TASKS.get_mut();
             match tasks_slot {
@@ -63,9 +63,10 @@ fn init_boot_info(boot_info_ptr: *const BootInfo) {
             }
         }
         logf!(
-            "boot_info: root_ppn=0x%x kstack_top=0x%x mem_size=%d",
+            "boot_info: root_ppn=0x%x kstack_top=0x%x heap_ptr=0x%x mem_size=%d",
             info.root_ppn,
             info.kstack_top,
+            info.heap_ptr,
             info.memory_size
         );
     } else {
