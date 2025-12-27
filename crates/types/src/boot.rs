@@ -20,6 +20,10 @@ pub struct BootInfo {
     pub memory_size: u32,
     /// First free physical page number after bootloader allocations.
     pub next_free_ppn: u32,
+    /// Base virtual address of the mapped VA window.
+    pub va_base: u32,
+    /// Size in bytes of the mapped VA window.
+    pub va_len: u32,
 }
 
 impl BootInfo {
@@ -29,6 +33,8 @@ impl BootInfo {
         heap_ptr: u32,
         memory_size: u32,
         next_free_ppn: u32,
+        va_base: u32,
+        va_len: u32,
     ) -> Self {
         Self {
             root_ppn,
@@ -36,6 +42,8 @@ impl BootInfo {
             heap_ptr,
             memory_size,
             next_free_ppn,
+            va_base,
+            va_len,
         }
     }
 }

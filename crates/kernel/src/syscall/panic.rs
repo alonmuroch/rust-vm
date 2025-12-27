@@ -63,7 +63,6 @@ pub(crate) fn sys_panic_with_message(msg_ptr: u32, msg_len: u32) -> u32 {
 }
 
 pub(crate) fn sys_panic(args: [u32; 6]) -> u32 {
-    log!("sys_panic: called");
     // Legacy path: treat args as [ptr, len] when a0/a1 aren't forwarded.
     sys_panic_with_message(args[0], args[1])
 }

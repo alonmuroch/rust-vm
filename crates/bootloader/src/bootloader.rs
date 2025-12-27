@@ -15,8 +15,6 @@ use vm::memory::{API, Perms, Sv32Memory, HEAP_PTR_OFFSET, Memory as MmuRef, Virt
 use vm::registers::Register;
 use vm::vm::VM;
 
-const MIN_KERNEL_MAP_BYTES: usize = 16 * 1024;
-const KERNEL_STACK_BYTES: usize = 4 * PAGE_SIZE;
 const KERNEL_WINDOW_BYTES: usize = 256 * 1024;
 const KERNEL_STACK_TOP: u32 = KERNEL_WINDOW_BYTES as u32;
 
@@ -86,18 +84,17 @@ impl Bootloader {
             image_end = core::cmp::max(image_end, bss_end);
         }
         let image_size = image_end.checked_sub(min_base).expect("invalid image size");
-        let kernel_map_bytes = core::cmp::max(image_size, MIN_KERNEL_MAP_BYTES);
-        let stack_base = (KERNEL_STACK_TOP as usize).saturating_sub(KERNEL_STACK_BYTES);
-
-        assert!(
-            kernel_map_bytes <= stack_base,
-            "kernel image overlaps stack window"
-        );
 
         assert!(
             image_end <= self.memory.size(),
             "ELF image does not fit in mapped memory (need {}, have {})",
             image_end,
+            self.memory.size()
+        );
+        assert!(
+            KERNEL_WINDOW_BYTES <= self.memory.size(),
+            "kernel window exceeds physical memory (need {}, have {})",
+            KERNEL_WINDOW_BYTES,
             self.memory.size()
         );
 
@@ -115,16 +112,12 @@ impl Bootloader {
         }
 
         self.memory
-            .map_range(VirtualAddress(min_base as u32), kernel_map_bytes, Perms::rwx_kernel());
+            .map_range(VirtualAddress(0), KERNEL_WINDOW_BYTES, Perms::rwx_kernel());
         self.memory
             .write_bytes(VirtualAddress(min_base as u32), &image);
-        // Start the heap after the loaded image to avoid overwriting kernel text/rodata
+        // Start the heap after the loaded image to avoid overwriting kernel text/rodata.
         let heap_start = ((image_end + HEAP_PTR_OFFSET as usize + 7) & !7) as u32;
         self.set_next_heap(heap_start);
-        // Ensure the kernel has a mapped stack region near the top of memory.
-        let stack_base = (KERNEL_STACK_TOP as usize).saturating_sub(KERNEL_STACK_BYTES);
-        self.memory
-            .map_range(VirtualAddress(stack_base as u32), KERNEL_STACK_BYTES, Perms::rw_kernel());
         // Map a direct window over all physical memory so the kernel can touch
         // page tables after paging is enabled.
         let mapped = self.memory.map_physical_range(
@@ -207,6 +200,8 @@ impl Bootloader {
             next_heap,
             self.memory.size() as u32,
             self.memory.next_free_ppn() as u32,
+            0,
+            KERNEL_WINDOW_BYTES as u32,
         );
         let bytes = unsafe {
             slice::from_raw_parts(

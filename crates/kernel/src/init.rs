@@ -50,7 +50,12 @@ fn init_boot_info(boot_info: Option<&BootInfo>) -> Option<&BootInfo> {
                 *PAGE_ALLOC_INIT.get_mut() = true;
             }
         }
-        let task = Task::kernel(info.root_ppn, info.heap_ptr);
+        let task = Task::kernel(
+            info.root_ppn,
+            info.heap_ptr,
+            info.va_base,
+            info.va_len,
+        );
         unsafe {
             let tasks_slot = TASKS.get_mut();
             if tasks_slot.set_at(KERNEL_TASK_SLOT, task).is_err() {

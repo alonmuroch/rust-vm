@@ -57,7 +57,7 @@ pub use run::run_task;
 
 const PAGE_SIZE: usize = 4096;
 const STACK_BYTES: usize = 0x4000; // 16 KiB user stack
-const HEAP_BYTES: usize = 0x8000; // 32 KiB user heap
+pub const HEAP_BYTES: usize = 0x8000; // 32 KiB user heap
 pub const PROGRAM_VA_BASE: u32 = 0x0;
 // Location of the page that hosts the satp-switch trampoline. Kept just past
 // the user window so it does not collide with program text/stack/heap. This VA

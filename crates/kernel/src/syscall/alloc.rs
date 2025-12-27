@@ -1,8 +1,6 @@
 use program::{log, logf};
 
 use crate::global::{CURRENT_TASK, TASKS};
-use crate::mmu;
-
 pub(crate) fn sys_alloc(args: [u32; 6]) -> u32 {
     let size = args[0];
     let align = args[1];
@@ -25,6 +23,13 @@ pub(crate) fn sys_alloc(args: [u32; 6]) -> u32 {
             return 0;
         }
     };
+    logf!(
+        "sys_alloc: size=0x%x align=0x%x heap_ptr=0x%x task=%d",
+        size,
+        align,
+        task.heap_ptr,
+        current as u32
+    );
 
     let mask = align - 1;
     let start = match task.heap_ptr.checked_add(mask) {
@@ -42,9 +47,16 @@ pub(crate) fn sys_alloc(args: [u32; 6]) -> u32 {
         }
     };
 
-    let len = end.saturating_sub(start) as usize;
-    if !mmu::map_kernel_range(start, len, mmu::PagePerms::kernel_rw()) {
-        log!("sys_alloc: failed to map heap range");
+    let window_base = task.addr_space.va_base;
+    let window_limit = window_base.saturating_add(task.addr_space.va_len);
+    if start < window_base || end > window_limit {
+        logf!(
+            "sys_alloc: heap range exceeds task window start=0x%x end=0x%x window=[0x%x,0x%x)",
+            start,
+            end,
+            window_base,
+            window_limit
+        );
         return 0;
     }
     task.heap_ptr = end;

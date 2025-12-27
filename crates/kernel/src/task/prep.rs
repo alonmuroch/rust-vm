@@ -3,7 +3,7 @@ use program::{log, logf};
 use types::address::Address;
 
 use super::{
-    alloc_asid, FROM_PTR_ADDR, INPUT_BASE_ADDR, PAGE_SIZE, PROGRAM_VA_BASE,
+    alloc_asid, FROM_PTR_ADDR, HEAP_BYTES, INPUT_BASE_ADDR, PAGE_SIZE, PROGRAM_VA_BASE,
     PROGRAM_WINDOW_BYTES, REG_A0, REG_A1, REG_A2, REG_A3, REG_SP, STACK_BYTES,
     TO_PTR_ADDR, TRAMPOLINE_CODE, TRAMPOLINE_VA,
 };
@@ -26,22 +26,6 @@ pub fn prep_program_task(
     if input.len() > Config::MAX_INPUT_LEN {
         log!("launch_program: input too large");
         return None;
-    }
-
-    // Make sure the kernel page allocator does not hand out frames that the
-    // kernel heap already consumed (account code lives there). We conservatively
-    // push the allocator toward the top of memory so new user roots/tables
-    // don't overlap heap-backed data.
-    let total_ppn = mmu::total_ppn().unwrap_or(0);
-    let reserve = (PROGRAM_WINDOW_BYTES / PAGE_SIZE) as u32 + 4; // user window + a few tables
-    if total_ppn > reserve {
-        let min_ppn = total_ppn - reserve;
-        mmu::bump_page_allocator(min_ppn);
-        logf!(
-            "prep_program_task: bump page alloc to ppn=0x%x (total_ppn=0x%x)",
-            min_ppn,
-            total_ppn
-        );
     }
 
     let asid = alloc_asid();
@@ -192,7 +176,15 @@ pub fn prep_program_task(
         tramp_phys_2 as u32
     );
 
-    let mut task = Task::new(AddressSpace::new(root_ppn, asid), Config::HEAP_START_ADDR as u32);
+    let mut task = Task::new(
+        AddressSpace::new(
+            root_ppn,
+            asid,
+            PROGRAM_VA_BASE,
+            PROGRAM_WINDOW_BYTES as u32,
+        ),
+        Config::HEAP_START_ADDR as u32,
+    );
     // Set up initial trapframe.
     let stack_top = PROGRAM_VA_BASE
         .wrapping_add((Config::CODE_SIZE_LIMIT + Config::RO_DATA_SIZE_LIMIT + STACK_BYTES) as u32);

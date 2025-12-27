@@ -26,11 +26,20 @@ pub struct AddressSpace {
     pub root_ppn: u32,
     /// Optional address-space identifier (ASID); zero if unused.
     pub asid: u16,
+    /// Base virtual address for this address space's mapped window.
+    pub va_base: u32,
+    /// Size in bytes of the mapped virtual window.
+    pub va_len: u32,
 }
 
 impl AddressSpace {
-    pub fn new(root_ppn: u32, asid: u16) -> Self {
-        Self { root_ppn, asid }
+    pub fn new(root_ppn: u32, asid: u16, va_base: u32, va_len: u32) -> Self {
+        Self {
+            root_ppn,
+            asid,
+            va_base,
+            va_len,
+        }
     }
 }
 
@@ -57,7 +66,7 @@ impl Task {
 
     /// Create the initial kernel task. This represents the supervisor itself:
     /// - `root_ppn` is the kernel page-table root PPN that will be loaded into satp.
-    pub fn kernel(root_ppn: u32, heap_ptr: u32) -> Self {
-        Task::new(AddressSpace::new(root_ppn, 0), heap_ptr)
+    pub fn kernel(root_ppn: u32, heap_ptr: u32, va_base: u32, va_len: u32) -> Self {
+        Task::new(AddressSpace::new(root_ppn, 0, va_base, va_len), heap_ptr)
     }
 }
