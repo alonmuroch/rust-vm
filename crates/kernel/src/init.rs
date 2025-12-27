@@ -1,9 +1,9 @@
-use core::slice;
+use core::{cmp, slice};
 
 use program::{log, logf};
 use state::State;
 
-use kernel::global::{KERNEL_TASK_SLOT, PAGE_ALLOC_INIT, STATE, TASKS};
+use kernel::global::{CURRENT_TASK, KERNEL_TASK_SLOT, PAGE_ALLOC_INIT, STATE, TASKS};
 use kernel::{mmu, BootInfo, Task, trap};
 
 /// Initialize kernel state from the bootloader handoff and optional state blob.
@@ -19,11 +19,6 @@ pub fn init_kernel(state_ptr: *const u8, state_len: usize, boot_info_ptr: *const
 }
 
 fn init_state(state_ptr: *const u8, state_len: usize) {
-    logf!(
-        "init_state: state_ptr=0x%x state_len=%d",
-        state_ptr as usize as u32,
-        state_len as u32
-    );
     unsafe {
         let state_slot = STATE.get_mut();
         if !state_ptr.is_null() && state_len > 0 {
@@ -61,6 +56,7 @@ fn init_boot_info(boot_info: Option<&BootInfo>) -> Option<&BootInfo> {
             if tasks_slot.set_at(KERNEL_TASK_SLOT, task).is_err() {
                 log!("kernel task slot unavailable; kernel task not recorded");
             }
+            *CURRENT_TASK.get_mut() = KERNEL_TASK_SLOT;
         }
         logf!(
             "boot_info: root_ppn=0x%x kstack_top=0x%x heap_ptr=0x%x mem_size=%d",

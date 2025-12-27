@@ -44,7 +44,7 @@
 //   when modeling fuller privilege transitions.
 
 use crate::{AddressSpace, Config, Task, mmu};
-use crate::global::{KERNEL_TASK_SLOT, NEXT_ASID, TASKS};
+use crate::global::{CURRENT_TASK, KERNEL_TASK_SLOT, NEXT_ASID, TASKS};
 use program::log;
 use program::logf;
 use types::{address::Address, ADDRESS_LEN};
@@ -307,16 +307,38 @@ pub fn prep_program_task(
 /// One-way context switch into a user task:
 /// - Saves the current kernel frame into TASKS[0]
 /// - Loads the task's satp/regs/pc and jumps to user code (no return path yet)
-pub fn run_task(task: &Task) {
+pub fn run_task(task_idx: usize) {
+    let (target_root, asid, pc, sp, a0, a1, a2, a3) = unsafe {
+        let tasks = TASKS.get_mut();
+        let task = match tasks.get(task_idx) {
+            Some(task) => task,
+            None => {
+                logf!("run_task: invalid task slot %d", task_idx as u32);
+                return;
+            }
+        };
+        (
+            task.addr_space.root_ppn,
+            task.addr_space.asid,
+            task.tf.pc,
+            task.tf.regs[REG_SP],
+            task.tf.regs[REG_A0],
+            task.tf.regs[REG_A1],
+            task.tf.regs[REG_A2],
+            task.tf.regs[REG_A3],
+        )
+    };
+    unsafe {
+        *CURRENT_TASK.get_mut() = task_idx;
+    }
     let kernel_root = mmu::current_root();
-    let target_root = task.addr_space.root_ppn;
     logf!(
         "run_task: switching satp 0x%x -> 0x%x asid=%d pc=0x%x sp=0x%x",
         kernel_root,
         target_root,
-        task.addr_space.asid as u32,
-        task.tf.pc,
-        task.tf.regs[REG_SP],
+        asid as u32,
+        pc,
+        sp,
     );
     // Save the current kernel frame (SP/RA/PC) into the kernel task slot (index 0).
     let mut saved_sp: u32;
@@ -360,12 +382,12 @@ pub fn run_task(task: &Task) {
             "mv a3, {a3}",
             "jr {tramp}",
             satp = in(reg) target_root,
-            pc = in(reg) task.tf.pc,
-            sp = in(reg) task.tf.regs[REG_SP],
-            a0 = in(reg) task.tf.regs[REG_A0],
-            a1 = in(reg) task.tf.regs[REG_A1],
-            a2 = in(reg) task.tf.regs[REG_A2],
-            a3 = in(reg) task.tf.regs[REG_A3],
+            pc = in(reg) pc,
+            sp = in(reg) sp,
+            a0 = in(reg) a0,
+            a1 = in(reg) a1,
+            a2 = in(reg) a2,
+            a3 = in(reg) a3,
             tramp = in(reg) TRAMPOLINE_VA,
             options(noreturn)
         );

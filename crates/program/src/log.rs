@@ -10,6 +10,7 @@ macro_rules! logf_syscall {
                 in("a2") $fmt_len,
                 in("a3") $args_ptr,
                 in("a4") $args_len,
+                clobber_abi("C"),
             );
         }
         #[cfg(not(target_arch = "riscv32"))]

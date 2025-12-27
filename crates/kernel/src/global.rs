@@ -31,6 +31,7 @@ unsafe impl<T> Sync for Global<T> {}
 
 pub const MAX_TASKS: usize = 16;
 pub const KERNEL_TASK_SLOT: usize = 0;
+pub static CURRENT_TASK: Global<usize> = Global::new(KERNEL_TASK_SLOT);
 
 pub struct TaskList {
     len: usize,
@@ -43,6 +44,10 @@ impl TaskList {
             len: 0,
             slots: MaybeUninit::uninit(),
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
     }
 
     pub fn push(&mut self, task: Task) -> Result<&Task, Task> {

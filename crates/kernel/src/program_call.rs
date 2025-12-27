@@ -84,9 +84,8 @@ pub(crate) fn program_call(tx: &Transaction) {
                 log!("program task list full; skipping run");
                 return;
             }
-            if let Some(last) = tasks_slot.last() {
-                run_task(last);
-            }
+            let current = tasks_slot.len().saturating_sub(1);
+            run_task(current);
         }
     } else {
         log!("Program call skipped: no memory manager installed");

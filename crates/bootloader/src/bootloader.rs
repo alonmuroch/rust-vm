@@ -61,11 +61,30 @@ impl Bootloader {
 
         let (code, code_base) = elf.get_flat_code().expect("kernel ELF missing .text");
         let (rodata, ro_base) = elf.get_flat_rodata().unwrap_or((Vec::new(), code_base));
+        let (bss, bss_base) = elf.get_flat_bss().unwrap_or((Vec::new(), code_base));
+        println!(
+            "kernel elf: text_base=0x{:08x} text_len=0x{:x} ro_base=0x{:08x} ro_len=0x{:x} bss_base=0x{:08x} bss_len=0x{:x}",
+            code_base as u32,
+            code.len(),
+            ro_base as u32,
+            rodata.len(),
+            bss_base as u32,
+            bss.len()
+        );
 
-        let min_base = core::cmp::min(code_base, ro_base) as usize;
+        let mut min_base = core::cmp::min(code_base, ro_base) as usize;
+        if !bss.is_empty() {
+            min_base = core::cmp::min(min_base, bss_base as usize);
+        }
         let code_end = (code_base + code.len() as u64) as usize;
         let ro_end = (ro_base + rodata.len() as u64) as usize;
-        let image_end = core::cmp::max(code_end, ro_end);
+        let mut image_end = core::cmp::max(code_end, ro_end);
+        if !bss.is_empty() {
+            let bss_end = bss_base
+                .checked_add(bss.len() as u64)
+                .expect("bss end overflow") as usize;
+            image_end = core::cmp::max(image_end, bss_end);
+        }
         let image_size = image_end.checked_sub(min_base).expect("invalid image size");
         let kernel_map_bytes = core::cmp::max(image_size, MIN_KERNEL_MAP_BYTES);
         let stack_base = (KERNEL_STACK_TOP as usize).saturating_sub(KERNEL_STACK_BYTES);
@@ -89,6 +108,10 @@ impl Bootloader {
         if !rodata.is_empty() {
             let ro_off = (ro_base as usize).saturating_sub(min_base);
             image[ro_off..ro_off + rodata.len()].copy_from_slice(&rodata);
+        }
+        if !bss.is_empty() {
+            let bss_off = (bss_base as usize).saturating_sub(min_base);
+            image[bss_off..bss_off + bss.len()].copy_from_slice(&bss);
         }
 
         self.memory
