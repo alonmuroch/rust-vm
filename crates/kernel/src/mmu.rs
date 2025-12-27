@@ -55,6 +55,10 @@ impl PageAllocator {
             self.next_ppn = min_ppn;
         }
     }
+
+    pub fn limit_ppn(&self) -> u32 {
+        self.limit_ppn
+    }
 }
 
 /// Return the kernel's current root PPN (satp PPN field).
@@ -98,6 +102,10 @@ pub fn bump_page_allocator(min_ppn: u32) {
             alloc.bump_to(min_ppn);
         }
     }
+}
+
+pub fn total_ppn() -> Option<u32> {
+    unsafe { PAGE_ALLOC.get_mut().as_ref().map(|alloc| alloc.limit_ppn()) }
 }
 
 /// Map a user-visible virtual range with the provided permissions into a specific root.

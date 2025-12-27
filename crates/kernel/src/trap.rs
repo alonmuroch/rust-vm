@@ -8,6 +8,8 @@ const SAVED_REG_COUNT: usize = 11;
 
 /// Install the kernel trap vector and set up the kernel stack for traps.
 pub fn init_trap_vector(kstack_top: u32) {
+    // Seed sscratch with the kernel stack top so trap entry can swap sp with
+    // sscratch and immediately land on a known-good kernel stack.
     logf!("init_trap_vector: kstack_top=0x%x", kstack_top);
     unsafe {
         asm!("csrw sscratch, {0}", in(reg) kstack_top);
@@ -75,7 +77,6 @@ pub extern "C" fn handle_trap(saved: *mut u32) {
     let scause = read_scause();
     let stval = read_stval();
     let sepc = regs[0];
-    let satp = read_satp();
     let sp: u32;
     unsafe { asm!("mv {0}, sp", out(reg) sp); }
     

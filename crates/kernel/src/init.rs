@@ -1,19 +1,21 @@
-use alloc::vec;
 use core::slice;
 
 use program::{log, logf};
 use state::State;
 
-use kernel::global::{BOOT_INFO, PAGE_ALLOC_INIT, STATE, TASKS};
+use kernel::global::{KERNEL_TASK_SLOT, PAGE_ALLOC_INIT, STATE, TASKS};
 use kernel::{mmu, BootInfo, Task, trap};
 
 /// Initialize kernel state from the bootloader handoff and optional state blob.
 pub fn init_kernel(state_ptr: *const u8, state_len: usize, boot_info_ptr: *const BootInfo) {
-    if let Some(info) = unsafe { boot_info_ptr.as_ref() } {
+    let boot_info = unsafe { boot_info_ptr.as_ref() };
+    if let Some(info) = init_boot_info(boot_info) {
         trap::init_trap_vector(info.kstack_top);
+        init_state(state_ptr, state_len);
+    } else {
+        panic!("init_kernel: missing boot info");
     }
-    init_state(state_ptr, state_len);
-    init_boot_info(boot_info_ptr);
+    log!("kernel initialized");
 }
 
 fn init_state(state_ptr: *const u8, state_len: usize) {
@@ -39,27 +41,25 @@ fn init_state(state_ptr: *const u8, state_len: usize) {
     }
 }
 
-fn init_boot_info(boot_info_ptr: *const BootInfo) {
+fn init_boot_info(boot_info: Option<&BootInfo>) -> Option<&BootInfo> {
     logf!(
         "init_boot_info: boot_info_ptr=0x%x",
-        boot_info_ptr as usize as u32
+        boot_info
+            .map(|info| info as *const BootInfo as usize as u32)
+            .unwrap_or(0)
     );
-    if let Some(info) = unsafe { boot_info_ptr.as_ref() } {
-        unsafe {
-            *BOOT_INFO.get_mut() = Some(*info);
-        }
+    if let Some(info) = boot_info {
         unsafe {
             if !*PAGE_ALLOC_INIT.get_mut() {
                 mmu::init(info);
                 *PAGE_ALLOC_INIT.get_mut() = true;
             }
         }
-        let task = Task::kernel(info.root_ppn, info.kstack_top, info.heap_ptr);
+        let task = Task::kernel(info.root_ppn, info.heap_ptr);
         unsafe {
             let tasks_slot = TASKS.get_mut();
-            match tasks_slot {
-                Some(tasks) => tasks.push(task),
-                None => *tasks_slot = Some(vec![task]),
+            if tasks_slot.set_at(KERNEL_TASK_SLOT, task).is_err() {
+                log!("kernel task slot unavailable; kernel task not recorded");
             }
         }
         logf!(
@@ -69,7 +69,9 @@ fn init_boot_info(boot_info_ptr: *const BootInfo) {
             info.heap_ptr,
             info.memory_size
         );
+        Some(info)
     } else {
         log!("boot_info missing; kernel task not initialized");
+        None
     }
 }

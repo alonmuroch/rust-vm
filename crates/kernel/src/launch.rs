@@ -19,7 +19,7 @@
 //     jr   t1
 //   This lets us switch satp safely from a VA that stays valid across the root change.
 //
-// prep_program_task(kstack_top, to, from, code, input, entry_off):
+// prep_program_task(to, from, code, input, entry_off):
 // 1) Allocate ASID and a fresh root PPN; map the user window with user_rwx perms.
 // 2) Copy program code starting at VA 0 (so section offsets are preserved), copy args (to/from/input).
 // 3) Map the trampoline page into the user root and mirror the same physical page
@@ -44,7 +44,7 @@
 //   when modeling fuller privilege transitions.
 
 use crate::{AddressSpace, Config, Task, mmu};
-use crate::global::{BOOT_INFO, NEXT_ASID, TASKS};
+use crate::global::{KERNEL_TASK_SLOT, NEXT_ASID, TASKS};
 use program::log;
 use program::logf;
 use types::{address::Address, ADDRESS_LEN};
@@ -93,12 +93,11 @@ const INPUT_BASE_ADDR: u32 = Config::HEAP_START_ADDR as u32;
 ///
 /// This sets up:
 /// - Maps a fixed VA window [PROGRAM_VA_BASE, PROGRAM_VA_BASE + PROGRAM_WINDOW_BYTES).
-/// - Returns a Task with the new address space and provided kernel stack top.
+/// - Returns a Task with the new address space.
 ///
 /// The caller is responsible for copying program bytes into the mapped window
 /// and initializing the user trapframe (PC/SP/args) before running.
 pub fn prep_program_task(
-    kstack_top: u32,
     to: &Address,
     from: &Address,
     code: &[u8],
@@ -114,13 +113,7 @@ pub fn prep_program_task(
     // kernel heap already consumed (account code lives there). We conservatively
     // push the allocator toward the top of memory so new user roots/tables
     // don't overlap heap-backed data.
-    let total_ppn = unsafe {
-        BOOT_INFO
-            .get_mut()
-            .as_ref()
-            .map(|b| b.memory_size / PAGE_SIZE as u32)
-            .unwrap_or(0)
-    };
+    let total_ppn = mmu::total_ppn().unwrap_or(0);
     let reserve = (PROGRAM_WINDOW_BYTES / PAGE_SIZE) as u32 + 4; // user window + a few tables
     if total_ppn > reserve {
         let min_ppn = total_ppn - reserve;
@@ -280,11 +273,7 @@ pub fn prep_program_task(
         tramp_phys_2 as u32
     );
 
-    let mut task = Task::new(
-        AddressSpace::new(root_ppn, asid),
-        kstack_top,
-        Config::HEAP_START_ADDR as u32,
-    );
+    let mut task = Task::new(AddressSpace::new(root_ppn, asid), Config::HEAP_START_ADDR as u32);
     // Set up initial trapframe.
     let stack_top = PROGRAM_VA_BASE
         .wrapping_add((Config::CODE_SIZE_LIMIT + Config::RO_DATA_SIZE_LIMIT + STACK_BYTES) as u32);
@@ -346,13 +335,12 @@ pub fn run_task(task: &Task) {
     );
     // Stash the kernel context so a future return path could restore it.
     unsafe {
-        if let Some(tasks) = TASKS.get_mut() {
-            if let Some(kernel_task) = tasks.get_mut(0) {
-                kernel_task.addr_space.root_ppn = kernel_root;
-                kernel_task.tf.regs[REG_SP] = saved_sp;
-                kernel_task.tf.regs[REG_RA] = saved_ra;
-                kernel_task.tf.pc = saved_pc;
-            }
+        let tasks = TASKS.get_mut();
+        if let Some(kernel_task) = tasks.get_mut(KERNEL_TASK_SLOT) {
+            kernel_task.addr_space.root_ppn = kernel_root;
+            kernel_task.tf.regs[REG_SP] = saved_sp;
+            kernel_task.tf.regs[REG_RA] = saved_ra;
+            kernel_task.tf.pc = saved_pc;
         }
     }
     // Update the helper's view of the current root before switching.

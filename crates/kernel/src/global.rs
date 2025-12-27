@@ -1,10 +1,9 @@
-extern crate alloc;
-
-use alloc::vec::Vec;
 use core::cell::UnsafeCell;
+use core::mem::MaybeUninit;
+use core::ptr;
 use state::State;
 
-use crate::{BootInfo, Task};
+use crate::Task;
 use crate::mmu::PageAllocator;
 
 /// Minimal wrapper to store non-`Sync` types in statics.
@@ -30,10 +29,96 @@ impl<T> Global<T> {
 
 unsafe impl<T> Sync for Global<T> {}
 
+pub const MAX_TASKS: usize = 16;
+pub const KERNEL_TASK_SLOT: usize = 0;
+
+pub struct TaskList {
+    len: usize,
+    slots: MaybeUninit<[Task; MAX_TASKS]>,
+}
+
+impl TaskList {
+    pub const fn new() -> Self {
+        Self {
+            len: 0,
+            slots: MaybeUninit::uninit(),
+        }
+    }
+
+    pub fn push(&mut self, task: Task) -> Result<&Task, Task> {
+        if self.len >= MAX_TASKS {
+            return Err(task);
+        }
+        let idx = self.len;
+        unsafe {
+            let base = self.slots.as_mut_ptr() as *mut Task;
+            base.add(idx).write(task);
+        }
+        self.len += 1;
+        Ok(unsafe { &*(self.slots.as_ptr() as *const Task).add(idx) })
+    }
+
+    pub fn get(&self, idx: usize) -> Option<&Task> {
+        if idx < self.len {
+            Some(unsafe { &*(self.slots.as_ptr() as *const Task).add(idx) })
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut(&mut self, idx: usize) -> Option<&mut Task> {
+        if idx < self.len {
+            Some(unsafe { &mut *(self.slots.as_mut_ptr() as *mut Task).add(idx) })
+        } else {
+            None
+        }
+    }
+
+    pub fn kernel_task(&self) -> Option<&Task> {
+        self.get(KERNEL_TASK_SLOT)
+    }
+
+    pub fn set_at(&mut self, idx: usize, task: Task) -> Result<&Task, Task> {
+        if idx >= MAX_TASKS {
+            return Err(task);
+        }
+        if idx > self.len {
+            return Err(task);
+        }
+        if idx < self.len {
+            unsafe { ptr::drop_in_place((self.slots.as_mut_ptr() as *mut Task).add(idx)) };
+        } else {
+            self.len += 1;
+        }
+        unsafe {
+            let base = self.slots.as_mut_ptr() as *mut Task;
+            base.add(idx).write(task);
+            Ok(&*base.add(idx))
+        }
+    }
+
+    pub fn last(&self) -> Option<&Task> {
+        if self.len == 0 {
+            None
+        } else {
+            self.get(self.len - 1)
+        }
+    }
+}
+
+impl Drop for TaskList {
+    fn drop(&mut self) {
+        for idx in 0..self.len {
+            unsafe {
+                ptr::drop_in_place((self.slots.as_mut_ptr() as *mut Task).add(idx));
+            }
+        }
+    }
+}
+
 #[allow(dead_code)]
-pub static TASKS: Global<Option<Vec<Task>>> = Global::new(None);
+pub static TASKS: Global<TaskList> = Global::new(TaskList::new());
 pub static STATE: Global<Option<State>> = Global::new(None);
-pub static BOOT_INFO: Global<Option<BootInfo>> = Global::new(None);
 pub static PAGE_ALLOC_INIT: Global<bool> = Global::new(false);
 pub static NEXT_ASID: Global<u16> = Global::new(1);
 pub static ROOT_PPN: Global<u32> = Global::new(0);

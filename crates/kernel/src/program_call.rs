@@ -1,7 +1,7 @@
-use alloc::{format, vec};
+use alloc::format;
 
 use kernel::{prep_program_task, run_task, Config, PROGRAM_WINDOW_BYTES};
-use kernel::global::{BOOT_INFO, STATE, TASKS};
+use kernel::global::{STATE, TASKS};
 use program::{log, logf};
 use state::State;
 use types::transaction::Transaction;
@@ -67,12 +67,10 @@ pub(crate) fn program_call(tx: &Transaction) {
         )
     );
 
-    let kstack_top = unsafe { BOOT_INFO.get_mut().as_ref().map(|b| b.kstack_top).unwrap_or(0) };
-
     let entry_off = first_nz as u32;
 
     if let Some(task) =
-        prep_program_task(kstack_top, &tx.to, &tx.from, &account.code, &tx.data, entry_off)
+        prep_program_task(&tx.to, &tx.from, &account.code, &tx.data, entry_off)
     {
         logf!(
             "Program task created: root=0x%x asid=%d window_size=%d",
@@ -82,14 +80,12 @@ pub(crate) fn program_call(tx: &Transaction) {
         );
         unsafe {
             let tasks_slot = TASKS.get_mut();
-            match tasks_slot {
-                Some(tasks) => tasks.push(task),
-                None => *tasks_slot = Some(vec![task]),
+            if tasks_slot.push(task).is_err() {
+                log!("program task list full; skipping run");
+                return;
             }
-            if let Some(tasks) = tasks_slot {
-                if let Some(last) = tasks.last() {
-                    run_task(last);
-                }
+            if let Some(last) = tasks_slot.last() {
+                run_task(last);
             }
         }
     } else {

@@ -42,26 +42,22 @@ pub struct Task {
     pub tf: TrapFrame,
     /// Address space for this task (page-table root/asid).
     pub addr_space: AddressSpace,
-    /// Kernel stack pointer for this task (top of the task's kernel stack).
-    pub kstack_top: u32,
     /// Next heap pointer for this task (virtual address).
     pub heap_ptr: u32,
 }
 
 impl Task {
-    pub fn new(addr_space: AddressSpace, kstack_top: u32, heap_ptr: u32) -> Self {
+    pub fn new(addr_space: AddressSpace, heap_ptr: u32) -> Self {
         Self {
             tf: TrapFrame::default(),
             addr_space,
-            kstack_top,
             heap_ptr,
         }
     }
 
     /// Create the initial kernel task. This represents the supervisor itself:
     /// - `root_ppn` is the kernel page-table root PPN that will be loaded into satp.
-    /// - `kstack_top` is the top of the kernel stack the kernel will run on.
-    pub fn kernel(root_ppn: u32, kstack_top: u32, heap_ptr: u32) -> Self {
-        Task::new(AddressSpace::new(root_ppn, 0), kstack_top, heap_ptr)
+    pub fn kernel(root_ppn: u32, heap_ptr: u32) -> Self {
+        Task::new(AddressSpace::new(root_ppn, 0), heap_ptr)
     }
 }
