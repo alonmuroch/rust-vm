@@ -36,14 +36,7 @@ pub fn prep_program_task(
             return None;
         }
     };
-    logf!(
-        "prep_program_task: new root=0x%x asid=%d code_len=%d input_len=%d entry_off=0x%x",
-        root_ppn,
-        asid as u32,
-        code.len() as u32,
-        input.len() as u32,
-        entry_off,
-    );
+
     let window_end = PROGRAM_VA_BASE.wrapping_add(PROGRAM_WINDOW_BYTES as u32);
     logf!(
         "launch_program: asid=%d root=0x%x map=[0x%x,0x%x)",
@@ -60,12 +53,7 @@ pub fn prep_program_task(
     // Copy the full program image starting at VA 0 so section offsets (e.g. .text at 0x400)
     // land where the ELF expected them. Entry offset is provided by the caller.
     if entry_off as usize >= code.len() {
-        logf!(
-            "prep_program_task: entry_off 0x%x is outside code len %d",
-            entry_off,
-            code.len() as u32
-        );
-        return None;
+        panic!("launch_program: invalid entry offset");
     }
     if code.len() >= entry_off as usize + 8 {
         let head = u32::from_le_bytes([
@@ -80,30 +68,15 @@ pub fn prep_program_task(
             code[entry_off as usize + 6],
             code[entry_off as usize + 7],
         ]);
-        logf!(
-            "prep_program_task: code head[0..8]=0x%x 0x%x (entry_off=0x%x)",
-            head,
-            head2,
-            entry_off,
-        );
     }
     let nz_count = code.iter().filter(|&&b| b != 0).count();
     let local_first_nz = code.iter().position(|&b| b != 0).unwrap_or(code.len());
-    logf!(
-        "prep_program_task: local code stats first_nz=0x%x nz_count=%d",
-        local_first_nz as u32,
-        nz_count as u32
-    );
+
     if !mmu::copy_into_user(root_ppn, PROGRAM_VA_BASE, code) {
         logf!("launch_program: failed to copy code into root=0x%x", root_ppn);
         return None;
     }
-    logf!(
-        "prep_program_task: copied code to 0x%x len=%d nz_count=%d",
-        PROGRAM_VA_BASE,
-        code.len() as u32,
-        nz_count as u32
-    );
+
     if !mmu::copy_into_user(root_ppn, TO_PTR_ADDR, &to.0) {
         logf!("launch_program: failed to copy 'to' address into root=0x%x", root_ppn);
         return None;
@@ -113,16 +86,11 @@ pub fn prep_program_task(
         return None;
     }
     if !mmu::copy_into_user(root_ppn, INPUT_BASE_ADDR, input) {
-        logf!("launch_program: failed to copy input into root=0x%x", root_ppn);
-        return None;
+        panic!(
+            "prep_program_task: failed to copy input into root=0x{:x}",
+            root_ppn
+        );
     }
-    logf!(
-        "prep_program_task: copied args to=0x%x from=0x%x input=0x%x len=%d",
-        TO_PTR_ADDR,
-        FROM_PTR_ADDR,
-        INPUT_BASE_ADDR,
-        input.len() as u32
-    );
 
     // Sanity check where the code landed in the user root.
     let entry_va = PROGRAM_VA_BASE.wrapping_add(entry_off);
@@ -139,35 +107,22 @@ pub fn prep_program_task(
     // satp safely before jumping into the user program.
     let tramp_perms = mmu::PagePerms::user_rwx();
     if !mmu::map_user_range_for_root(root_ppn, TRAMPOLINE_VA, PAGE_SIZE, tramp_perms) {
-        logf!("prep_program_task: failed to map trampoline page in user root");
-        return None;
+        panic!("prep_program_task: failed to map trampoline page in user root");
     }
     let tramp_phys = match mmu::translate_user_va(root_ppn, TRAMPOLINE_VA) {
         Some(p) => p as u32,
-        None => {
-            log!("prep_program_task: trampoline VA not mapped");
-            return None;
-        }
+        None => panic!("prep_program_task: trampoline VA not mapped"),
     };
     if !mmu::mirror_user_range_into_kernel(root_ppn, TRAMPOLINE_VA, PAGE_SIZE, tramp_perms) {
-        log!("prep_program_task: failed to mirror trampoline into kernel root");
-        return None;
+        panic!("prep_program_task: failed to mirror trampoline into kernel root");
     }
     let mut tramp_bytes = [0u8; TRAMPOLINE_CODE.len() * 4];
     for (i, word) in TRAMPOLINE_CODE.iter().enumerate() {
         tramp_bytes[i * 4..(i + 1) * 4].copy_from_slice(&word.to_le_bytes());
     }
     if !mmu::copy_into_user(root_ppn, TRAMPOLINE_VA, &tramp_bytes) {
-        log!("prep_program_task: failed to populate trampoline code");
-        return None;
+        panic!("prep_program_task: failed to populate trampoline code");
     }
-    let tramp_phys_2 = mmu::translate_user_va(root_ppn, TRAMPOLINE_VA + 4).unwrap_or(usize::MAX);
-    logf!(
-        "prep_program_task: trampoline mapped va=0x%x phys=0x%x phys(+4)=0x%x",
-        TRAMPOLINE_VA,
-        tramp_phys,
-        tramp_phys_2 as u32
-    );
 
     let mut task = Task::new(
         AddressSpace::new(

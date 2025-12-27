@@ -22,12 +22,18 @@ pub const SYSCALL_TRANSFER: u32 = 9;
 pub const SYSCALL_BALANCE: u32 = 10;
 pub const SYSCALL_BRK: u32 = 214;
 
-pub fn dispatch_syscall(call_id: u32, args: [u32; 6]) -> u32 {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CallerMode {
+    User,
+    Supervisor,
+}
+
+pub fn dispatch_syscall(call_id: u32, args: [u32; 6], caller_mode: CallerMode) -> u32 {
     match call_id {
         SYSCALL_STORAGE_GET => sys_storage_get(args),
         SYSCALL_STORAGE_SET => sys_storage_set(args),
         SYSCALL_PANIC => sys_panic(args),
-        SYSCALL_LOG => sys_log(args),
+        SYSCALL_LOG => sys_log(args, caller_mode),
         SYSCALL_CALL_PROGRAM => sys_call_program(args),
         SYSCALL_FIRE_EVENT => sys_fire_event(args),
         SYSCALL_ALLOC => sys_alloc(args),
@@ -52,8 +58,12 @@ fn sys_storage_set(_args: [u32; 6]) -> u32 {
     0
 }
 
-fn sys_log(_args: [u32; 6]) -> u32 {
-    log!("sys_log: need implementation");
+fn sys_log(_args: [u32; 6], caller_mode: CallerMode) -> u32 {
+    if caller_mode == CallerMode::Supervisor {
+        log!("kernel: sys_log: need implementation");
+    } else {
+        log!("guest: sys_log: need implementation");
+    }
     0
 }
 

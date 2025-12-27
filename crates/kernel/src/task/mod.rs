@@ -16,7 +16,7 @@
 // - TRAMPOLINE_VA is one page immediately after the user window, mapped into both
 //   the kernel root and the new user root. It contains two instructions:
 //     csrw satp, t0
-//     jr   t1
+//     sret
 //   This lets us switch satp safely from a VA that stays valid across the root change.
 //
 // prep_program_task(to, from, code, input, entry_off):
@@ -32,10 +32,10 @@
 //
 // run_task(task):
 // - Save the current kernel frame (sp/ra/pc) into TASKS[0] for a future return path.
-// - Preload t0 with the task root (satp value) and t1 with the user PC; load
-//   user sp and a0..a3; clear ra.
+// - Preload t0 with the task root (satp value); load user sp and a0..a3; clear ra.
+// - Set sepc to the user PC and clear sstatus.SPP so sret enters user mode.
 // - jr TRAMPOLINE_VA. The trampoline executes under the old root, writes satp
-//   to the new root, and immediately jr t1 into user code. There is no return
+//   to the new root, and executes sret into user code. There is no return
 //   path yet; this is a one-way handoff.
 //
 // Notes:
@@ -82,13 +82,12 @@ const REG_A2: usize = 12;
 const REG_A3: usize = 13;
 // Raw RISC-V words for the trampoline used to switch satp safely while
 // executing from a page mapped in both the kernel and user roots. The kernel
-// loads t0 = target satp and t1 = user PC before entering this stub so we can
-// change roots and immediately branch to user code without returning to
-// unmapped kernel text.
-// t0: target satp value, t1: user PC (jump target).
+// loads t0 = target satp before entering this stub so we can change roots
+// and return to user mode at sepc without returning to unmapped kernel text.
+// t0: target satp value.
 const TRAMPOLINE_CODE: [u32; 2] = [
     0x1802_9073, // csrw satp, t0
-    0x0003_0067, // jr t1
+    0x1020_0073, // sret
 ];
 
 const TO_PTR_ADDR: u32 = 0x120;

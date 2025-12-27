@@ -4,6 +4,8 @@ use program::{log, logf};
 use crate::syscall;
 
 const SCAUSE_ECALL_FROM_U: usize = 8;
+const SCAUSE_ECALL_FROM_S: usize = 9;
+const SSTATUS_SPP: u32 = 1 << 8;
 const SAVED_REG_COUNT: usize = 11;
 
 /// Install the kernel trap vector and set up the kernel stack for traps.
@@ -80,14 +82,6 @@ pub extern "C" fn handle_trap(saved: *mut u32) {
     let sp: u32;
     unsafe { asm!("mv {0}, sp", out(reg) sp); }
     
-    // logf!(
-    //     "trap_entry: scause=0x%x stval=0x%x sepc=0x%x satp=0x%x sp=0x%x",
-    //     scause as u32,
-    //     stval as u32,
-    //     sepc,
-    //     satp,
-    //     sp
-    // );
     let is_interrupt = (scause >> 31) != 0;
     if is_interrupt {
         panic!(
@@ -98,7 +92,7 @@ pub extern "C" fn handle_trap(saved: *mut u32) {
 
     let code = scause & 0xfff;
     match code {
-        SCAUSE_ECALL_FROM_U => {
+        SCAUSE_ECALL_FROM_U | SCAUSE_ECALL_FROM_S => {
             let args = [
                 regs[3], // a1
                 regs[4], // a2
@@ -108,7 +102,12 @@ pub extern "C" fn handle_trap(saved: *mut u32) {
                 regs[8], // a6
             ];
             let call_id = regs[9]; // a7
-            let ret = syscall::dispatch_syscall(call_id, args);
+            let caller_mode = if read_sstatus() & SSTATUS_SPP != 0 {
+                syscall::CallerMode::Supervisor
+            } else {
+                syscall::CallerMode::User
+            };
+            let ret = syscall::dispatch_syscall(call_id, args, caller_mode);
             regs[2] = ret; // a0 return value
             regs[0] = regs[0].wrapping_add(4); // Advance past ecall
         }
@@ -127,6 +126,13 @@ fn read_scause() -> usize {
 fn read_satp() -> u32 {
     let value: u32;
     unsafe { asm!("csrr {0}, satp", out(reg) value); }
+    value
+}
+
+#[inline(always)]
+fn read_sstatus() -> u32 {
+    let value: u32;
+    unsafe { asm!("csrr {0}, sstatus", out(reg) value); }
     value
 }
 

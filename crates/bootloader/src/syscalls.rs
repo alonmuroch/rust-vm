@@ -124,6 +124,7 @@ impl SyscallHandler for DefaultSyscallHandler {
         &mut self,
         call_id: u32,
         args: [u32; 6],
+        caller_mode: vm::cpu::PrivilegeMode,
         memory: Memory,
         host: &mut Box<dyn HostInterface>,
         regs: &mut [u32; 32],
@@ -136,7 +137,7 @@ impl SyscallHandler for DefaultSyscallHandler {
             SYSCALL_STORAGE_GET => self.sys_storage_get(args, memory, metering),
             SYSCALL_STORAGE_SET => self.sys_storage_set(args, memory, metering),
             SYSCALL_PANIC => self.sys_panic_with_message(regs, memory),
-            SYSCALL_LOG => self.sys_log(args, memory, metering),
+            SYSCALL_LOG => self.sys_log(args, caller_mode, memory, metering),
             SYSCALL_CALL_PROGRAM => self.sys_call_program(args, memory, host, metering),
             SYSCALL_FIRE_EVENT => self.sys_fire_event(args, memory, host, metering),
             SYSCALL_ALLOC => self.sys_alloc(args, memory, metering),
@@ -475,7 +476,13 @@ impl DefaultSyscallHandler {
         panic!("🔥 Guest panic: {}", msg);
     }
 
-    fn sys_log(&mut self, args: [u32; 6], memory: Memory, metering: &mut dyn Metering) -> u32 {
+    fn sys_log(
+        &mut self,
+        args: [u32; 6],
+        caller_mode: vm::cpu::PrivilegeMode,
+        memory: Memory,
+        metering: &mut dyn Metering,
+    ) -> u32 {
         let [fmt_ptr, fmt_len, arg_ptr, arg_len, ..] = args;
         let payload_len = fmt_len.saturating_add(arg_len) as usize;
         if matches!(
@@ -668,12 +675,16 @@ impl DefaultSyscallHandler {
                 output.push(c);
             }
         }
+        let prefix = match caller_mode {
+            vm::cpu::PrivilegeMode::Supervisor => "🛡️ Kernel",
+            vm::cpu::PrivilegeMode::User => "📜 Guest",
+        };
         match &self.verbose_writer {
             Some(writer) => {
-                let _ = writeln!(writer.borrow_mut(), "📜 Guest Log: {}", output);
+                let _ = writeln!(writer.borrow_mut(), "{}: {}", prefix, output);
             }
             None => {
-                println!("📜 Guest Log: {}", output);
+                println!("{}: {}", prefix, output);
             }
         }
         0

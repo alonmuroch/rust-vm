@@ -21,6 +21,7 @@ fn test_allocator_syscalls() {
     let (result, _) = syscall_handler.handle_syscall(
         SYSCALL_ALLOC,
         args,
+        vm::cpu::PrivilegeMode::Supervisor,
         memory.clone(),
         &mut host,
         &mut regs,
@@ -34,6 +35,7 @@ fn test_allocator_syscalls() {
     let (dealloc_result, _) = syscall_handler.handle_syscall(
         SYSCALL_DEALLOC,
         dealloc_args,
+        vm::cpu::PrivilegeMode::Supervisor,
         memory.clone(),
         &mut host,
         &mut regs,
@@ -62,6 +64,7 @@ fn test_multiple_allocations() {
         let (ptr, _) = syscall_handler.handle_syscall(
             SYSCALL_ALLOC,
             args,
+            vm::cpu::PrivilegeMode::Supervisor,
             memory.clone(),
             &mut host,
             &mut regs,
@@ -102,6 +105,7 @@ fn test_alignment_requirements() {
         let (ptr, _) = syscall_handler.handle_syscall(
             SYSCALL_ALLOC,
             args,
+            vm::cpu::PrivilegeMode::Supervisor,
             memory.clone(),
             &mut host,
             &mut regs,
@@ -130,6 +134,7 @@ fn test_invalid_alignment() {
         let (ptr, _) = syscall_handler.handle_syscall(
             SYSCALL_ALLOC,
             args,
+            vm::cpu::PrivilegeMode::Supervisor,
             memory.clone(),
             &mut host,
             &mut regs,

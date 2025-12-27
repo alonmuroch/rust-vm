@@ -12,11 +12,20 @@ use std::rc::Rc;
 mod exec;
 
 pub const CSR_SATP: u16 = 0x180;
+pub const CSR_SSTATUS: u16 = 0x100;
 pub const CSR_STVEC: u16 = 0x105;
 pub const CSR_SEPC: u16 = 0x141;
 pub const CSR_SCAUSE: u16 = 0x142;
 pub const CSR_STVAL: u16 = 0x143;
 const SCAUSE_ECALL_FROM_U: u32 = 8;
+const SCAUSE_ECALL_FROM_S: u32 = 9;
+const SSTATUS_SPP: u32 = 1 << 8;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PrivilegeMode {
+    User,
+    Supervisor,
+}
 
 /// Represents the Central Processing Unit (CPU) of our RISC-V virtual machine.
 /// 
@@ -84,6 +93,9 @@ pub struct CPU {
 
     /// Minimal CSR storage for CSR instructions
     pub csrs: HashMap<u16, u32>,
+
+    /// Current privilege mode (minimal U/S support).
+    pub priv_mode: PrivilegeMode,
 }
 
 impl std::fmt::Debug for CPU {
@@ -130,6 +142,7 @@ impl CPU {
             verbose_writer: None,
             metering,
             csrs: HashMap::new(),
+            priv_mode: PrivilegeMode::Supervisor,
         }
     }
     
@@ -175,6 +188,7 @@ impl CPU {
             0xF11 | 0xF12 | 0xF13 => *self.csrs.get(&csr).unwrap_or(&0), // mvendorid/marchid/mimpid
             0x301 => *self.csrs.get(&csr).unwrap_or(&0), // misa
             0x300 => *self.csrs.get(&csr).unwrap_or(&0), // mstatus
+            CSR_SSTATUS => *self.csrs.get(&csr).unwrap_or(&0),
             _ => *self.csrs.get(&csr).unwrap_or(&0),
         })
     }
@@ -192,6 +206,34 @@ impl CPU {
         self.write_csr(CSR_SATP, value)
     }
 
+    fn set_sstatus_spp(&mut self, prev: PrivilegeMode) {
+        let mut sstatus = self.read_csr(CSR_SSTATUS).unwrap_or(0);
+        match prev {
+            PrivilegeMode::User => sstatus &= !SSTATUS_SPP,
+            PrivilegeMode::Supervisor => sstatus |= SSTATUS_SPP,
+        }
+        let _ = self.write_csr(CSR_SSTATUS, sstatus);
+    }
+
+    fn take_sstatus_spp(&mut self) -> PrivilegeMode {
+        let mut sstatus = self.read_csr(CSR_SSTATUS).unwrap_or(0);
+        let prev = if sstatus & SSTATUS_SPP != 0 {
+            PrivilegeMode::Supervisor
+        } else {
+            PrivilegeMode::User
+        };
+        sstatus &= !SSTATUS_SPP;
+        let _ = self.write_csr(CSR_SSTATUS, sstatus);
+        prev
+    }
+
+    fn ecall_cause(&self) -> u32 {
+        match self.priv_mode {
+            PrivilegeMode::User => SCAUSE_ECALL_FROM_U,
+            PrivilegeMode::Supervisor => SCAUSE_ECALL_FROM_S,
+        }
+    }
+
     fn trap_to_vector(&mut self, cause: u32, trap_value: u32, syscall_id: Option<u32>) -> bool {
         if !self.write_csr(CSR_SEPC, self.pc) {
             panic!("trap_to_vector: failed to write sepc");
@@ -206,6 +248,8 @@ impl CPU {
             Some(val) => val & !0x3,
             None => return false,
         };
+        self.set_sstatus_spp(self.priv_mode);
+        self.priv_mode = PrivilegeMode::Supervisor;
         self.set_pc(stvec)
     }
 

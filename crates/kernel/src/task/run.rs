@@ -4,6 +4,8 @@ use program::logf;
 
 use super::{REG_A0, REG_A1, REG_A2, REG_A3, REG_RA, REG_SP, TRAMPOLINE_VA};
 
+const SSTATUS_SPP: u32 = 1 << 8;
+
 /// One-way context switch into a user task:
 /// - Saves the current kernel frame into TASKS[0]
 /// - Loads the task's satp/regs/pc and jumps to user code (no return path yet)
@@ -65,6 +67,16 @@ pub fn run_task(task_idx: usize) {
             kernel_task.tf.pc = saved_pc;
         }
     }
+    // Prepare to enter user mode via sret: set sepc and clear sstatus.SPP.
+    let mut sstatus: u32;
+    unsafe {
+        core::arch::asm!("csrr {0}, sstatus", out(reg) sstatus);
+    }
+    sstatus &= !SSTATUS_SPP;
+    unsafe {
+        core::arch::asm!("csrw sstatus, {0}", in(reg) sstatus);
+        core::arch::asm!("csrw sepc, {0}", in(reg) pc);
+    }
     // Update the helper's view of the current root before switching.
     mmu::set_current_root(target_root);
     // Set up registers and jump to the shared trampoline page (mapped in both
@@ -76,7 +88,6 @@ pub fn run_task(task_idx: usize) {
             "mv sp, t2",
             "jr t3",
             in("t0") target_root,
-            in("t1") pc,
             in("a0") a0,
             in("a1") a1,
             in("a2") a2,

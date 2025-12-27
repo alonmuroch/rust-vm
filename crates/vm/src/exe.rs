@@ -796,7 +796,7 @@ impl CPU {
                 if self.has_trap_vector() {
                     // Bypass trap for logging syscalls so they execute directly.
                     if call_id != SYSCALL_LOG {
-                        if !self.trap_to_vector(SCAUSE_ECALL_FROM_U, 0, Some(call_id)) {
+                        if !self.trap_to_vector(self.ecall_cause(), 0, Some(call_id)) {
                             panic!(
                                 "trap_to_vector returned false for ecall id={} pc=0x{:08x}",
                                 call_id, self.pc
@@ -808,6 +808,7 @@ impl CPU {
                 let (result, cont) = self.syscall_handler.handle_syscall(
                     call_id,
                     args,
+                    self.priv_mode,
                     memory,
                     host,
                     &mut self.regs,
@@ -883,9 +884,11 @@ impl CPU {
                     Some(v) => v,
                     None => return false,
                 };
+                let prev = self.take_sstatus_spp();
                 if !self.set_pc(target) {
                     return false;
                 }
+                self.priv_mode = prev;
                 return true;
             }
 
