@@ -49,11 +49,6 @@ pub(crate) fn sys_panic_with_message(msg_ptr: u32, msg_len: u32) -> u32 {
     }
 
     let msg = &buf[..dst_off];
-    logf!(
-        "sys_panic: %s",
-        msg.as_ptr() as u32,
-        msg.len() as u32
-    );
     if let Ok(s) = core::str::from_utf8(msg) {
         logf!("guest panic: %s", s.as_ptr() as u32, s.len() as u32);
     } else {

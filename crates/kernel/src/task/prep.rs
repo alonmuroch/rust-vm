@@ -54,8 +54,7 @@ pub fn prep_program_task(
     );
     let perms = mmu::PagePerms::user_rwx();
     if !mmu::map_user_range_for_root(root_ppn, PROGRAM_VA_BASE, PROGRAM_WINDOW_BYTES, perms) {
-        logf!("launch_program: mapping failed (root=0x%x)", root_ppn);
-        return None;
+        panic!("launch_program: mapping failed (root=0x{:x})", root_ppn);
     }
 
     // Copy the full program image starting at VA 0 so section offsets (e.g. .text at 0x400)

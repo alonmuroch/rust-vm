@@ -23,13 +23,6 @@ pub(crate) fn sys_alloc(args: [u32; 6]) -> u32 {
             return 0;
         }
     };
-    logf!(
-        "sys_alloc: size=0x%x align=0x%x heap_ptr=0x%x task=%d",
-        size,
-        align,
-        task.heap_ptr,
-        current as u32
-    );
 
     let mask = align - 1;
     let start = match task.heap_ptr.checked_add(mask) {

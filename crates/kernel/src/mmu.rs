@@ -59,6 +59,14 @@ impl PageAllocator {
     pub fn limit_ppn(&self) -> u32 {
         self.limit_ppn
     }
+
+    pub fn next_ppn(&self) -> u32 {
+        self.next_ppn
+    }
+
+    pub fn remaining_ppn(&self) -> u32 {
+        self.limit_ppn.saturating_sub(self.next_ppn)
+    }
 }
 
 /// Return the kernel's current root PPN (satp PPN field).
@@ -110,9 +118,33 @@ pub fn total_ppn() -> Option<u32> {
 
 /// Map a user-visible virtual range with the provided permissions into a specific root.
 pub fn map_user_range_for_root(root_ppn: u32, va_start: u32, len: usize, perms: PagePerms) -> bool {
+    if len == 0 {
+        return true;
+    }
     let alloc = unsafe { PAGE_ALLOC.get_mut() };
     match alloc {
         Some(alloc) => {
+            let page_size = PAGE_SIZE;
+            let start = align_down_local(va_start as usize, page_size);
+            let end = match (va_start as usize).checked_add(len) {
+                Some(v) => align_up_local(v, page_size),
+                None => return false,
+            };
+            let page_count = (end - start) / page_size;
+            let vpn1_start = ((start as u32) >> 22) & SV32_VPN_MASK;
+            let vpn1_end = (((end - 1) as u32) >> 22) & SV32_VPN_MASK;
+            let l2_tables = vpn1_end
+                .checked_sub(vpn1_start)
+                .map(|v| v as usize + 1)
+                .unwrap_or(0);
+            let needed = page_count + l2_tables;
+            let available = alloc.remaining_ppn() as usize;
+            if needed > available {
+                panic!(
+                    "map_user_range_for_root: out of physical memory (need {} pages, have {})",
+                    needed, available
+                );
+            }
             let mapper = KernelMapper::new(alloc);
             map_allocating(&mapper, root_ppn, va_start, len, perms)
         }

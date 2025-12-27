@@ -3,6 +3,7 @@ use alloc::format;
 use kernel::{prep_program_task, run_task, Config, PROGRAM_WINDOW_BYTES};
 use kernel::global::{STATE, TASKS};
 use program::{log, logf};
+use program::parser::HexCodec;
 use state::State;
 use types::transaction::Transaction;
 
@@ -56,15 +57,18 @@ pub(crate) fn program_call(tx: &Transaction) {
         );
     }
 
+    let mut from_buf = [0u8; 40];
+    let mut to_buf = [0u8; 40];
+    let from_hex = HexCodec::encode(tx.from.as_ref(), &mut from_buf);
+    let to_hex = HexCodec::encode(tx.to.as_ref(), &mut to_buf);
     logf!(
-        "%s",
-        display: format!(
-            "Program call: from={} to={} input_len={} code_len={}",
-            tx.from,
-            tx.to,
-            tx.data.len(),
-            code_len
-        )
+        "Program call: from=%s to=%s input_len=%d code_len=%d",
+        from_hex.as_ptr() as u32,
+        from_hex.len() as u32,
+        to_hex.as_ptr() as u32,
+        to_hex.len() as u32,
+        tx.data.len() as u32,
+        code_len as u32
     );
 
     let entry_off = first_nz as u32;

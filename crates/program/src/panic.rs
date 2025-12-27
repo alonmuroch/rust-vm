@@ -27,10 +27,20 @@ pub fn vm_panic(msg: &[u8]) -> ! {
 #[cfg(all(target_arch = "riscv32", feature = "guest_handlers"))]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
-    let msg_bytes = if let Some(s) = info.message().as_str() {
-        s.as_bytes()
-    } else {
-        b"guest panic"
+    use core::fmt::Write;
+
+    let mut buf = [0u8; 256];
+    let len = {
+        let mut writer = crate::BufferWriter::new(&mut buf);
+        if write!(&mut writer, "{}", info).is_ok() {
+            writer.len()
+        } else {
+            0
+        }
     };
-    vm_panic(msg_bytes);
+    if len == 0 {
+        vm_panic(b"guest panic");
+    } else {
+        vm_panic(&buf[..len]);
+    }
 }

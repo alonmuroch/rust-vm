@@ -206,23 +206,6 @@ impl CPU {
             Some(val) => val & !0x3,
             None => return false,
         };
-        if let Some(syscall_id) = syscall_id {
-            self.log(
-                &format!(
-                    "trap_to_vector: pc=0x{:08x} -> stvec=0x{:08x} cause=0x{:x} stval=0x{:x} syscall=0x{:x}",
-                    self.pc, stvec, cause, trap_value, syscall_id
-                ),
-                false,
-            );
-        } else {
-            self.log(
-                &format!(
-                    "trap_to_vector: pc=0x{:08x} -> stvec=0x{:08x} cause=0x{:x} stval=0x{:x}",
-                    self.pc, stvec, cause, trap_value
-                ),
-                false,
-            );
-        }
         self.set_pc(stvec)
     }
 
