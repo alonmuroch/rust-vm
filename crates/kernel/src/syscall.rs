@@ -4,6 +4,7 @@
 use program::{log, logf};
 
 use crate::global::{CURRENT_TASK, TASKS};
+use crate::mmu;
 
 pub const SYSCALL_STORAGE_GET: u32 = 1;
 pub const SYSCALL_STORAGE_SET: u32 = 2;
@@ -106,6 +107,11 @@ fn sys_alloc(args: [u32; 6]) -> u32 {
         }
     };
 
+    let len = end.saturating_sub(start) as usize;
+    if !mmu::map_kernel_range(start, len, mmu::PagePerms::kernel_rw()) {
+        log!("sys_alloc: failed to map heap range");
+        return 0;
+    }
     task.heap_ptr = end;
     start
 }

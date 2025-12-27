@@ -7,6 +7,7 @@ use crate::create_account::create_account;
 use crate::program_call::program_call;
 
 pub(crate) fn process_bundle(encoded_bundle: &[u8]) {
+    log!("processing transaction bundle");
     if let Some(bundle) = TransactionBundle::decode(encoded_bundle) {
         let count = bundle.transactions.len();
         logf!("decoded tx count=%d", count as u32);

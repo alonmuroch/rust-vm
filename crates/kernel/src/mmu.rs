@@ -126,6 +126,24 @@ pub fn map_user_range(va_start: u32, len: usize, perms: PagePerms) -> bool {
     map_user_range_for_root(root, va_start, len, perms)
 }
 
+/// Map a kernel-only virtual range with the provided permissions into a specific root.
+pub fn map_kernel_range_for_root(root_ppn: u32, va_start: u32, len: usize, perms: PagePerms) -> bool {
+    let alloc = unsafe { PAGE_ALLOC.get_mut() };
+    match alloc {
+        Some(alloc) => {
+            let mapper = KernelMapper::new(alloc);
+            map_allocating(&mapper, root_ppn, va_start, len, perms)
+        }
+        None => false,
+    }
+}
+
+/// Map a kernel-only virtual range with the provided permissions into the current root.
+pub fn map_kernel_range(va_start: u32, len: usize, perms: PagePerms) -> bool {
+    let root = unsafe { *ROOT_PPN.get_mut() };
+    map_kernel_range_for_root(root, va_start, len, perms)
+}
+
 /// Map a VA range in `root_ppn` to an explicit physical range (no allocation).
 pub fn map_physical_range_for_root(
     root_ppn: u32,
